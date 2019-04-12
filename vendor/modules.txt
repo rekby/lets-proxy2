@@ -13,3 +13,5 @@ go.uber.org/zap/zapcore
 go.uber.org/zap/buffer
 go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
+# golang.org/x/crypto v0.0.0-20190411191339-88737f569e3a
+golang.org/x/crypto/acme
