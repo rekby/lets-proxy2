@@ -1,3 +1,8 @@
 module github.com/rekby/lets-proxy2
 
 go 1.12
+
+require (
+	github.com/pelletier/go-toml v1.3.0
+	github.com/rekby/zapcontext v0.0.2
+)
