@@ -1,6 +1,6 @@
 # github.com/pelletier/go-toml v1.3.0
 github.com/pelletier/go-toml
-# github.com/rekby/zapcontext v0.0.2
+# github.com/rekby/zapcontext v0.0.3
 github.com/rekby/zapcontext
 # go.uber.org/atomic v1.3.2
 go.uber.org/atomic
