@@ -7,15 +7,16 @@ go:
 env:
   global:
     - GO111MODULE=on
-  matrix:
-    - GOFLAGS=-mod=vendor
-    - GOFLAGS=
 
 matrix:
-  exclude:
-  - go: "master"
-    env:
-      - GOFLAGS=-mod=vendor
+  include:
+    - env: GOFLAGS=-mod=vendor
+    - env: GOFLAGS=
+    - go: "master"
+      env: GOFLAGS=
+  fast_finish: true
+  allow_failures:
+    - go: "master"
 
 services:
   - docker
