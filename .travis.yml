@@ -1,0 +1,10 @@
+language: go
+go:
+  - "1.12"
+
+services:
+  - docker
+
+script:
+  - bash tests/prepare.sh
+  - go test -v ./...
