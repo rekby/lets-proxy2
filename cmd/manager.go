@@ -250,8 +250,16 @@ func (m *Manager) issueCertificate(ctx context.Context, domain string) (*tls.Cer
 	}, nil
 }
 
-func (m *Manager) revokePendingAuthorizations(revokeContext context.Context, strings []string) {
-	// TODO:
+func (m *Manager) revokePendingAuthorizations(ctx context.Context, uries []string) {
+	logger := zc.L(ctx)
+	for _, uri := range uries {
+		err := m.Client.RevokeAuthorization(ctx, uri)
+		if err == nil {
+			logger.Debug("Revoke authorization ok", zap.String("uri", uri))
+		} else {
+			logger.Error("Can't revoke authorization", zap.String("uri", uri), zap.Error(err))
+		}
+	}
 }
 
 func (m *Manager) domainKeyGet(ctx context.Context, domain string) (crypto.Signer, error) {
