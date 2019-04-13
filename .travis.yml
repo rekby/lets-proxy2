@@ -2,7 +2,7 @@ language: go
 
 go:
   - "1.12"
-  - "tip"
+  - "master"
 
 env:
   - GOMODULE111=on
