@@ -25,9 +25,12 @@ services:
 
 install:
   - bash tests/prepare.sh
-  - go get -mod= golang.org/x/tools/cmd/cover
-  - go get -mod= github.com/mattn/goveralls
 
 script:
   - go test -v -covermode=count -coverprofile=coverage.out ./...
+
+after_script:
+  # Install and upload test coverage must not failure for test build
+  - go get -mod= golang.org/x/tools/cmd/cover
+  - go get -mod= github.com/mattn/goveralls
   - goveralls -coverprofile=coverage.out -service=travis-ci -repotoken $COVERALLS_TOKEN
