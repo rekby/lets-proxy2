@@ -7,7 +7,7 @@ cd $GOPATH/src/github.com/letsencrypt/boulder
 
 docker-compose build
 
-docker-compose run --use-aliases -e FAKE_DNS=172.17.0.1 --service-ports boulder ./start.py
+docker-compose run -d --use-aliases --service-ports boulder ./start.py
 
 echo -n "Wait for bounder start listen "
 date
