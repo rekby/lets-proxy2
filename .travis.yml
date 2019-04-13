@@ -1,18 +1,18 @@
 language: go
 
+go:
+  - "stable"
+  - "master"
+
 env:
   global:
     - GO111MODULE=on
-    - VERSION=$TRAVIS_TAG commit $TRAVIS_COMMIT
+  matrix:
+    - GOFLAGS=-mod=vendor
+    - GOFLAGS=
 
 matrix:
-  include:
-  - go: "stable"
-    env:
-      - GOFLAGS=-mod=vendor
-  - go: "stable"
-    env:
-      - GOFLAGS=
+  exclude:
   - go: "master"
     env:
       - GOFLAGS=-mod=vendor
