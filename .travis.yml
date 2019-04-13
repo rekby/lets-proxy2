@@ -4,7 +4,7 @@ go:
   - "1.12"
 
 env:
-  -GOMODULE111=on
+  - GOMODULE111=on
 
 services:
   - docker
