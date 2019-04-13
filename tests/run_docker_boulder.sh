@@ -5,9 +5,9 @@ GOPATH=$(go env GOPATH)
 git clone https://github.com/letsencrypt/boulder/ $GOPATH/src/github.com/letsencrypt/boulder
 cd $GOPATH/src/github.com/letsencrypt/boulder
 
-docker-compose build
+sed -i -e 's/FAKE_DNS.*/FAKE_DNS: 172.17.0.1/' docker-compose.yml
 
-docker-compose run -d --use-aliases --service-ports boulder ./start.py
+docker-compose up -d
 
 echo -n "Wait for bounder start listen "
 date
