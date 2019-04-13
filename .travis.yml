@@ -5,7 +5,12 @@ go:
   - "master"
 
 env:
-  - GOMODULE111=on
+  global:
+    - GOMODULE111=on
+    - VERSION=$TRAVIS_TAG commit $TRAVIS_COMMIT
+  matrix:
+    - GOFLAGS=-mod=vendor
+    - GOFLAGS=
 
 services:
   - docker

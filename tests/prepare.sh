@@ -1,6 +1,8 @@
 #!/bin/bash
 set -ev
 
+echo $VERSION
+
 go version
 
 go env
