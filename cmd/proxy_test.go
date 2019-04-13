@@ -124,7 +124,7 @@ func TestProxyTLS(t *testing.T) {
 }
 
 func dummyGetCertificate(info *tls.ClientHelloInfo) (certificate *tls.Certificate, e error) {
-	key, _ := rsa.GenerateKey(rand.Reader, 512)
+	key, _ := rsa.GenerateKey(rand.Reader, 2048)
 
 	certTemplate := &x509.Certificate{
 		SerialNumber: big.NewInt(123),
