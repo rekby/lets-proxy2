@@ -1,4 +1,6 @@
 #!/bin/bash
+set -ev
+
 go version
 
 go env

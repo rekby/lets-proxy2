@@ -1,4 +1,6 @@
 #!/bin/bash
+set -ev
+
 GOPATH=$(go env GOPATH)
 git clone https://github.com/letsencrypt/boulder/ $GOPATH/src/github.com/letsencrypt/boulder
 cd $GOPATH/src/github.com/letsencrypt/boulder
