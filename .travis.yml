@@ -7,13 +7,13 @@ go:
 env:
   global:
     - GO111MODULE=on
-
+  matrix:
+    - GOFLAGS=
+    - GOFLAGS=-mod=vendor
 matrix:
-  include:
-    - env: GOFLAGS=-mod=vendor
-    - env: GOFLAGS=
+  exclude:
     - go: "master"
-      env: GOFLAGS=
+      env: GOFLAGS=-mod=vendor
   fast_finish: true
   allow_failures:
     - go: "master"
