@@ -2,7 +2,7 @@ language: go
 
 env:
   global:
-    - GOMODULE111=on
+    - GO111MODULE=on
     - VERSION=$TRAVIS_TAG commit $TRAVIS_COMMIT
 
 matrix:
