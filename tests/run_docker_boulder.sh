@@ -13,7 +13,9 @@ docker-compose up -d
 
 echo -n "Wait for bounder start listen "
 date
+
 while ! curl -q http://localhost:4000 >/dev/null 2>&1; do
     sleep 1
 done
 
+date
