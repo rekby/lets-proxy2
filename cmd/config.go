@@ -9,8 +9,9 @@ import (
 )
 
 type configType struct {
-	A              int `toml:"-" comment:"sss"`
-	ListenHttpPort int `default:"0" comment:"Port for listen and proxy http traffic. 0 for disable."`
+	IssueTimeout           int    `default:"300" comment:"Seconds for issue every certificate. Cancel issue and return error if timeout."`
+	AutoIssueForSubdomains string `default:"www" comment:"Comma separated for subdomains for try get common used subdomains in one certificate."`
+	ListenHttpPort         int    `default:"5" comment:"Port for listen and proxy http traffic. 0 for disable."`
 }
 
 var (
