@@ -64,7 +64,7 @@ func TestManager_GetCertificate(t *testing.T) {
 
 	cert, err := manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain})
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
 	if cert.Leaf.NotBefore.After(time.Now()) {
