@@ -6,5 +6,9 @@ import (
 )
 
 func init() {
-	zc.SetDefaultLogger(zap.NewNop())
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+	zc.SetDefaultLogger(logger)
 }
