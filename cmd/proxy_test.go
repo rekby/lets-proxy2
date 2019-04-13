@@ -15,14 +15,7 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/rekby/zapcontext"
-	"go.uber.org/zap"
 )
-
-func init() {
-	zc.SetDefaultLogger(zap.NewNop())
-}
 
 func TestProxyListener(t *testing.T) {
 	listener := listenerType{connections: make(chan net.Conn)}

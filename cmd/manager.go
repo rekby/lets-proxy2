@@ -2,13 +2,19 @@ package main
 
 import (
 	"context"
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"errors"
+	"sync"
+	"time"
+
 	"github.com/rekby/zapcontext"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/acme"
-	"sync"
-	"time"
 )
 
 const (
@@ -16,7 +22,8 @@ const (
 )
 
 var (
-	allowedChallenges = []string{tlsAlpn01}
+	allowedChallenges  = []string{tlsAlpn01}
+	domainKeyRSALength = 2048
 )
 
 var ErrCacheMiss = errors.New("lets proxy: certificate cache miss")
@@ -74,6 +81,7 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, 
 			logger.Warn("Doesn't have token for request domain")
 			return nil, haveNoCert
 		}
+		return cert, nil
 	}
 
 	// TODO: check cache
@@ -208,11 +216,55 @@ func (m *Manager) authorizeDomain(ctx context.Context, domain string) error {
 
 func (m *Manager) issueCertificate(ctx context.Context, domain string) (*tls.Certificate, error) {
 	// TODO: issue certificate for many domains same time
-	return nil, notImplementedError
+	logger := zc.L(ctx).With(logDomain(domain))
+
+	key, err := m.domainKeyGet(ctx, domain)
+	if err != nil {
+		logger.Error("Can't get domain key", zap.Error(err))
+		return nil, err
+	}
+	csr, err := createCertRequest(key, domain, domain)
+	der, _, err := m.Client.CreateCert(ctx, csr, 0, true)
+
+	if err != nil {
+		logger.Error("Can't issue certificate", zap.Error(err))
+		return nil, err
+	}
+
+	cert, err := validCert([]string{domain}, der, key, time.Now())
+
+	if err == nil {
+		logger.Info("Certificated issued", zap.Time("not_before", cert.NotBefore),
+			zap.Time("not_after", cert.NotAfter), zap.String("common_name", cert.Subject.CommonName),
+			zap.Strings("domains", cert.DNSNames), zap.String("serial_number", cert.Subject.SerialNumber),
+		)
+	} else {
+		logger.Error("Receive invalid certificate", zap.Error(err))
+		return nil, err
+	}
+
+	return &tls.Certificate{
+		PrivateKey:  key,
+		Certificate: der,
+		Leaf:        cert,
+	}, nil
 }
 
 func (m *Manager) revokePendingAuthorizations(revokeContext context.Context, strings []string) {
 	// TODO:
+}
+
+func (m *Manager) domainKeyGet(ctx context.Context, domain string) (crypto.Signer, error) {
+	//TODO: load/save with cache
+	logger := zc.L(ctx)
+	logger.Debug("Generate new rsa key")
+	key, err := rsa.GenerateKey(rand.Reader, domainKeyRSALength)
+	if err == nil {
+		return key, nil
+	}
+
+	logger.Error("Can't generate rsa key", zap.Error(err))
+	return nil, err
 }
 
 func (m *Manager) fulfill(ctx context.Context, challenge *acme.Challenge, domain string) (func(context.Context), error) {
@@ -245,6 +297,10 @@ func (m *Manager) putCertToken(ctx context.Context, key string, certificate *tls
 
 	m.tokensMu.Lock()
 	defer m.tokensMu.Unlock()
+
+	if m.tokens == nil {
+		m.tokens = make(map[string]*tls.Certificate)
+	}
 
 	_, overwriteToken = m.tokens[key]
 	m.tokens[key] = certificate
@@ -279,4 +335,59 @@ func pickChallenge(typ string, chal []*acme.Challenge) *acme.Challenge {
 		}
 	}
 	return nil
+}
+
+func createCertRequest(key crypto.Signer, commonName string, dnsNames ...string) ([]byte, error) {
+	req := &x509.CertificateRequest{
+		Subject:  pkix.Name{CommonName: commonName},
+		DNSNames: dnsNames,
+	}
+	return x509.CreateCertificateRequest(rand.Reader, req, key)
+}
+
+// Return valid parced certificate or error
+func validCert(domains []string, der [][]byte, key crypto.Signer, now time.Time) (leaf *x509.Certificate, err error) {
+	// parse public part(s)
+	var n int
+	for _, b := range der {
+		n += len(b)
+	}
+	pub := make([]byte, n)
+	n = 0
+	for _, b := range der {
+		n += copy(pub[n:], b)
+	}
+	x509Cert, err := x509.ParseCertificates(pub)
+	if err != nil || len(x509Cert) == 0 {
+		return nil, errors.New("no public key found")
+	}
+	// verify the leaf is not expired and matches the domain name
+	leaf = x509Cert[0]
+	if now.Before(leaf.NotBefore) {
+		return nil, errors.New("certificate is not valid yet")
+	}
+	if now.After(leaf.NotAfter) {
+		return nil, errors.New("expired certificate")
+	}
+
+	for _, domain := range domains {
+		if err := leaf.VerifyHostname(domain); err != nil {
+			return nil, err
+		}
+	}
+
+	// ensure the leaf corresponds to the private key and matches the certKey type
+	switch pub := leaf.PublicKey.(type) {
+	case *rsa.PublicKey:
+		prv, ok := key.(*rsa.PrivateKey)
+		if !ok {
+			return nil, errors.New("private key type does not match public key type")
+		}
+		if pub.N.Cmp(prv.N) != 0 {
+			return nil, errors.New("private key does not match public key")
+		}
+	default:
+		return nil, errors.New("unknown public key algorithm")
+	}
+	return leaf, nil
 }
