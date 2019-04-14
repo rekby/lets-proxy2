@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"errors"
 	"sort"
 	"sync"
 	"testing"
@@ -24,19 +25,19 @@ func TestCertState(t *testing.T) {
 
 	cert := &tls.Certificate{Leaf: &x509.Certificate{Subject: pkix.Name{CommonName: "asd"}}}
 
-	td.CmpNotPanic(t, func() {
-		s.FinishIssue(ctx, cert)
-	})
+	s.FinishIssue(ctx, cert, nil)
 
-	td.CmpDeeply(t, s.Cert(), cert)
+	rCert, rErr := s.Cert()
+	td.CmpDeeply(t, rCert, cert)
+	td.CmpNil(t, rErr)
 
-	cert2 := &tls.Certificate{Leaf: &x509.Certificate{Subject: pkix.Name{CommonName: "asdf"}}}
-
-	td.CmpPanic(t, func() {
-		s.FinishIssue(th.NoLog(ctx), cert2)
-	}, td.NotEmpty())
-
-	td.CmpDeeply(t, s.Cert(), cert2)
+	s = &certState{}
+	err1 := errors.New("1")
+	td.CmpTrue(t, s.StartIssue(ctx))
+	s.FinishIssue(ctx, nil, err1)
+	rCert, rErr = s.Cert()
+	td.CmpNil(t, rCert)
+	td.CmpDeeply(t, rErr, err1)
 
 }
 
@@ -58,6 +59,7 @@ func TestCertStateManyIssuers(t *testing.T) {
 	ctxNoLog := th.NoLog(ctx)
 
 	s := certState{}
+	err1 := errors.New("test noerror")
 
 	lockFunc := func() []lockTimeStruct {
 		res := make([]lockTimeStruct, 0, cnt)
@@ -74,7 +76,7 @@ func TestCertStateManyIssuers(t *testing.T) {
 				item := lockTimeStruct{start: time.Now()}
 				time.Sleep(pause)
 				item.end = time.Now()
-				s.FinishIssue(ctxNoLog, nil)
+				s.FinishIssue(ctxNoLog, nil, err1)
 				res = append(res, item)
 				i = 0 // for check exit
 			}
@@ -144,16 +146,65 @@ func TestCertState_WaitFinishIssue(t *testing.T) {
 	const timeout = time.Millisecond * 10
 
 	ctxTimeout, _ := context.WithTimeout(ctx, timeout)
-	td.CmpNoError(t, s.WaitFinishIssue(ctxTimeout))
+	rCert, rErr := s.WaitFinishIssue(ctxTimeout)
+	td.CmpNil(t, rCert)
+	td.CmpNil(t, rErr)
 
-	s.StartIssue(context.Background())
+	s.StartIssue(ctx)
 	ctxTimeout, _ = context.WithTimeout(ctx, timeout)
-	td.CmpError(t, s.WaitFinishIssue(ctxTimeout))
+	rCert, rErr = s.WaitFinishIssue(ctxTimeout)
+	td.CmpNil(t, rCert)
+	td.CmpError(t, rErr)
 
+	cert1 := &tls.Certificate{Leaf: &x509.Certificate{Subject: pkix.Name{CommonName: "asdasd"}}}
 	go func() {
 		time.Sleep(timeout / 2)
-		s.FinishIssue(ctx, nil)
+		s.FinishIssue(ctx, cert1, nil)
 	}()
-	ctxTimeout, _ = context.WithTimeout(context.Background(), timeout)
-	td.CmpNoError(t, s.WaitFinishIssue(ctxTimeout))
+	ctxTimeout, _ = context.WithTimeout(ctx, timeout)
+	rCert, rErr = s.WaitFinishIssue(ctxTimeout)
+	td.CmpNoError(t, rErr)
+
+	s.StartIssue(ctx)
+	err2 := errors.New("2")
+	go func() {
+		time.Sleep(timeout / 2)
+		s.FinishIssue(ctx, nil, err2)
+	}()
+	ctxTimeout, _ = context.WithTimeout(ctx, timeout)
+	rCert, rErr = s.WaitFinishIssue(ctxTimeout)
+	td.CmpNil(t, rCert)
+	td.CmpDeeply(t, rErr, err2)
+}
+
+func TestCertState_FinishIssuePanic(t *testing.T) {
+	ctx, flush := th.TestContext()
+	defer flush()
+
+	ctx = th.NoLog(ctx)
+	s := certState{}
+
+	cert1 := &tls.Certificate{Leaf: &x509.Certificate{Subject: pkix.Name{CommonName: "asdf"}}}
+	err1 := errors.New("2")
+
+	td.CmpPanic(t, func() {
+		s.FinishIssue(th.NoLog(ctx), cert1, nil)
+	}, td.NotEmpty())
+
+	rCert, rErr := s.Cert()
+	td.CmpDeeply(t, rCert, cert1)
+	td.CmpNil(t, rErr)
+
+	s = certState{}
+	s.StartIssue(ctx)
+	td.CmpPanic(t, func() {
+		s.FinishIssue(th.NoLog(ctx), nil, nil)
+	}, td.NotEmpty())
+
+	s = certState{}
+	s.StartIssue(ctx)
+	td.CmpPanic(t, func() {
+		s.FinishIssue(th.NoLog(ctx), cert1, err1)
+	}, td.NotEmpty())
+
 }

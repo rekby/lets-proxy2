@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"errors"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/acme"
@@ -34,39 +35,60 @@ func createCertRequest(key crypto.Signer, commonName string, dnsNames ...string)
 	return x509.CreateCertificateRequest(rand.Reader, req, key)
 }
 
+func normalizeDomain(domain string) string {
+	domain = strings.TrimSpace(domain)
+	domain = strings.TrimSuffix(domain, ".")
+	domain = strings.ToLower(domain)
+	return domain
+}
+
 // Return valid parced certificate or error
-func validCert(domains []string, der [][]byte, key crypto.Signer, now time.Time) (leaf *x509.Certificate, err error) {
+func validCertDer(domains []string, der [][]byte, key crypto.PrivateKey, now time.Time) (cert *tls.Certificate, err error) {
 	// parse public part(s)
 	var n int
 	for _, b := range der {
 		n += len(b)
 	}
-	pub := make([]byte, n)
+	buf := make([]byte, n)
 	n = 0
 	for _, b := range der {
-		n += copy(pub[n:], b)
+		n += copy(buf[n:], b)
 	}
-	x509Cert, err := x509.ParseCertificates(pub)
+	x509Cert, err := x509.ParseCertificates(buf)
 	if err != nil || len(x509Cert) == 0 {
-		return nil, errors.New("no public key found")
-	}
-	// verify the leaf is not expired and matches the domain name
-	leaf = x509Cert[0]
-	if now.Before(leaf.NotBefore) {
-		return nil, errors.New("certificate is not valid yet")
-	}
-	if now.After(leaf.NotAfter) {
-		return nil, errors.New("expired certificate")
+		return nil, errors.New("no certificate found in der bytes")
 	}
 
-	for _, domain := range domains {
-		if err := leaf.VerifyHostname(domain); err != nil {
-			return nil, err
-		}
+	leaf := x509Cert[0]
+
+	cert = &tls.Certificate{
+		PrivateKey:  key,
+		Certificate: der,
+		Leaf:        leaf,
+	}
+
+	return validCertTls(cert, domains, key, now)
+}
+
+func validCertTls(cert *tls.Certificate, domains []string, key crypto.PrivateKey, now time.Time) (validCert *tls.Certificate, err error) {
+	if cert == nil {
+		return nil, errors.New("certificate is nil")
+	}
+
+	if cert.Leaf == nil {
+		return nil, errors.New("certificate leaf is nil")
+	}
+
+	if cert.PrivateKey == nil {
+		return nil, errors.New("certificate has no private key")
+	}
+
+	if cert.Leaf.PublicKey == nil {
+		return nil, errors.New("certificate has no public key")
 	}
 
 	// ensure the leaf corresponds to the private key and matches the certKey type
-	switch pub := leaf.PublicKey.(type) {
+	switch pub := cert.Leaf.PublicKey.(type) {
 	case *rsa.PublicKey:
 		prv, ok := key.(*rsa.PrivateKey)
 		if !ok {
@@ -78,5 +100,20 @@ func validCert(domains []string, der [][]byte, key crypto.Signer, now time.Time)
 	default:
 		return nil, errors.New("unknown public key algorithm")
 	}
-	return leaf, nil
+
+	// verify the leaf is not expired and matches the domain name
+	if now.Before(cert.Leaf.NotBefore) {
+		return nil, errors.New("certificate is not valid yet")
+	}
+	if now.After(cert.Leaf.NotAfter) {
+		return nil, errors.New("expired certificate")
+	}
+
+	for _, domain := range domains {
+		if err := cert.Leaf.VerifyHostname(domain); err != nil {
+			return nil, err
+		}
+	}
+
+	return cert, nil
 }
