@@ -1,3 +1,13 @@
+# github.com/davecgh/go-spew v1.1.1
+github.com/davecgh/go-spew/spew
+# github.com/maxatome/go-testdeep v1.0.8
+github.com/maxatome/go-testdeep
+github.com/maxatome/go-testdeep/helpers/tdutil
+github.com/maxatome/go-testdeep/internal/ctxerr
+github.com/maxatome/go-testdeep/internal/dark
+github.com/maxatome/go-testdeep/internal/location
+github.com/maxatome/go-testdeep/internal/types
+github.com/maxatome/go-testdeep/internal/util
 # github.com/pelletier/go-toml v1.3.0
 github.com/pelletier/go-toml
 # github.com/rekby/zapcontext v0.0.3
