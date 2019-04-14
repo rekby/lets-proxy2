@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -15,9 +14,12 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/rekby/lets-proxy2/internal/th"
 )
 
 func TestProxyListener(t *testing.T) {
+
 	listener := listenerType{connections: make(chan net.Conn)}
 
 	// test proxy
@@ -78,6 +80,9 @@ func TestProxyListener(t *testing.T) {
 }
 
 func TestProxyTLS(t *testing.T) {
+	ctx, flush := th.TestContext()
+	defer flush()
+
 	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = fmt.Fprint(w, "Hello, client")
 	}))
@@ -89,9 +94,6 @@ func TestProxyTLS(t *testing.T) {
 	}
 
 	testUrl := "https://" + listener.Addr().String()
-
-	ctx, ctxCancel := context.WithCancel(context.Background())
-	defer ctxCancel()
 
 	proxy := proxyType{
 		GetCertificate: dummyGetCertificate,

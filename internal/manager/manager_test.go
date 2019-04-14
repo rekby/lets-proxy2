@@ -1,4 +1,4 @@
-package main
+package manager
 
 import (
 	"context"
@@ -21,7 +21,7 @@ func TestManager_GetCertificate(t *testing.T) {
 	domain := "asdfadfwefdc.com"
 
 	manager := Manager{
-		Client:                  createTestClient(),
+		Client:                  createTestClient(t),
 		GetCertContext:          context.Background(),
 		CertificateIssueTimeout: time.Minute,
 	}
@@ -78,7 +78,12 @@ func TestManager_GetCertificate(t *testing.T) {
 	}
 }
 
-func createTestClient() *acme.Client {
+func createTestClient(t *testing.T) *acme.Client {
+	_, err := http.Get(testACMEServer)
+	if err != nil {
+		t.Fatal("Can't connect to buoulder server")
+	}
+
 	client := acme.Client{}
 	client.HTTPClient = &http.Client{
 		Transport: &http.Transport{
@@ -90,12 +95,12 @@ func createTestClient() *acme.Client {
 
 	client.DirectoryURL = testACMEServer
 	client.Key, _ = rsa.GenerateKey(rand.Reader, rsaKeyLength)
-	_, err := client.Register(context.Background(), &acme.Account{}, func(tosURL string) bool {
+	_, err = client.Register(context.Background(), &acme.Account{}, func(tosURL string) bool {
 		return true
 	})
 
 	if err != nil {
-		panic(err)
+		t.Fatal("Can't initialize acme client.")
 	}
 	return &client
 }

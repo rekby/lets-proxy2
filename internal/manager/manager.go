@@ -1,4 +1,4 @@
-package main
+package manager
 
 import (
 	"context"
@@ -6,11 +6,11 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
-	"crypto/x509"
-	"crypto/x509/pkix"
 	"errors"
 	"sync"
 	"time"
+
+	"github.com/rekby/lets-proxy2/internal/log"
 
 	"github.com/rekby/zapcontext"
 	"go.uber.org/zap"
@@ -60,8 +60,18 @@ type Manager struct {
 	// Mutating the field after the first call of GetCertificate method will have no effect.
 	Client *acme.Client
 
-	tokensMu sync.RWMutex
-	tokens   map[string]*tls.Certificate
+	certTokensMu sync.RWMutex
+	certTokens   map[string]*tls.Certificate
+
+	certStateMu sync.RWMutex
+	certState   map[string]*certState
+}
+
+func New() *Manager {
+	res := Manager{}
+	res.certTokens = make(map[string]*tls.Certificate)
+	res.certState = make(map[string]*certState)
+	return &res
 }
 
 // GetCertificate implements the tls.Config.GetCertificate hook.
@@ -69,13 +79,13 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, 
 	// TODO: get context of connection
 
 	domain := hello.ServerName
-	logger := zc.L(m.GetCertContext).With(logDomain(domain))
+	logger := zc.L(m.GetCertContext).With(log.Domain(domain))
 	logger.Info("Get certificate")
 	if isTlsAlpn01Hello(hello) {
 		logger.Debug("It is token request domain.")
-		m.tokensMu.RLock()
-		cert := m.tokens[domain]
-		m.tokensMu.RUnlock()
+		m.certTokensMu.RLock()
+		cert := m.certTokens[domain]
+		m.certTokensMu.RUnlock()
 
 		if cert == nil {
 			logger.Warn("Doesn't have token for request domain")
@@ -102,8 +112,12 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, 
 	}
 }
 
+func (m *Manager) certificateInternalDescribe(domain string) {
+
+}
+
 func (m *Manager) createCertificateForDomain(ctx context.Context, domain string) (*tls.Certificate, error) {
-	logger := zc.L(ctx).With(logDomain(domain))
+	logger := zc.L(ctx).With(log.Domain(domain))
 	ctx = zc.WithLogger(ctx, logger)
 
 	// TODO: syncronize many goroutines get certificate for one domain same time
@@ -125,7 +139,7 @@ func (m *Manager) createCertificateForDomain(ctx context.Context, domain string)
 }
 
 func (m *Manager) authorizeDomain(ctx context.Context, domain string) error {
-	logger := zc.L(ctx).With(logDomain(domain))
+	logger := zc.L(ctx).With(log.Domain(domain))
 	pendingAuthorizations := make(map[string]struct{})
 	defer func() {
 		if len(pendingAuthorizations) == 0 {
@@ -216,7 +230,7 @@ func (m *Manager) authorizeDomain(ctx context.Context, domain string) error {
 
 func (m *Manager) issueCertificate(ctx context.Context, domain string) (*tls.Certificate, error) {
 	// TODO: issue certificate for many domains same time
-	logger := zc.L(ctx).With(logDomain(domain))
+	logger := zc.L(ctx).With(log.Domain(domain))
 
 	key, err := m.domainKeyGet(ctx, domain)
 	if err != nil {
@@ -303,15 +317,15 @@ func (m *Manager) putCertToken(ctx context.Context, key string, certificate *tls
 		}
 	}()
 
-	m.tokensMu.Lock()
-	defer m.tokensMu.Unlock()
+	m.certTokensMu.Lock()
+	defer m.certTokensMu.Unlock()
 
-	if m.tokens == nil {
-		m.tokens = make(map[string]*tls.Certificate)
+	if m.certTokens == nil {
+		m.certTokens = make(map[string]*tls.Certificate)
 	}
 
-	_, overwriteToken = m.tokens[key]
-	m.tokens[key] = certificate
+	_, overwriteToken = m.certTokens[key]
+	m.certTokens[key] = certificate
 }
 
 func (m *Manager) deleteCertToken(ctx context.Context, key string) {
@@ -325,77 +339,9 @@ func (m *Manager) deleteCertToken(ctx context.Context, key string) {
 		}
 	}()
 
-	m.tokensMu.Lock()
-	defer m.tokensMu.Unlock()
+	m.certTokensMu.Lock()
+	defer m.certTokensMu.Unlock()
 
-	_, exist = m.tokens[key]
-	delete(m.tokens, key)
-}
-
-func isTlsAlpn01Hello(hello *tls.ClientHelloInfo) bool {
-	return len(hello.SupportedProtos) == 1 && hello.SupportedProtos[0] == acme.ALPNProto
-}
-
-func pickChallenge(typ string, chal []*acme.Challenge) *acme.Challenge {
-	for _, c := range chal {
-		if c.Type == typ {
-			return c
-		}
-	}
-	return nil
-}
-
-func createCertRequest(key crypto.Signer, commonName string, dnsNames ...string) ([]byte, error) {
-	req := &x509.CertificateRequest{
-		Subject:  pkix.Name{CommonName: commonName},
-		DNSNames: dnsNames,
-	}
-	return x509.CreateCertificateRequest(rand.Reader, req, key)
-}
-
-// Return valid parced certificate or error
-func validCert(domains []string, der [][]byte, key crypto.Signer, now time.Time) (leaf *x509.Certificate, err error) {
-	// parse public part(s)
-	var n int
-	for _, b := range der {
-		n += len(b)
-	}
-	pub := make([]byte, n)
-	n = 0
-	for _, b := range der {
-		n += copy(pub[n:], b)
-	}
-	x509Cert, err := x509.ParseCertificates(pub)
-	if err != nil || len(x509Cert) == 0 {
-		return nil, errors.New("no public key found")
-	}
-	// verify the leaf is not expired and matches the domain name
-	leaf = x509Cert[0]
-	if now.Before(leaf.NotBefore) {
-		return nil, errors.New("certificate is not valid yet")
-	}
-	if now.After(leaf.NotAfter) {
-		return nil, errors.New("expired certificate")
-	}
-
-	for _, domain := range domains {
-		if err := leaf.VerifyHostname(domain); err != nil {
-			return nil, err
-		}
-	}
-
-	// ensure the leaf corresponds to the private key and matches the certKey type
-	switch pub := leaf.PublicKey.(type) {
-	case *rsa.PublicKey:
-		prv, ok := key.(*rsa.PrivateKey)
-		if !ok {
-			return nil, errors.New("private key type does not match public key type")
-		}
-		if pub.N.Cmp(prv.N) != 0 {
-			return nil, errors.New("private key does not match public key")
-		}
-	default:
-		return nil, errors.New("unknown public key algorithm")
-	}
-	return leaf, nil
+	_, exist = m.certTokens[key]
+	delete(m.certTokens, key)
 }
