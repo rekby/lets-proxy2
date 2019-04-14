@@ -1,0 +1,48 @@
+language: go
+go_import_path: github.com/maxatome/go-testdeep
+
+sudo: false
+
+matrix:
+  include:
+    - go: 1.9.x
+    - go: 1.10.x
+    - go: 1.11.x
+      env:
+        - GO_TEST_SAFE_FLAGS="-covermode=atomic -coverprofile=coverage-safe.out ./..."
+        - GO_TEST_UNSAFE_FLAGS="-covermode=atomic -coverprofile=coverage-unsafe.out ./..."
+        - USE_GOMETALINTER=1
+      install:
+        - version=2.0.12; name=gometalinter-2.0.12-linux-amd64;
+          wget -q -O - https://github.com/alecthomas/gometalinter/releases/download/v$version/$name.tar.gz |
+            tar -zxvf - -C $GOPATH/bin && mv $GOPATH/bin/$name/[a-z]* $GOPATH/bin
+      after_success:
+        - go get github.com/mattn/goveralls
+        - go get github.com/wadey/gocovmerge
+        - gocovmerge coverage-safe.out coverage-unsafe.out > coverage.out
+        - goveralls -coverprofile=coverage.out -service=travis-ci
+    - go: master
+  allow_failures:
+    - go: master
+  fast_finish: true
+
+script:
+  - export GORACE="halt_on_error=1"
+  - go get -t ./...
+  - env TESTDEEP_COLOR=off go test -race -tags safe $GO_TEST_SAFE_FLAGS ./...
+  - env TESTDEEP_COLOR=off go test -race $GO_TEST_UNSAFE_FLAGS ./...
+  - if [ "$USE_GOMETALINTER" = 1 ]; then
+      gometalinter
+        --disable-all
+        --enable=errcheck
+        --enable=gofmt
+        --enable=golint
+        --enable=gosimple
+        --enable=ineffassign
+        --enable=maligned
+        --enable=unconvert
+        --enable=staticcheck
+        --deadline=4m
+        -e 'internal/dark/bypass\.go\z'
+        ./...;
+      fi

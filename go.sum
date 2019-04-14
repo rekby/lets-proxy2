@@ -1,5 +1,8 @@
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
+github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
+github.com/maxatome/go-testdeep v1.0.8 h1:OORprsdGMEDRo1diHCQzxCAaZFWKlHDrBnPttC4wL8g=
+github.com/maxatome/go-testdeep v1.0.8/go.mod h1:Vcp0RXXOMhUTw2S2HRmUIqHQpG2Oxz+HM/WSWK7yXto=
 github.com/pelletier/go-toml v1.3.0 h1:e5+lF2E4Y2WCIxBefVowBuB0iHrUH4HZ8q+6mGF7fJc=
 github.com/pelletier/go-toml v1.3.0/go.mod h1:PN7xzY2wHTK0K9p34ErDQMlFxa51Fk0OUruD3k1mMwo=
 github.com/rekby/zapcontext v0.0.2 h1:uZeURw9PmHRvFjX2IIIIoInWkBCDvZf8+dF34gMSb+Q=
