@@ -8,7 +8,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"errors"
-	"strings"
 	"time"
 
 	"golang.org/x/crypto/acme"
@@ -27,23 +26,20 @@ func pickChallenge(typ string, chal []*acme.Challenge) *acme.Challenge {
 	return nil
 }
 
-func createCertRequest(key crypto.Signer, commonName string, dnsNames ...string) ([]byte, error) {
+func createCertRequest(key crypto.Signer, commonName DomainName, domains ...DomainName) ([]byte, error) {
+	dnsNames := make([]string, len(domains))
+	for i, v := range domains {
+		dnsNames[i] = v.String()
+	}
 	req := &x509.CertificateRequest{
-		Subject:  pkix.Name{CommonName: commonName},
+		Subject:  pkix.Name{CommonName: commonName.String()},
 		DNSNames: dnsNames,
 	}
 	return x509.CreateCertificateRequest(rand.Reader, req, key)
 }
 
-func normalizeDomain(domain string) string {
-	domain = strings.TrimSpace(domain)
-	domain = strings.TrimSuffix(domain, ".")
-	domain = strings.ToLower(domain)
-	return domain
-}
-
 // Return valid parced certificate or error
-func validCertDer(domains []string, der [][]byte, key crypto.PrivateKey, now time.Time) (cert *tls.Certificate, err error) {
+func validCertDer(domains []DomainName, der [][]byte, key crypto.PrivateKey, now time.Time) (cert *tls.Certificate, err error) {
 	// parse public part(s)
 	var n int
 	for _, b := range der {
@@ -70,7 +66,7 @@ func validCertDer(domains []string, der [][]byte, key crypto.PrivateKey, now tim
 	return validCertTls(cert, domains, key, now)
 }
 
-func validCertTls(cert *tls.Certificate, domains []string, key crypto.PrivateKey, now time.Time) (validCert *tls.Certificate, err error) {
+func validCertTls(cert *tls.Certificate, domains []DomainName, key crypto.PrivateKey, now time.Time) (validCert *tls.Certificate, err error) {
 	if cert == nil {
 		return nil, errors.New("certificate is nil")
 	}
@@ -110,7 +106,7 @@ func validCertTls(cert *tls.Certificate, domains []string, key crypto.PrivateKey
 	}
 
 	for _, domain := range domains {
-		if err := cert.Leaf.VerifyHostname(domain); err != nil {
+		if err := cert.Leaf.VerifyHostname(string(domain)); err != nil {
 			return nil, err
 		}
 	}

@@ -78,6 +78,9 @@ func TestManager_GetCertificate(t *testing.T) {
 		if cert.Leaf.VerifyHostname(domain) != nil {
 			t.Error(cert.Leaf.VerifyHostname(domain))
 		}
+		if cert.Leaf.VerifyHostname("www."+domain) != nil {
+			t.Error(cert.Leaf.VerifyHostname(domain))
+		}
 	})
 
 	t.Run("OneCertCamelCase", func(t *testing.T) {

@@ -8,10 +8,6 @@ import (
 	"go.uber.org/zap"
 )
 
-func Domain(domain string) zap.Field {
-	return zap.String("domain", domain)
-}
-
 type certLogger x509.Certificate
 
 func (c *certLogger) String() string {

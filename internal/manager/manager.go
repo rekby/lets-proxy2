@@ -61,7 +61,7 @@ type Manager struct {
 	Client *acme.Client
 
 	certTokensMu sync.RWMutex
-	certTokens   map[string]*tls.Certificate
+	certTokens   map[DomainName]*tls.Certificate
 
 	certStateMu sync.Mutex
 	certState   map[certNameType]*certState
@@ -71,7 +71,7 @@ func New(ctx context.Context, client *acme.Client) *Manager {
 	res := Manager{}
 	res.Client = client
 	res.GetCertContext = ctx
-	res.certTokens = make(map[string]*tls.Certificate)
+	res.certTokens = make(map[DomainName]*tls.Certificate)
 	res.certState = make(map[certNameType]*certState)
 	res.CertificateIssueTimeout = time.Minute
 	return &res
@@ -80,16 +80,16 @@ func New(ctx context.Context, client *acme.Client) *Manager {
 // GetCertificate implements the tls.Config.GetCertificate hook.
 func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 	// TODO: get context of connection
+	ctx := m.GetCertContext
 
-	domain := hello.ServerName
-	domain = normalizeDomain(domain)
+	needDomain := normalizeDomain(hello.ServerName)
 
-	logger := zc.L(m.GetCertContext).With(log.Domain(domain))
+	logger := zc.L(ctx).With(logDomain(needDomain))
 	logger.Info("Get certificate")
 	if isTlsAlpn01Hello(hello) {
-		logger.Debug("It is token request domain.")
+		logger.Debug("It is tls-alpn-01 token request.")
 		m.certTokensMu.RLock()
-		cert := m.certTokens[domain]
+		cert := m.certTokens[needDomain]
 		m.certTokensMu.RUnlock()
 
 		if cert == nil {
@@ -101,11 +101,15 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, 
 
 	// TODO: check disk cache
 
-	certDescription := describeCertificate(domain)
-	certState := m.certStateGet(certDescription.Name)
+	certName := certNameFromDomain(needDomain)
+
+	logger = logger.With(logCetName(certName))
+	ctx = zc.WithLogger(ctx, zc.L(ctx).With(logCetName(certName)))
+
+	certState := m.certStateGet(certName)
 	cert, err := certState.Cert()
 	if cert != nil {
-		cert, err = validCertDer([]string{domain}, cert.Certificate, cert.PrivateKey, time.Now())
+		cert, err = validCertDer([]DomainName{needDomain}, cert.Certificate, cert.PrivateKey, time.Now())
 		if cert != nil {
 			logger.Debug("Got certificate from local state", log.Cert(cert))
 			return cert, nil
@@ -120,7 +124,7 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, 
 	defer cancelFunc()
 
 	// TODO: receive cert for domain and subdomains same time
-	res, err := m.createCertificateForDomain(certIssueContext, domain)
+	res, err := m.createCertificateForDomains(certIssueContext, certName, domainNamesFromCertificateName(certName), needDomain)
 	if err == nil {
 		logger.Info("Certificate issued.", log.Cert(res),
 			zap.Time("expire", res.Leaf.NotAfter))
@@ -143,12 +147,11 @@ func (m *Manager) certStateGet(certName certNameType) *certState {
 	return res
 }
 
-func (m *Manager) createCertificateForDomain(ctx context.Context, domain string) (res *tls.Certificate, err error) {
-	logger := zc.L(ctx).With(log.Domain(domain))
+func (m *Manager) createCertificateForDomains(ctx context.Context, certName certNameType, domainNames []DomainName, needDomain DomainName) (res *tls.Certificate, err error) {
+	logger := zc.L(ctx)
 	ctx = zc.WithLogger(ctx, logger)
 
-	certDescription := describeCertificate(domain)
-	certState := m.certStateGet(certDescription.Name)
+	certState := m.certStateGet(certName)
 	if certState.StartIssue(ctx) {
 		// outer func need for get argument values in defer time
 		defer func() { certState.FinishIssue(ctx, res, err) }()
@@ -159,15 +162,44 @@ func (m *Manager) createCertificateForDomain(ctx context.Context, domain string)
 		return certState.WaitFinishIssue(waitTimeout)
 	}
 
-	err = m.authorizeDomain(ctx, domain)
-	if err == nil {
-		logger.Debug("Domain authorized.")
-	} else {
-		logger.Warn("Domain doesn't authorized.", zap.Error(err))
-		return nil, err
+	var authorizeDomainsWg sync.WaitGroup
+	var authorizedDomainsMu sync.Mutex
+	var authorizedDomains []DomainName
+	var needDomainAuthorized = false
+
+	authorizeDomainsWg.Add(len(domainNames))
+	for _, authorizeDomain := range domainNames {
+		go func(domain DomainName) {
+			localLogger := logger.With(logDomain(domain))
+			localCtx := zc.WithLogger(ctx, localLogger)
+
+			err = m.authorizeDomain(localCtx, domain)
+			if err == nil {
+				localLogger.Debug("Domain authorized.")
+
+				authorizedDomainsMu.Lock()
+				authorizedDomains = append(authorizedDomains, domain)
+				if domain == needDomain {
+					needDomainAuthorized = true
+				}
+				authorizedDomainsMu.Unlock()
+
+			} else {
+				localLogger.Warn("Domain doesn't authorized.", zap.Error(err))
+			}
+			authorizeDomainsWg.Done()
+		}(authorizeDomain)
+	}
+	logger.Debug("Wait for domains authorization.", logDomains(domainNames))
+	authorizeDomainsWg.Wait()
+
+	if !needDomainAuthorized {
+		logger.Warn("Need domain doesn't authorized.", logDomain(needDomain),
+			logDomainsNamed("authorized_domains", authorizedDomains))
+		return nil, errors.New("need domain doesn't authorized")
 	}
 
-	res, err = m.issueCertificate(ctx, domain)
+	res, err = m.issueCertificate(ctx, authorizedDomains)
 	if err == nil {
 		logger.Debug("Certificate created.")
 	} else {
@@ -176,8 +208,8 @@ func (m *Manager) createCertificateForDomain(ctx context.Context, domain string)
 	return res, err
 }
 
-func (m *Manager) authorizeDomain(ctx context.Context, domain string) error {
-	logger := zc.L(ctx).With(log.Domain(domain))
+func (m *Manager) authorizeDomain(ctx context.Context, domain DomainName) error {
+	logger := zc.L(ctx).With(logDomain(domain))
 	pendingAuthorizations := make(map[string]struct{})
 	defer func() {
 		if len(pendingAuthorizations) == 0 {
@@ -200,7 +232,7 @@ func (m *Manager) authorizeDomain(ctx context.Context, domain string) error {
 	var nextChallengeTypeIndex int
 	for {
 		// Start domain authorization and get the challenge.
-		authz, err := m.Client.Authorize(ctx, domain)
+		authz, err := m.Client.Authorize(ctx, domain.String())
 		if err == nil {
 			logger.Debug("Got authorization description.", zap.Reflect("auth_object", authz))
 		} else {
@@ -266,16 +298,19 @@ func (m *Manager) authorizeDomain(ctx context.Context, domain string) error {
 	}
 }
 
-func (m *Manager) issueCertificate(ctx context.Context, domain string) (*tls.Certificate, error) {
+func (m *Manager) issueCertificate(ctx context.Context, domains []DomainName) (*tls.Certificate, error) {
+	if len(domains) == 0 {
+		return nil, errors.New("No domains for issue certificate")
+	}
 	// TODO: issue certificate for many domains same time
-	logger := zc.L(ctx).With(log.Domain(domain))
+	logger := zc.L(ctx).With(logDomains(domains))
 
-	key, err := m.domainKeyGet(ctx, domain)
+	key, err := m.certKeyGet(ctx, certNameFromDomain(domains[0]))
 	if err != nil {
 		logger.Error("Can't get domain key", zap.Error(err))
 		return nil, err
 	}
-	csr, err := createCertRequest(key, domain, domain)
+	csr, err := createCertRequest(key, domains[0], domains...)
 	der, _, err := m.Client.CreateCert(ctx, csr, 0, true)
 
 	if err != nil {
@@ -283,7 +318,7 @@ func (m *Manager) issueCertificate(ctx context.Context, domain string) (*tls.Cer
 		return nil, err
 	}
 
-	cert, err := validCertDer([]string{domain}, der, key, time.Now())
+	cert, err := validCertDer(domains, der, key, time.Now())
 
 	if err == nil {
 		logger.Info("Certificated issued", log.Cert(cert))
@@ -306,12 +341,21 @@ func (m *Manager) revokePendingAuthorizations(ctx context.Context, uries []strin
 	}
 }
 
-func (m *Manager) domainKeyGet(ctx context.Context, domain string) (crypto.Signer, error) {
-	//TODO: load/save with cache
+var generatedKey *rsa.PrivateKey
+
+func (m *Manager) certKeyGet(ctx context.Context, domain certNameType) (crypto.Signer, error) {
 	logger := zc.L(ctx)
+
+	//TODO: load/save with cache
+	if generatedKey != nil {
+		logger.Debug("Get RSA key from cache.")
+		return generatedKey, nil
+	}
+
 	logger.Debug("Generate new rsa key")
 	key, err := rsa.GenerateKey(rand.Reader, domainKeyRSALength)
 	if err == nil {
+		generatedKey = key
 		return key, nil
 	}
 
@@ -319,11 +363,11 @@ func (m *Manager) domainKeyGet(ctx context.Context, domain string) (crypto.Signe
 	return nil, err
 }
 
-func (m *Manager) fulfill(ctx context.Context, challenge *acme.Challenge, domain string) (func(context.Context), error) {
+func (m *Manager) fulfill(ctx context.Context, challenge *acme.Challenge, domain DomainName) (func(context.Context), error) {
 	logger := zc.L(ctx)
 	switch challenge.Type {
 	case tlsAlpn01:
-		cert, err := m.Client.TLSALPN01ChallengeCert(challenge.Token, domain)
+		cert, err := m.Client.TLSALPN01ChallengeCert(challenge.Token, domain.String())
 		if err != nil {
 			return nil, err
 		}
@@ -335,15 +379,15 @@ func (m *Manager) fulfill(ctx context.Context, challenge *acme.Challenge, domain
 	}
 }
 
-func (m *Manager) putCertToken(ctx context.Context, key string, certificate *tls.Certificate) {
+func (m *Manager) putCertToken(ctx context.Context, key DomainName, certificate *tls.Certificate) {
 	logger := zc.L(ctx)
-	logger.Debug("Put cert token", zap.String("key", key))
+	logger.Debug("Put cert token", zap.String("key", string(key)))
 
 	var overwriteToken bool
 
 	defer func() {
 		if overwriteToken {
-			logger.Warn("Unexpected cert token already exist", zap.String("key", key))
+			logger.Warn("Unexpected cert token already exist", zap.String("key", key.String()))
 		}
 	}()
 
@@ -351,21 +395,21 @@ func (m *Manager) putCertToken(ctx context.Context, key string, certificate *tls
 	defer m.certTokensMu.Unlock()
 
 	if m.certTokens == nil {
-		m.certTokens = make(map[string]*tls.Certificate)
+		m.certTokens = make(map[DomainName]*tls.Certificate)
 	}
 
 	_, overwriteToken = m.certTokens[key]
 	m.certTokens[key] = certificate
 }
 
-func (m *Manager) deleteCertToken(ctx context.Context, key string) {
+func (m *Manager) deleteCertToken(ctx context.Context, key DomainName) {
 	logger := zc.L(ctx)
-	logger.Debug("Delete cert token", zap.String("key", key))
+	logger.Debug("Delete cert token", zap.String("key", key.String()))
 
 	var exist bool
 	defer func() {
 		if !exist {
-			logger.Warn("Cert token for delete doesn't exist", zap.String("key", key))
+			logger.Warn("Cert token for delete doesn't exist", zap.String("key", string(key)))
 		}
 	}()
 

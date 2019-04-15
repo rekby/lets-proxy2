@@ -1,5 +1,7 @@
 package manager
 
+import "go.uber.org/zap"
+
 type certNameType string
 
 type certDescription struct {
@@ -7,9 +9,14 @@ type certDescription struct {
 	Domain string       // Domain in certificate, it will slice in future.
 }
 
-func describeCertificate(domain string) certDescription {
-	return certDescription{
-		certNameType(normalizeDomain(domain)),
-		normalizeDomain(domain),
-	}
+func certNameFromDomain(domain DomainName) certNameType {
+	return certNameType(domain)
+}
+
+func domainNamesFromCertificateName(name certNameType) []DomainName {
+	return []DomainName{DomainName(name), DomainName("www." + name)}
+}
+
+func logCetName(certName certNameType) zap.Field {
+	return zap.String("cert_name", string(certName))
 }
