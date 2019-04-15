@@ -38,19 +38,23 @@ func createCertRequest(key crypto.Signer, commonName DomainName, domains ...Doma
 	return x509.CreateCertificateRequest(rand.Reader, req, key)
 }
 
-// Return valid parced certificate or error
-func validCertDer(domains []DomainName, der [][]byte, key crypto.PrivateKey, now time.Time) (cert *tls.Certificate, err error) {
-	// parse public part(s)
+func flatByteSlices(in [][]byte) []byte {
 	var n int
-	for _, b := range der {
+	for _, b := range in {
 		n += len(b)
 	}
 	buf := make([]byte, n)
 	n = 0
-	for _, b := range der {
+	for _, b := range in {
 		n += copy(buf[n:], b)
 	}
-	x509Cert, err := x509.ParseCertificates(buf)
+	return buf
+}
+
+// Return valid parced certificate or error
+func validCertDer(domains []DomainName, der [][]byte, key crypto.PrivateKey, now time.Time) (cert *tls.Certificate, err error) {
+	// parse public part(s)
+	x509Cert, err := x509.ParseCertificates(flatByteSlices(der))
 	if err != nil || len(x509Cert) == 0 {
 		return nil, errors.New("no certificate found in der bytes")
 	}

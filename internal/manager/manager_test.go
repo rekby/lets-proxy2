@@ -161,3 +161,7 @@ func createTestClient(t *testing.T) *acme.Client {
 	}
 	return &client
 }
+
+func TestStoreCertificate(t *testing.T) {
+
+}

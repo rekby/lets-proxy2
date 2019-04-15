@@ -1,12 +1,16 @@
 package manager
 
 import (
+	"bytes"
 	"context"
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
+	"reflect"
 	"sync"
 	"time"
 
@@ -49,6 +53,7 @@ type Cache interface {
 type Manager struct {
 	GetCertContext          context.Context // base context for use in GetCertificate - use for logging and cancel.
 	CertificateIssueTimeout time.Duration
+	Cache                   Cache
 
 	// Client is used to perform low-level operations, such as account registration
 	// and requesting new certificates.
@@ -148,7 +153,7 @@ func (m *Manager) certStateGet(certName certNameType) *certState {
 }
 
 func (m *Manager) createCertificateForDomains(ctx context.Context, certName certNameType, domainNames []DomainName, needDomain DomainName) (res *tls.Certificate, err error) {
-	logger := zc.L(ctx)
+	logger := zc.L(ctx).With(logCetName(certName))
 	ctx = zc.WithLogger(ctx, logger)
 
 	certState := m.certStateGet(certName)
@@ -199,7 +204,7 @@ func (m *Manager) createCertificateForDomains(ctx context.Context, certName cert
 		return nil, errors.New("need domain doesn't authorized")
 	}
 
-	res, err = m.issueCertificate(ctx, authorizedDomains)
+	res, err = m.issueCertificate(ctx, certName, authorizedDomains)
 	if err == nil {
 		logger.Debug("Certificate created.")
 	} else {
@@ -298,14 +303,13 @@ func (m *Manager) authorizeDomain(ctx context.Context, domain DomainName) error 
 	}
 }
 
-func (m *Manager) issueCertificate(ctx context.Context, domains []DomainName) (*tls.Certificate, error) {
+func (m *Manager) issueCertificate(ctx context.Context, certName certNameType, domains []DomainName) (*tls.Certificate, error) {
 	if len(domains) == 0 {
-		return nil, errors.New("No domains for issue certificate")
+		return nil, errors.New("no domains for issue certificate")
 	}
-	// TODO: issue certificate for many domains same time
 	logger := zc.L(ctx).With(logDomains(domains))
 
-	key, err := m.certKeyGet(ctx, certNameFromDomain(domains[0]))
+	key, err := m.certKeyGet(ctx, certName)
 	if err != nil {
 		logger.Error("Can't get domain key", zap.Error(err))
 		return nil, err
@@ -321,7 +325,8 @@ func (m *Manager) issueCertificate(ctx context.Context, domains []DomainName) (*
 	cert, err := validCertDer(domains, der, key, time.Now())
 
 	if err == nil {
-		logger.Info("Certificated issued", log.Cert(cert))
+		logger.Info("Certificated issued")
+		storeCertificate(ctx, m.Cache, certName, cert)
 		return cert, nil
 	} else {
 		logger.Error("Receive invalid certificate", zap.Error(err))
@@ -418,4 +423,62 @@ func (m *Manager) deleteCertToken(ctx context.Context, key DomainName) {
 
 	_, exist = m.certTokens[key]
 	delete(m.certTokens, key)
+}
+
+// It isn't atomic syncronized - caller must not save two certificates with same name same time
+func storeCertificate(ctx context.Context, cache Cache, certName certNameType,
+	cert *tls.Certificate) {
+	logger := zc.L(ctx)
+	if cache == nil {
+		logger.Debug("Can't save certificate to nil cache")
+		return
+	}
+
+	var keyType string
+
+	var certBuf bytes.Buffer
+	for _, block := range cert.Certificate {
+		pemBlock := pem.Block{Type: "CERTIFICATE", Bytes: block}
+		err := pem.Encode(&certBuf, &pemBlock)
+		if err != nil {
+			logger.DPanic("Can't encode pem block of certificate", zap.Error(err), zap.Binary("block", block))
+			return
+		}
+	}
+
+	var privateKeyBuf bytes.Buffer
+
+	switch privateKey := cert.PrivateKey.(type) {
+	case *rsa.PrivateKey:
+		keyType = "rsa"
+		keyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
+		pemBlock := pem.Block{Type: "RSA PRIVATE KEY", Bytes: keyBytes}
+		err := pem.Encode(&privateKeyBuf, &pemBlock)
+		if err != nil {
+			logger.DPanic("Can't marshal rsa private key", zap.Error(err))
+			return
+		}
+	default:
+		logger.DPanic("Unknow private key type", zap.String("type", reflect.TypeOf(cert.PrivateKey).String()))
+		return
+	}
+
+	if keyType == "" {
+		logger.DPanic("store cert key type doesn't init")
+	}
+
+	certKeyName := string(certName) + "." + keyType + ".cer"
+	keyKeyName := string(certName) + "." + keyType + ".key"
+
+	err := cache.Put(ctx, certKeyName, certBuf.Bytes())
+	if err != nil {
+		logger.Error("Can't store certificate file", zap.Error(err))
+		return
+	}
+
+	err = cache.Put(ctx, keyKeyName, privateKeyBuf.Bytes())
+	if err != nil {
+		_ = cache.Delete(ctx, certKeyName)
+		logger.Error("Can't store certificate key file", zap.Error(err))
+	}
 }
