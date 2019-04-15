@@ -67,10 +67,10 @@ func validCertDer(domains []DomainName, der [][]byte, key crypto.PrivateKey, now
 		Leaf:        leaf,
 	}
 
-	return validCertTls(cert, domains, key, now)
+	return validCertTls(cert, domains, now)
 }
 
-func validCertTls(cert *tls.Certificate, domains []DomainName, key crypto.PrivateKey, now time.Time) (validCert *tls.Certificate, err error) {
+func validCertTls(cert *tls.Certificate, domains []DomainName, now time.Time) (validCert *tls.Certificate, err error) {
 	if cert == nil {
 		return nil, errors.New("certificate is nil")
 	}
@@ -90,7 +90,7 @@ func validCertTls(cert *tls.Certificate, domains []DomainName, key crypto.Privat
 	// ensure the leaf corresponds to the private key and matches the certKey type
 	switch pub := cert.Leaf.PublicKey.(type) {
 	case *rsa.PublicKey:
-		prv, ok := key.(*rsa.PrivateKey)
+		prv, ok := cert.PrivateKey.(*rsa.PrivateKey)
 		if !ok {
 			return nil, errors.New("private key type does not match public key type")
 		}

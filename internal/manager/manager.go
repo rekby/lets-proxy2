@@ -159,12 +159,20 @@ func (m *Manager) createCertificateForDomains(ctx context.Context, certName cert
 	certState := m.certStateGet(certName)
 	if certState.StartIssue(ctx) {
 		// outer func need for get argument values in defer time
-		defer func() { certState.FinishIssue(ctx, res, err) }()
+		defer func() {
+			certState.FinishIssue(ctx, res, err)
+		}()
 	} else {
 		waitTimeout, waitTimeoutCancel := context.WithTimeout(ctx, m.CertificateIssueTimeout)
 		defer waitTimeoutCancel()
 
 		return certState.WaitFinishIssue(waitTimeout)
+	}
+
+	cachedCert, err := getCertificate(ctx, m.Cache, certName, "rsa")
+	if err == nil {
+		logger.Debug("Certificate loaded from cache")
+		return cachedCert, nil
 	}
 
 	var authorizeDomainsWg sync.WaitGroup
@@ -481,4 +489,31 @@ func storeCertificate(ctx context.Context, cache Cache, certName certNameType,
 		_ = cache.Delete(ctx, certKeyName)
 		logger.Error("Can't store certificate key file", zap.Error(err))
 	}
+}
+
+func getCertificate(ctx context.Context, cache Cache, certName certNameType, keyType string) (cert *tls.Certificate, err error) {
+	logger := zc.L(ctx)
+	logger.Debug("Check certificate in cache")
+	defer func() {
+		logger.Debug("Check certificate in cache", log.Cert(cert), zap.Error(err))
+	}()
+
+	certKeyName := string(certName) + "." + keyType + ".cer"
+	keyKeyName := string(certName) + "." + keyType + ".key"
+
+	certBytes, err := cache.Get(ctx, certKeyName)
+	if err != nil {
+		return nil, err
+	}
+
+	keyBytes, err := cache.Get(ctx, keyKeyName)
+	if err != nil {
+		return nil, err
+	}
+
+	cert2, err := tls.X509KeyPair(certBytes, keyBytes)
+	if err != nil {
+		return nil, err
+	}
+	return validCertTls(&cert2, nil, time.Now())
 }
