@@ -93,7 +93,7 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, 
 	needDomain := normalizeDomain(hello.ServerName)
 
 	logger := zc.L(ctx).With(logDomain(needDomain))
-	logger.Info("Get certificate")
+	logger.Info("Get certificate", zap.String("original_domain", hello.ServerName))
 	if isTlsAlpn01Hello(hello) {
 		logger.Debug("It is tls-alpn-01 token request.")
 

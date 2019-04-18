@@ -221,6 +221,28 @@ func TestManager_GetCertificate(t *testing.T) {
 		}
 	})
 
+	t.Run("punycode-domain", func(t *testing.T) {
+		domain := "xn--80adjurfhd.xn--p1ai" // проверка.рф
+
+		cert, err := manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain, Conn: contextConnection{Context: ctx}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if cert.Leaf.NotBefore.After(time.Now()) {
+			t.Error(cert.Leaf.NotBefore)
+		}
+		if cert.Leaf.NotAfter.Before(time.Now()) {
+			t.Error(cert.Leaf.NotAfter)
+		}
+		if cert.Leaf.VerifyHostname(domain) != nil {
+			t.Error(cert.Leaf.VerifyHostname(domain))
+		}
+		if cert.Leaf.VerifyHostname("www."+domain) != nil {
+			t.Error(cert.Leaf.VerifyHostname(domain))
+		}
+	})
+
 	t.Run("OneCertCamelCase", func(t *testing.T) {
 		domain := "onecertCamelCase.ru"
 		cert, err := manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain, Conn: contextConnection{Context: ctx}})
