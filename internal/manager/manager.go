@@ -49,9 +49,12 @@ type Cache interface {
 	Delete(ctx context.Context, key string) error
 }
 
+type GetContext interface {
+	GetContext() context.Context
+}
+
 // Interface inspired to https://godoc.org/golang.org/x/crypto/acme/autocert#Manager but not compatible gurantee
 type Manager struct {
-	GetCertContext          context.Context // base context for use in GetCertificate - use for logging and cancel.
 	CertificateIssueTimeout time.Duration
 	Cache                   Cache
 
@@ -75,7 +78,6 @@ type Manager struct {
 func New(ctx context.Context, client *acme.Client) *Manager {
 	res := Manager{}
 	res.Client = client
-	res.GetCertContext = ctx
 	res.certTokens = make(map[DomainName]*tls.Certificate)
 	res.certState = make(map[certNameType]*certState)
 	res.CertificateIssueTimeout = time.Minute
@@ -83,9 +85,17 @@ func New(ctx context.Context, client *acme.Client) *Manager {
 }
 
 // GetCertificate implements the tls.Config.GetCertificate hook.
+//
 func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
 	// TODO: get context of connection
-	ctx := m.GetCertContext
+	var ctx context.Context
+	if getContext, ok := hello.Conn.(GetContext); ok {
+		ctx = getContext.GetContext()
+	} else {
+		defaultLogger := zc.L(nil)
+		defaultLogger.DPanic("hello.Conn must implement GetContext interface")
+		ctx = zc.WithLogger(context.Background(), defaultLogger)
+	}
 
 	needDomain := normalizeDomain(hello.ServerName)
 
@@ -125,7 +135,7 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, 
 	}
 
 	// TODO: check domain
-	certIssueContext, cancelFunc := context.WithTimeout(m.GetCertContext, m.CertificateIssueTimeout)
+	certIssueContext, cancelFunc := context.WithTimeout(ctx, m.CertificateIssueTimeout)
 	defer cancelFunc()
 
 	// TODO: receive cert for domain and subdomains same time

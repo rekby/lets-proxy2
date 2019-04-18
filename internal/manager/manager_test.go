@@ -114,7 +114,29 @@ RJWdLy/H7EyBc86Ak/0zK4WdIHNHQheP2RPMMuT0RFgeZSqcjM4j1wg=
 -----END RSA PRIVATE KEY-----
 `
 
+type contextConnection struct {
+	net.Conn
+	context.Context
+}
+
+func (c contextConnection) GetContext() context.Context {
+	return c.Context
+}
+
+func init() {
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+	zc.SetDefaultLogger(logger)
+}
+
 func TestManager_GetCertificate(t *testing.T) {
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	ctx, flush := th.TestContext()
 	defer flush()
 
@@ -142,12 +164,14 @@ func TestManager_GetCertificate(t *testing.T) {
 	defer lisneter.Close()
 
 	go func() {
+		counter := 0
 		for {
 			conn, err := lisneter.Accept()
 			if conn != nil {
 				t.Log("incoming connection")
+				ctx := zc.WithLogger(context.Background(), logger.With(zap.Int("connection_id", counter)))
 
-				tlsConn := tls.Server(conn, &tls.Config{
+				tlsConn := tls.Server(contextConnection{conn, ctx}, &tls.Config{
 					NextProtos: []string{
 						"h2", "http/1.1", // enable HTTP/2
 						acme.ALPNProto, // enable tls-alpn ACME challenges
@@ -162,7 +186,10 @@ func TestManager_GetCertificate(t *testing.T) {
 					t.Error(err)
 				}
 
-				conn.Close()
+				err = conn.Close()
+				if err != nil {
+					t.Error(err)
+				}
 			}
 			if err != nil {
 				break
@@ -173,7 +200,7 @@ func TestManager_GetCertificate(t *testing.T) {
 	t.Run("OneCert", func(t *testing.T) {
 		domain := "onecert.ru"
 
-		cert, err := manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain})
+		cert, err := manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain, Conn: contextConnection{Context: ctx}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -194,7 +221,7 @@ func TestManager_GetCertificate(t *testing.T) {
 
 	t.Run("OneCertCamelCase", func(t *testing.T) {
 		domain := "onecertCamelCase.ru"
-		cert, err := manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain})
+		cert, err := manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain, Conn: contextConnection{Context: ctx}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -211,11 +238,14 @@ func TestManager_GetCertificate(t *testing.T) {
 	})
 
 	t.Run("ParallelCert", func(t *testing.T) {
-		oldManagetCtx := manager.GetCertContext
-		manager.GetCertContext = th.NoLog(ctx)
+		// change top loevel logger
+		// no parallelize
+		oldLogger := logger
+		logger = zap.NewNop()
 		defer func() {
-			manager.GetCertContext = oldManagetCtx
+			logger = oldLogger
 		}()
+
 		domain := "ParallelCert.ru"
 		const cnt = 100
 
@@ -226,7 +256,7 @@ func TestManager_GetCertificate(t *testing.T) {
 
 		for i := 0; i < cnt; i++ {
 			go func() {
-				cert, err := manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain})
+				cert, err := manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain, Conn: contextConnection{Context: ctx}})
 				if err != nil {
 					t.Fatal(err)
 				}
