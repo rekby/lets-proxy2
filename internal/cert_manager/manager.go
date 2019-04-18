@@ -12,6 +12,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"net/http"
 	"reflect"
 	"strings"
 	"sync"
@@ -27,12 +28,14 @@ import (
 )
 
 const (
-	tlsAlpn01 = "tls-alpn-01"
+	tlsAlpn01     = "tls-alpn-01"
+	http01        = "http-01"
+	httpWellKnown = "/.well-known/acme-challenge/"
 )
 
 var (
-	allowedChallenges  = []string{tlsAlpn01}
-	domainKeyRSALength = 2048
+	globalAllowedChallenges = []string{tlsAlpn01}
+	domainKeyRSALength      = 2048
 )
 
 var haveNoCert = errors.New("have no certificate for domain")
@@ -59,13 +62,19 @@ type Manager struct {
 	// generated and, if Cache is not nil, stored in cache.
 	//
 	// Mutating the field after the first call of GetCertificate method will have no effect.
-	Client *acme.Client
+	Client               *acme.Client
+	EnableHttpValidation bool
+	EnableTlsValidation  bool
 
+	// will rewrite to Cache in future
+	// https://github.com/rekby/lets-proxy2/issues/32
 	certTokensMu sync.RWMutex
 	certTokens   map[DomainName]*tls.Certificate
 
 	certStateMu sync.Mutex
 	certState   map[certNameType]*certState
+
+	httpTokens *cache.MemoryCache
 }
 
 func New(ctx context.Context, client *acme.Client) *Manager {
@@ -74,6 +83,8 @@ func New(ctx context.Context, client *acme.Client) *Manager {
 	res.certTokens = make(map[DomainName]*tls.Certificate)
 	res.certState = make(map[certNameType]*certState)
 	res.CertificateIssueTimeout = time.Minute
+	res.httpTokens = cache.NewMemoryCache("Http validation tokens")
+	res.EnableTlsValidation = true
 	return &res
 }
 
@@ -248,6 +259,14 @@ func (m *Manager) authorizeDomain(ctx context.Context, domain DomainName) error 
 		go m.revokePendingAuthorizations(revokeContext, authUries)
 	}()
 
+	var allowedChallenges []string
+	if m.EnableTlsValidation {
+		allowedChallenges = append(allowedChallenges, tlsAlpn01)
+	}
+	if m.EnableHttpValidation {
+		allowedChallenges = append(allowedChallenges, http01)
+	}
+
 	var nextChallengeTypeIndex int
 	for {
 		// Start domain authorization and get the challenge.
@@ -399,10 +418,49 @@ func (m *Manager) fulfill(ctx context.Context, challenge *acme.Challenge, domain
 			return nil, err
 		}
 		m.putCertToken(ctx, domain, &cert)
-		return func(ctx context.Context) { go m.deleteCertToken(ctx, domain) }, nil
+		return func(localContext context.Context) { go m.deleteCertToken(localContext, domain) }, nil
+	case http01:
+		resp, err := m.Client.HTTP01ChallengeResponse(challenge.Token)
+		if err != nil {
+			return nil, err
+		}
+		key := domain.ASCII() + "/" + challenge.Token
+		err = m.httpTokens.Put(ctx, key, []byte(resp))
+		return func(localContext context.Context) { _ = m.httpTokens.Delete(localContext, key) }, nil
 	default:
 		logger.Error("Unknow challenge type", zap.Reflect("challenge", challenge))
 		return nil, errors.New("unknown challenge type")
+	}
+}
+
+func (m *Manager) IsHttpValidationRequest(r *http.Request) bool {
+	if r == nil || r.URL == nil {
+		return false
+	}
+	if r.Method != http.MethodGet {
+		return false
+	}
+
+	return strings.HasPrefix(r.URL.Path, httpWellKnown)
+}
+
+func (m *Manager) HandleHttpValidation(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	logger := zc.L(ctx)
+	if !m.IsHttpValidationRequest(r) {
+		logger.DPanic("Pass non validation url to handle in cert manager.", zap.Reflect("req", r))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	token := strings.TrimPrefix(r.URL.Path, httpWellKnown)
+	domain := normalizeDomain(r.Host)
+	resp, err := m.httpTokens.Get(ctx, domain.ASCII()+"/"+token)
+	if err == nil {
+		_, err = w.Write(resp)
+		logger.Warn("Error write http token answer to response", logDomain(domain), zap.String("token", token), zap.Error(err))
+	} else {
+		logger.Warn("Have no validation token", logDomain(domain), zap.String("token", token), zap.Error(err))
 	}
 }
 

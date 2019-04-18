@@ -133,7 +133,7 @@ func init() {
 	zc.SetDefaultLogger(logger)
 }
 
-func TestManager_GetCertificate(t *testing.T) {
+func TestManager_GetCertificateTls(t *testing.T) {
 	logger, err := zap.NewDevelopment()
 	if err != nil {
 		t.Fatal(err)
@@ -197,6 +197,162 @@ func TestManager_GetCertificate(t *testing.T) {
 				break
 			}
 		}
+	}()
+
+	t.Run("OneCert", func(t *testing.T) {
+		domain := "onecert.ru"
+
+		cert, err := manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain, Conn: contextConnection{Context: ctx}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if cert.Leaf.NotBefore.After(time.Now()) {
+			t.Error(cert.Leaf.NotBefore)
+		}
+		if cert.Leaf.NotAfter.Before(time.Now()) {
+			t.Error(cert.Leaf.NotAfter)
+		}
+		if cert.Leaf.VerifyHostname(domain) != nil {
+			t.Error(cert.Leaf.VerifyHostname(domain))
+		}
+		if cert.Leaf.VerifyHostname("www."+domain) != nil {
+			t.Error(cert.Leaf.VerifyHostname(domain))
+		}
+	})
+
+	t.Run("punycode-domain", func(t *testing.T) {
+		domain := "xn--80adjurfhd.xn--p1ai" // проверка.рф
+
+		cert, err := manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain, Conn: contextConnection{Context: ctx}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if cert.Leaf.NotBefore.After(time.Now()) {
+			t.Error(cert.Leaf.NotBefore)
+		}
+		if cert.Leaf.NotAfter.Before(time.Now()) {
+			t.Error(cert.Leaf.NotAfter)
+		}
+		if cert.Leaf.VerifyHostname(domain) != nil {
+			t.Error(cert.Leaf.VerifyHostname(domain))
+		}
+		if cert.Leaf.VerifyHostname("www."+domain) != nil {
+			t.Error(cert.Leaf.VerifyHostname(domain))
+		}
+	})
+
+	t.Run("OneCertCamelCase", func(t *testing.T) {
+		domain := "onecertCamelCase.ru"
+		cert, err := manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain, Conn: contextConnection{Context: ctx}})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if cert.Leaf.NotBefore.After(time.Now()) {
+			t.Error(cert.Leaf.NotBefore)
+		}
+		if cert.Leaf.NotAfter.Before(time.Now()) {
+			t.Error(cert.Leaf.NotAfter)
+		}
+		if cert.Leaf.VerifyHostname(domain) != nil {
+			t.Error(cert.Leaf.VerifyHostname(domain))
+		}
+	})
+
+	t.Run("ParallelCert", func(t *testing.T) {
+		// change top loevel logger
+		// no parallelize
+		oldLogger := logger
+		logger = zap.NewNop()
+		defer func() {
+			logger = oldLogger
+		}()
+
+		domain := "ParallelCert.ru"
+		const cnt = 100
+
+		chanCerts := make(chan *tls.Certificate, cnt)
+
+		var wg sync.WaitGroup
+		wg.Add(cnt)
+
+		for i := 0; i < cnt; i++ {
+			go func() {
+				cert, err := manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain, Conn: contextConnection{Context: ctx}})
+				if err != nil {
+					t.Fatal(err)
+				}
+				chanCerts <- cert
+				wg.Done()
+			}()
+		}
+
+		wg.Wait()
+		cert := <-chanCerts
+		for i := 0; i < len(chanCerts)-1; i++ {
+			cert2 := <-chanCerts
+			td.CmpDeeply(t, cert2, cert)
+		}
+	})
+}
+
+func TestManager_GetCertificateHttp01(t *testing.T) {
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, flush := th.TestContext()
+	defer flush()
+
+	mc := minimock.NewController(t)
+	defer mc.Finish()
+
+	cacheMock := NewCacheMock(mc)
+	cacheMock.GetMock.Set(func(ctx context.Context, key string) (ba1 []byte, err error) {
+		zc.L(ctx).Debug("Cache mock get", zap.String("key", key))
+		return nil, cache.ErrCacheMiss
+	})
+	cacheMock.PutMock.Set(func(ctx context.Context, key string, data []byte) (err error) {
+		zc.L(ctx).Debug("Cache mock put", zap.String("key", key))
+		return nil
+	})
+
+	manager := New(ctx, createTestClient(t))
+	manager.Cache = cacheMock
+	manager.EnableTlsValidation = false
+	manager.EnableHttpValidation = true
+
+	lisneter, err := net.ListenTCP("tcp", &net.TCPAddr{Port: 5002})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lisneter.Close()
+
+	go func() {
+		ctx := zc.WithLogger(context.Background(), logger)
+		server := http.Server{}
+		mux := http.ServeMux{}
+		mux.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+			request = request.WithContext(ctx)
+			if manager.IsHttpValidationRequest(request) {
+				logger.Info("Handle validation request", zap.Reflect("request", request))
+				manager.HandleHttpValidation(writer, request)
+			} else {
+				logger.Warn("Handle non validation request")
+				writer.WriteHeader(http.StatusInternalServerError)
+			}
+		})
+		server.Handler = &mux
+		go func() {
+			<-ctx.Done()
+			_ = server.Shutdown(context.Background())
+		}()
+		err = server.Serve(lisneter)
+		logger.Info("http server shutdown", zap.Error(err))
 	}()
 
 	t.Run("OneCert", func(t *testing.T) {
