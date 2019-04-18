@@ -10,4 +10,5 @@ require (
 	github.com/satori/go.uuid v1.2.0
 	go.uber.org/zap v1.9.1
 	golang.org/x/crypto v0.0.0-20190411191339-88737f569e3a
+	golang.org/x/net v0.0.0-20190415214537-1da14a5a36f2
 )

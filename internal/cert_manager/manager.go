@@ -1,18 +1,24 @@
-package manager
+package cert_manager
 
 import (
 	"bytes"
 	"context"
 	"crypto"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"fmt"
+	"net/http"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/rekby/lets-proxy2/internal/cache"
 
 	"github.com/rekby/lets-proxy2/internal/log"
 
@@ -22,41 +28,31 @@ import (
 )
 
 const (
-	tlsAlpn01 = "tls-alpn-01"
+	tlsAlpn01     = "tls-alpn-01"
+	http01        = "http-01"
+	httpWellKnown = "/.well-known/acme-challenge/"
 )
 
 var (
-	allowedChallenges  = []string{tlsAlpn01}
-	domainKeyRSALength = 2048
+	globalAllowedChallenges = []string{tlsAlpn01}
+	domainKeyRSALength      = 2048
 )
 
-var ErrCacheMiss = errors.New("lets proxy: certificate cache miss")
 var haveNoCert = errors.New("have no certificate for domain")
 var notImplementedError = errors.New("not implemented yet")
-
-type Cache interface {
-	// Get returns a certificate data for the specified key.
-	// If there's no such key, Get returns ErrCacheMiss.
-	Get(ctx context.Context, key string) ([]byte, error)
-
-	// Put stores the data in the cache under the specified key.
-	// Underlying implementations may use any data storage format,
-	// as long as the reverse operation, Get, results in the original data.
-	Put(ctx context.Context, key string, data []byte) error
-
-	// Delete removes a certificate data from the cache under the specified key.
-	// If there's no such key in the cache, Delete returns nil.
-	Delete(ctx context.Context, key string) error
-}
 
 type GetContext interface {
 	GetContext() context.Context
 }
 
+type keyType string
+
+const keyRSA keyType = "rsa"
+
 // Interface inspired to https://godoc.org/golang.org/x/crypto/acme/autocert#Manager but not compatible gurantee
 type Manager struct {
 	CertificateIssueTimeout time.Duration
-	Cache                   Cache
+	Cache                   cache.Cache
 
 	// Client is used to perform low-level operations, such as account registration
 	// and requesting new certificates.
@@ -66,13 +62,19 @@ type Manager struct {
 	// generated and, if Cache is not nil, stored in cache.
 	//
 	// Mutating the field after the first call of GetCertificate method will have no effect.
-	Client *acme.Client
+	Client               *acme.Client
+	EnableHttpValidation bool
+	EnableTlsValidation  bool
 
+	// will rewrite to Cache in future
+	// https://github.com/rekby/lets-proxy2/issues/32
 	certTokensMu sync.RWMutex
 	certTokens   map[DomainName]*tls.Certificate
 
 	certStateMu sync.Mutex
 	certState   map[certNameType]*certState
+
+	httpTokens *cache.MemoryCache
 }
 
 func New(ctx context.Context, client *acme.Client) *Manager {
@@ -81,6 +83,8 @@ func New(ctx context.Context, client *acme.Client) *Manager {
 	res.certTokens = make(map[DomainName]*tls.Certificate)
 	res.certState = make(map[certNameType]*certState)
 	res.CertificateIssueTimeout = time.Minute
+	res.httpTokens = cache.NewMemoryCache("Http validation tokens")
+	res.EnableTlsValidation = true
 	return &res
 }
 
@@ -100,9 +104,10 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, 
 	needDomain := normalizeDomain(hello.ServerName)
 
 	logger := zc.L(ctx).With(logDomain(needDomain))
-	logger.Info("Get certificate")
+	logger.Info("Get certificate", zap.String("original_domain", hello.ServerName))
 	if isTlsAlpn01Hello(hello) {
 		logger.Debug("It is tls-alpn-01 token request.")
+
 		m.certTokensMu.RLock()
 		cert := m.certTokens[needDomain]
 		m.certTokensMu.RUnlock()
@@ -124,10 +129,12 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, 
 	certState := m.certStateGet(certName)
 	cert, err := certState.Cert()
 	if cert != nil {
+		logger.Debug("Got certificate from local state", log.Cert(cert))
+
+		// Disable check for locked certificates
 		cert, err = validCertDer([]DomainName{needDomain}, cert.Certificate, cert.PrivateKey, time.Now())
-		if cert != nil {
-			logger.Debug("Got certificate from local state", log.Cert(cert))
-			return cert, nil
+		if err != nil {
+			logger.Debug("In memory cached certificate doesn't valid. Issue new.", log.Cert(cert), zap.Error(err))
 		}
 	}
 	if err != nil {
@@ -179,7 +186,7 @@ func (m *Manager) createCertificateForDomains(ctx context.Context, certName cert
 		return certState.WaitFinishIssue(waitTimeout)
 	}
 
-	cachedCert, err := getCertificate(ctx, m.Cache, certName, "rsa")
+	cachedCert, err := getCertificate(ctx, m.Cache, certName, keyRSA)
 	if err == nil {
 		logger.Debug("Certificate loaded from cache")
 		return cachedCert, nil
@@ -251,6 +258,14 @@ func (m *Manager) authorizeDomain(ctx context.Context, domain DomainName) error 
 		revokeContext = zc.WithLogger(revokeContext, logger.With(zap.Bool("detached", true)))
 		go m.revokePendingAuthorizations(revokeContext, authUries)
 	}()
+
+	var allowedChallenges []string
+	if m.EnableTlsValidation {
+		allowedChallenges = append(allowedChallenges, tlsAlpn01)
+	}
+	if m.EnableHttpValidation {
+		allowedChallenges = append(allowedChallenges, http01)
+	}
 
 	var nextChallengeTypeIndex int
 	for {
@@ -327,7 +342,7 @@ func (m *Manager) issueCertificate(ctx context.Context, certName certNameType, d
 	}
 	logger := zc.L(ctx).With(logDomains(domains))
 
-	key, err := m.certKeyGet(ctx, certName)
+	key, err := m.certKeyGetOrCreate(ctx, certName, keyRSA)
 	if err != nil {
 		logger.Error("Can't get domain key", zap.Error(err))
 		return nil, err
@@ -364,26 +379,34 @@ func (m *Manager) revokePendingAuthorizations(ctx context.Context, uries []strin
 	}
 }
 
-var generatedKey *rsa.PrivateKey
-
-func (m *Manager) certKeyGet(ctx context.Context, domain certNameType) (crypto.Signer, error) {
+func (m *Manager) certKeyGetOrCreate(ctx context.Context, certName certNameType, keyType keyType) (crypto.Signer, error) {
 	logger := zc.L(ctx)
 
-	//TODO: load/save with cache
-	if generatedKey != nil {
-		logger.Debug("Get RSA key from cache.")
-		return generatedKey, nil
+	if keyType != keyRSA {
+		logger.DPanic("Unknown key type", zap.String("key_type", string(keyType)))
+		return nil, errors.New("unknown key type for generate key")
+	}
+
+	key, err := getCertificateKey(ctx, m.Cache, certName, keyType)
+	if err == nil {
+		logger.Debug("Got certificate key from cache and reuse old key")
+	} else {
+		if err == cache.ErrCacheMiss {
+			logger.Debug("Cert key no in cache. Create new.")
+		} else {
+			logger.Error("Error while check cert key in cache", zap.Error(err))
+			return nil, err
+		}
 	}
 
 	logger.Debug("Generate new rsa key")
-	key, err := rsa.GenerateKey(rand.Reader, domainKeyRSALength)
-	if err == nil {
-		generatedKey = key
-		return key, nil
+	key, err = rsa.GenerateKey(rand.Reader, domainKeyRSALength)
+	if err != nil {
+		logger.Error("Can't generate rsa key", zap.Error(err))
+		return nil, err
 	}
 
-	logger.Error("Can't generate rsa key", zap.Error(err))
-	return nil, err
+	return key, nil
 }
 
 func (m *Manager) fulfill(ctx context.Context, challenge *acme.Challenge, domain DomainName) (func(context.Context), error) {
@@ -395,10 +418,49 @@ func (m *Manager) fulfill(ctx context.Context, challenge *acme.Challenge, domain
 			return nil, err
 		}
 		m.putCertToken(ctx, domain, &cert)
-		return func(ctx context.Context) { go m.deleteCertToken(ctx, domain) }, nil
+		return func(localContext context.Context) { go m.deleteCertToken(localContext, domain) }, nil
+	case http01:
+		resp, err := m.Client.HTTP01ChallengeResponse(challenge.Token)
+		if err != nil {
+			return nil, err
+		}
+		key := domain.ASCII() + "/" + challenge.Token
+		err = m.httpTokens.Put(ctx, key, []byte(resp))
+		return func(localContext context.Context) { _ = m.httpTokens.Delete(localContext, key) }, nil
 	default:
 		logger.Error("Unknow challenge type", zap.Reflect("challenge", challenge))
 		return nil, errors.New("unknown challenge type")
+	}
+}
+
+func (m *Manager) IsHttpValidationRequest(r *http.Request) bool {
+	if r == nil || r.URL == nil {
+		return false
+	}
+	if r.Method != http.MethodGet {
+		return false
+	}
+
+	return strings.HasPrefix(r.URL.Path, httpWellKnown)
+}
+
+func (m *Manager) HandleHttpValidation(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	logger := zc.L(ctx)
+	if !m.IsHttpValidationRequest(r) {
+		logger.DPanic("Pass non validation url to handle in cert manager.", zap.Reflect("req", r))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	token := strings.TrimPrefix(r.URL.Path, httpWellKnown)
+	domain := normalizeDomain(r.Host)
+	resp, err := m.httpTokens.Get(ctx, domain.ASCII()+"/"+token)
+	if err == nil {
+		_, err = w.Write(resp)
+		logger.Warn("Error write http token answer to response", logDomain(domain), zap.String("token", token), zap.Error(err))
+	} else {
+		logger.Warn("Have no validation token", logDomain(domain), zap.String("token", token), zap.Error(err))
 	}
 }
 
@@ -444,7 +506,7 @@ func (m *Manager) deleteCertToken(ctx context.Context, key DomainName) {
 }
 
 // It isn't atomic syncronized - caller must not save two certificates with same name same time
-func storeCertificate(ctx context.Context, cache Cache, certName certNameType,
+func storeCertificate(ctx context.Context, cache cache.Cache, certName certNameType,
 	cert *tls.Certificate) {
 	logger := zc.L(ctx)
 	if cache == nil {
@@ -452,7 +514,7 @@ func storeCertificate(ctx context.Context, cache Cache, certName certNameType,
 		return
 	}
 
-	var keyType string
+	var keyType keyType
 
 	var certBuf bytes.Buffer
 	for _, block := range cert.Certificate {
@@ -468,7 +530,7 @@ func storeCertificate(ctx context.Context, cache Cache, certName certNameType,
 
 	switch privateKey := cert.PrivateKey.(type) {
 	case *rsa.PrivateKey:
-		keyType = "rsa"
+		keyType = keyRSA
 		keyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
 		pemBlock := pem.Block{Type: "RSA PRIVATE KEY", Bytes: keyBytes}
 		err := pem.Encode(&privateKeyBuf, &pemBlock)
@@ -485,8 +547,8 @@ func storeCertificate(ctx context.Context, cache Cache, certName certNameType,
 		logger.DPanic("store cert key type doesn't init")
 	}
 
-	certKeyName := string(certName) + "." + keyType + ".cer"
-	keyKeyName := string(certName) + "." + keyType + ".key"
+	certKeyName := string(certName) + "." + string(keyType) + ".cer"
+	keyKeyName := string(certName) + "." + string(keyType) + ".key"
 
 	err := cache.Put(ctx, certKeyName, certBuf.Bytes())
 	if err != nil {
@@ -501,22 +563,20 @@ func storeCertificate(ctx context.Context, cache Cache, certName certNameType,
 	}
 }
 
-func getCertificate(ctx context.Context, cache Cache, certName certNameType, keyType string) (cert *tls.Certificate, err error) {
+func getCertificate(ctx context.Context, cache cache.Cache, certName certNameType, keyType keyType) (cert *tls.Certificate, err error) {
 	logger := zc.L(ctx)
 	logger.Debug("Check certificate in cache")
 	defer func() {
 		logger.Debug("Check certificate in cache", log.Cert(cert), zap.Error(err))
 	}()
 
-	certKeyName := string(certName) + "." + keyType + ".cer"
-	keyKeyName := string(certName) + "." + keyType + ".key"
+	certKeyName := string(certName) + "." + string(keyType) + ".cer"
 
 	certBytes, err := cache.Get(ctx, certKeyName)
 	if err != nil {
 		return nil, err
 	}
-
-	keyBytes, err := cache.Get(ctx, keyKeyName)
+	keyBytes, err := getCertificateKeyBytes(ctx, cache, certName, keyType)
 	if err != nil {
 		return nil, err
 	}
@@ -526,4 +586,67 @@ func getCertificate(ctx context.Context, cache Cache, certName certNameType, key
 		return nil, err
 	}
 	return validCertTls(&cert2, nil, time.Now())
+}
+
+func getCertificateKeyBytes(ctx context.Context, cache cache.Cache, certName certNameType, keyType keyType) ([]byte, error) {
+	keyKeyName := string(certName) + "." + string(keyType) + ".key"
+	return cache.Get(ctx, keyKeyName)
+}
+
+func getCertificateKey(ctx context.Context, cache cache.Cache, certName certNameType, keyType keyType) (crypto.Signer, error) {
+	certBytes, err := getCertificateKeyBytes(ctx, cache, certName, keyType)
+	if err != nil {
+		return nil, err
+	}
+	return parsePrivateKey(certBytes)
+}
+
+func parsePrivateKey(keyPEMBlock []byte) (crypto.Signer, error) {
+	// extract from tls.go, standard lib. func X509KeyPair(certPEMBlock, keyPEMBlock []byte) (Certificate, error)
+	// X509KeyPair parses a public/private key pair from a pair of
+	// PEM encoded data. On successful return, Certificate.Leaf will be nil because
+	// the parsed form of the certificate is not retained.
+	fail := func(err error) (crypto.Signer, error) { return nil, err }
+
+	var keyDERBlock *pem.Block
+	var skippedBlockTypes []string
+	for {
+		keyDERBlock, keyPEMBlock = pem.Decode(keyPEMBlock)
+		if keyDERBlock == nil {
+			return fail(fmt.Errorf("tls: failed to find PEM block with type ending in \"PRIVATE KEY\" in key input after skipping PEM blocks of the following types: %v", skippedBlockTypes))
+		}
+		if keyDERBlock.Type == "PRIVATE KEY" || strings.HasSuffix(keyDERBlock.Type, " PRIVATE KEY") {
+			break
+		}
+		skippedBlockTypes = append(skippedBlockTypes, keyDERBlock.Type)
+	}
+
+	// bedge key bytes
+	der := keyDERBlock.Bytes
+
+	// copy from tls.go, standard lib. func parsePrivateKey(der []byte) (crypto.PrivateKey, error)
+	//
+	// Attempt to parse the given private key DER block. OpenSSL 0.9.8 generates
+	// PKCS#1 private keys by default, while OpenSSL 1.0.0 generates PKCS#8 keys.
+	// OpenSSL ecparam generates SEC1 EC private keys for ECDSA. We try all three.
+	// func parsePrivateKey(der []byte) (crypto.PrivateKey, error) {
+	if key, err := x509.ParsePKCS1PrivateKey(der); err == nil {
+		return key, nil
+	}
+	if key, err := x509.ParsePKCS8PrivateKey(der); err == nil {
+		switch key := key.(type) {
+		// change from original. separate case need for allow return signer interface
+		case *rsa.PrivateKey:
+			return key, nil
+		case *ecdsa.PrivateKey:
+			return key, nil
+		default:
+			return nil, errors.New("tls: found unknown private key type in PKCS#8 wrapping")
+		}
+	}
+	if key, err := x509.ParseECPrivateKey(der); err == nil {
+		return key, nil
+	}
+
+	return nil, errors.New("tls: failed to parse private key")
 }
