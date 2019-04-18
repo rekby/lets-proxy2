@@ -39,6 +39,11 @@ func TestMemoryCache(t *testing.T) {
 		t.Error(err)
 	}
 
+	err = c.Delete(ctx, "non-existed-key")
+	if err != nil {
+		t.Error(err)
+	}
+
 	res, err = c.Get(ctx, "asd")
 	if len(res) != 0 {
 		t.Error(res)
