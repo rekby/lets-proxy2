@@ -1,4 +1,4 @@
-package manager
+package cert_manager
 
 // DO NOT EDIT!
 // The code below was generated with http://github.com/gojuno/minimock (dev)

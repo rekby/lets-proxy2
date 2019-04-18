@@ -6,8 +6,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/rekby/lets-proxy2/internal/manager"
-
 	"github.com/rekby/lets-proxy2/internal/th"
 )
 
@@ -27,7 +25,7 @@ func TestDiskCache(t *testing.T) {
 	if len(res) != 0 {
 		t.Error(res)
 	}
-	if err != manager.ErrCacheMiss {
+	if err != ErrCacheMiss {
 		t.Error(err)
 	}
 
@@ -54,7 +52,7 @@ func TestDiskCache(t *testing.T) {
 	if len(res) != 0 {
 		t.Error(res)
 	}
-	if err != manager.ErrCacheMiss {
+	if err != ErrCacheMiss {
 		t.Error(err)
 	}
 }

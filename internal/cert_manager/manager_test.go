@@ -1,4 +1,4 @@
-package manager
+package cert_manager
 
 import (
 	"context"
@@ -11,6 +11,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/rekby/lets-proxy2/internal/cache"
 
 	"go.uber.org/zap"
 
@@ -146,7 +148,7 @@ func TestManager_GetCertificate(t *testing.T) {
 	cacheMock := NewCacheMock(mc)
 	cacheMock.GetMock.Set(func(ctx context.Context, key string) (ba1 []byte, err error) {
 		zc.L(ctx).Debug("Cache mock get", zap.String("key", key))
-		return nil, ErrCacheMiss
+		return nil, cache.ErrCacheMiss
 	})
 	cacheMock.PutMock.Set(func(ctx context.Context, key string, data []byte) (err error) {
 		zc.L(ctx).Debug("Cache mock put", zap.String("key", key))

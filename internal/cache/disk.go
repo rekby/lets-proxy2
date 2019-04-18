@@ -10,8 +10,6 @@ import (
 
 	"github.com/rekby/zapcontext"
 	"go.uber.org/zap"
-
-	"github.com/rekby/lets-proxy2/internal/manager"
 )
 
 type DiskCache struct {
@@ -32,7 +30,7 @@ func (d *DiskCache) Get(ctx context.Context, key string) ([]byte, error) {
 
 	res, err := ioutil.ReadFile(d.filepath(key))
 	if os.IsNotExist(err) {
-		err = manager.ErrCacheMiss
+		err = ErrCacheMiss
 	}
 
 	zc.L(ctx).Debug("Got from disk cache", zap.String("dir", d.Dir), zap.String("key", key), zap.Error(err))
