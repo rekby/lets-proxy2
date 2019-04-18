@@ -8,7 +8,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"errors"
-	"strings"
 	"time"
 
 	"golang.org/x/crypto/acme"
@@ -27,34 +26,35 @@ func pickChallenge(typ string, chal []*acme.Challenge) *acme.Challenge {
 	return nil
 }
 
-func createCertRequest(key crypto.Signer, commonName string, dnsNames ...string) ([]byte, error) {
+func createCertRequest(key crypto.Signer, commonName DomainName, domains ...DomainName) ([]byte, error) {
+	dnsNames := make([]string, len(domains))
+	for i, v := range domains {
+		dnsNames[i] = v.String()
+	}
 	req := &x509.CertificateRequest{
-		Subject:  pkix.Name{CommonName: commonName},
+		Subject:  pkix.Name{CommonName: commonName.String()},
 		DNSNames: dnsNames,
 	}
 	return x509.CreateCertificateRequest(rand.Reader, req, key)
 }
 
-func normalizeDomain(domain string) string {
-	domain = strings.TrimSpace(domain)
-	domain = strings.TrimSuffix(domain, ".")
-	domain = strings.ToLower(domain)
-	return domain
-}
-
-// Return valid parced certificate or error
-func validCertDer(domains []string, der [][]byte, key crypto.PrivateKey, now time.Time) (cert *tls.Certificate, err error) {
-	// parse public part(s)
+func flatByteSlices(in [][]byte) []byte {
 	var n int
-	for _, b := range der {
+	for _, b := range in {
 		n += len(b)
 	}
 	buf := make([]byte, n)
 	n = 0
-	for _, b := range der {
+	for _, b := range in {
 		n += copy(buf[n:], b)
 	}
-	x509Cert, err := x509.ParseCertificates(buf)
+	return buf
+}
+
+// Return valid parced certificate or error
+func validCertDer(domains []DomainName, der [][]byte, key crypto.PrivateKey, now time.Time) (cert *tls.Certificate, err error) {
+	// parse public part(s)
+	x509Cert, err := x509.ParseCertificates(flatByteSlices(der))
 	if err != nil || len(x509Cert) == 0 {
 		return nil, errors.New("no certificate found in der bytes")
 	}
@@ -67,10 +67,10 @@ func validCertDer(domains []string, der [][]byte, key crypto.PrivateKey, now tim
 		Leaf:        leaf,
 	}
 
-	return validCertTls(cert, domains, key, now)
+	return validCertTls(cert, domains, now)
 }
 
-func validCertTls(cert *tls.Certificate, domains []string, key crypto.PrivateKey, now time.Time) (validCert *tls.Certificate, err error) {
+func validCertTls(cert *tls.Certificate, domains []DomainName, now time.Time) (validCert *tls.Certificate, err error) {
 	if cert == nil {
 		return nil, errors.New("certificate is nil")
 	}
@@ -90,7 +90,7 @@ func validCertTls(cert *tls.Certificate, domains []string, key crypto.PrivateKey
 	// ensure the leaf corresponds to the private key and matches the certKey type
 	switch pub := cert.Leaf.PublicKey.(type) {
 	case *rsa.PublicKey:
-		prv, ok := key.(*rsa.PrivateKey)
+		prv, ok := cert.PrivateKey.(*rsa.PrivateKey)
 		if !ok {
 			return nil, errors.New("private key type does not match public key type")
 		}
@@ -110,7 +110,7 @@ func validCertTls(cert *tls.Certificate, domains []string, key crypto.PrivateKey
 	}
 
 	for _, domain := range domains {
-		if err := cert.Leaf.VerifyHostname(domain); err != nil {
+		if err := cert.Leaf.VerifyHostname(string(domain)); err != nil {
 			return nil, err
 		}
 	}

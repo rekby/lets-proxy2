@@ -1,4 +1,4 @@
-package main
+package proxy
 
 import (
 	"context"
@@ -102,7 +102,7 @@ func (p *proxyType) handleTcpTLSConnection(ctx context.Context, conn net.Conn, a
 		logger.Info("Can't handshake", zap.Error(err))
 	}
 
-	err = p.connListenProxy.Put(tlsConn)
+	err = p.connListenProxy.Put(ContextConnextion{tlsConn, ctx})
 	if err != nil {
 		if ctx.Err() != nil {
 			logger.Warn("Can't put connection to proxy. Close it.", zap.Error(err))
@@ -121,8 +121,8 @@ type listenerType struct {
 }
 
 func (l *listenerType) Put(conn net.Conn) error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.mu.RLock()
+	defer l.mu.RUnlock()
 
 	if l.closed {
 		return errors.New("listener closed")

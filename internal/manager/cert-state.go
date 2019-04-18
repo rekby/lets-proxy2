@@ -7,10 +7,9 @@ import (
 	"sync"
 
 	"github.com/rekby/lets-proxy2/internal/log"
+	"github.com/rekby/zapcontext"
 
 	"go.uber.org/zap"
-
-	"github.com/rekby/zapcontext"
 )
 
 type certState struct {

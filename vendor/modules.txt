@@ -1,5 +1,7 @@
 # github.com/davecgh/go-spew v1.1.1
 github.com/davecgh/go-spew/spew
+# github.com/gojuno/minimock v0.0.0-20190201083043-bbb4f602d884
+github.com/gojuno/minimock
 # github.com/maxatome/go-testdeep v1.0.8
 github.com/maxatome/go-testdeep
 github.com/maxatome/go-testdeep/helpers/tdutil
@@ -10,6 +12,8 @@ github.com/maxatome/go-testdeep/internal/types
 github.com/maxatome/go-testdeep/internal/util
 # github.com/pelletier/go-toml v1.3.0
 github.com/pelletier/go-toml
+# github.com/pmezard/go-difflib v1.0.0
+github.com/pmezard/go-difflib/difflib
 # github.com/rekby/zapcontext v0.0.3
 github.com/rekby/zapcontext
 # github.com/satori/go.uuid v1.2.0
@@ -20,8 +24,8 @@ go.uber.org/atomic
 go.uber.org/multierr
 # go.uber.org/zap v1.9.1
 go.uber.org/zap
-go.uber.org/zap/internal/bufferpool
 go.uber.org/zap/zapcore
+go.uber.org/zap/internal/bufferpool
 go.uber.org/zap/buffer
 go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
