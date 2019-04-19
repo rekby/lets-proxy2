@@ -89,7 +89,7 @@ func (p *proxyType) handleTcpTLSConnection(ctx context.Context, conn net.Conn, a
 
 	ctx = zc.WithLogger(ctx, logger)
 
-	// TODO: save logger/context to some map - for extract in GetCertificate by Conn
+	// TODO: save logger/context to some map - for extract in proxy
 
 	logger.Debug("Accept connection", zap.String("remote_addr", conn.RemoteAddr().String()),
 		zap.String("local_addr", conn.LocalAddr().String()))
@@ -102,7 +102,14 @@ func (p *proxyType) handleTcpTLSConnection(ctx context.Context, conn net.Conn, a
 		logger.Info("Can't handshake", zap.Error(err))
 	}
 
-	err = p.connListenProxy.Put(ContextConnextion{tlsConn, ctx})
+	contextConn := ContextConnextion{Conn: tlsConn, Context: ctx}
+	contextConn.CloseFunc = func() error {
+		res := contextConn.Conn.Close()
+		logger.Debug("Close connection", zap.Error(err))
+		return res
+	}
+
+	err = p.connListenProxy.Put(contextConn)
 	if err != nil {
 		if ctx.Err() != nil {
 			logger.Warn("Can't put connection to proxy. Close it.", zap.Error(err))
