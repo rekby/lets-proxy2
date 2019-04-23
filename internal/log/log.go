@@ -35,13 +35,18 @@ func CertX509(cert *x509.Certificate) zap.Field {
 }
 
 func DebugError(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
+	debugError(logger, err, mess, fields...)
+}
+
+func DebugErrorCtx(ctx context.Context, err error, mess string, fields ...zap.Field) {
+	debugError(zc.L(ctx), err, mess, fields...)
+}
+
+func debugError(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
+	logger = logger.WithOptions(zap.AddCallerSkip(2))
 	if err == nil {
 		logger.Debug(mess, fields...)
 	} else {
 		logger.Error(mess, append(fields, zap.Error(err))...)
 	}
-}
-
-func DebugErrorCtx(ctx context.Context, err error, mess string, fields ...zap.Field) {
-	DebugError(zc.L(ctx), err, mess, fields...)
 }

@@ -21,7 +21,6 @@ type HttpProxy struct {
 	GetDestination       func(ctx context.Context, remoteAddr string) (addr string, err error)
 	GetContext           func(req *http.Request) context.Context
 	HandleHttpValidation func(w http.ResponseWriter, r *http.Request) bool
-	HttpClient           *http.Client
 
 	listener         net.Listener
 	httpReverseProxy httputil.ReverseProxy
@@ -33,7 +32,6 @@ func NewHttpProxy(ctx context.Context, listener net.Listener) *HttpProxy {
 		HandleHttpValidation: func(_ http.ResponseWriter, _ *http.Request) bool {
 			return false
 		},
-		HttpClient: http.DefaultClient,
 		GetContext: getContext,
 		listener:   listener,
 	}
