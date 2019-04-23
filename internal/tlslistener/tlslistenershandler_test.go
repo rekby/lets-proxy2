@@ -82,7 +82,7 @@ func TestProxyListenerType(t *testing.T) {
 }
 
 func TestProxyTLS(t *testing.T) {
-	defer time.Sleep(time.Second)
+	defer time.Sleep(time.Second / 10)
 
 	var body []byte
 	var resp *http.Response
