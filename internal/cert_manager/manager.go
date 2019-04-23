@@ -433,7 +433,7 @@ func (m *Manager) fulfill(ctx context.Context, challenge *acme.Challenge, domain
 	}
 }
 
-func (m *Manager) IsHttpValidationRequest(r *http.Request) bool {
+func (m *Manager) isHttpValidationRequest(r *http.Request) bool {
 	if r == nil || r.URL == nil {
 		return false
 	}
@@ -444,14 +444,13 @@ func (m *Manager) IsHttpValidationRequest(r *http.Request) bool {
 	return strings.HasPrefix(r.URL.Path, httpWellKnown)
 }
 
-func (m *Manager) HandleHttpValidation(w http.ResponseWriter, r *http.Request) {
+func (m *Manager) HandleHttpValidation(w http.ResponseWriter, r *http.Request) bool {
+	if !m.isHttpValidationRequest(r) {
+		return false
+	}
+
 	ctx := r.Context()
 	logger := zc.L(ctx)
-	if !m.IsHttpValidationRequest(r) {
-		logger.DPanic("Pass non validation url to handle in cert manager.", zap.Reflect("req", r))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
 
 	token := strings.TrimPrefix(r.URL.Path, httpWellKnown)
 	domain := normalizeDomain(r.Host)

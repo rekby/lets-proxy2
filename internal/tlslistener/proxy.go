@@ -1,4 +1,4 @@
-package proxy
+package tlslistener
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
-	"net/url"
 	"sync"
 
 	"github.com/rekby/zapcontext"
@@ -68,14 +67,6 @@ func (p *proxyType) init() {
 	p.connListenProxy.connections = make(chan net.Conn)
 	p.tlsConfig = tls.Config{GetCertificate: p.GetCertificate}
 	p.httpServer.Handler = &p.proxy
-}
-
-func (p *proxyType) director(request *http.Request) {
-	if request.URL == nil {
-		request.URL = &url.URL{}
-	}
-	request.URL.Scheme = "http"
-	request.URL.Host = p.TargetAddr
 }
 
 func (p *proxyType) handleTcpTLSConnection(ctx context.Context, conn net.Conn, acceptError error) {
