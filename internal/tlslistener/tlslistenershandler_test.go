@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -132,9 +133,14 @@ func TestProxyTLS(t *testing.T) {
 
 	go func() {
 		err := httpServer.Serve(&proxy)
-		if err != http.ErrServerClosed {
-			td.CmpNoError(err)
+		if err != nil {
+			if err == http.ErrServerClosed {
+				err = nil
+			} else if strings.Contains(err.Error(), "listener closed") {
+				err = nil
+			}
 		}
+		td.CmpNoError(err)
 	}()
 
 	httpClient := http.Client{
