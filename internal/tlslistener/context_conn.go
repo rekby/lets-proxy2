@@ -1,8 +1,10 @@
-package proxy
+package tlslistener
 
 import (
 	"context"
 	"net"
+
+	zc "github.com/rekby/zapcontext"
 )
 
 type ContextConnextion struct {
@@ -21,4 +23,11 @@ func (c ContextConnextion) Close() error {
 	} else {
 		return c.CloseFunc()
 	}
+}
+
+func finalizeContextConnection(conn *ContextConnextion) {
+	go func() {
+		zc.L(conn.Context).Warn("Leaked connection")
+		_ = conn.Close()
+	}()
 }

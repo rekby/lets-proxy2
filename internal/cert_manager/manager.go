@@ -433,7 +433,7 @@ func (m *Manager) fulfill(ctx context.Context, challenge *acme.Challenge, domain
 	}
 }
 
-func (m *Manager) IsHttpValidationRequest(r *http.Request) bool {
+func (m *Manager) isHttpValidationRequest(r *http.Request) bool {
 	if r == nil || r.URL == nil {
 		return false
 	}
@@ -444,24 +444,25 @@ func (m *Manager) IsHttpValidationRequest(r *http.Request) bool {
 	return strings.HasPrefix(r.URL.Path, httpWellKnown)
 }
 
-func (m *Manager) HandleHttpValidation(w http.ResponseWriter, r *http.Request) {
+func (m *Manager) HandleHttpValidation(w http.ResponseWriter, r *http.Request) bool {
+	if !m.isHttpValidationRequest(r) {
+		return false
+	}
+
 	ctx := r.Context()
 	logger := zc.L(ctx)
-	if !m.IsHttpValidationRequest(r) {
-		logger.DPanic("Pass non validation url to handle in cert manager.", zap.Reflect("req", r))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
 
 	token := strings.TrimPrefix(r.URL.Path, httpWellKnown)
 	domain := normalizeDomain(r.Host)
 	resp, err := m.httpTokens.Get(ctx, domain.ASCII()+"/"+token)
+	logger.Debug("Get http token", zap.Error(err))
 	if err == nil {
 		_, err = w.Write(resp)
-		logger.Warn("Error write http token answer to response", logDomain(domain), zap.String("token", token), zap.Error(err))
+		log.DebugInfo(logger, err, "Error write http token answer to response", logDomain(domain), zap.String("token", token))
 	} else {
 		logger.Warn("Have no validation token", logDomain(domain), zap.String("token", token), zap.Error(err))
 	}
+	return true
 }
 
 func (m *Manager) putCertToken(ctx context.Context, key DomainName, certificate *tls.Certificate) {

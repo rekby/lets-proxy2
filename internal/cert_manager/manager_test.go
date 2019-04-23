@@ -338,7 +338,7 @@ func TestManager_GetCertificateHttp01(t *testing.T) {
 		mux := http.ServeMux{}
 		mux.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 			request = request.WithContext(ctx)
-			if manager.IsHttpValidationRequest(request) {
+			if manager.isHttpValidationRequest(request) {
 				logger.Info("Handle validation request", zap.Reflect("request", request))
 				manager.HandleHttpValidation(writer, request)
 			} else {
