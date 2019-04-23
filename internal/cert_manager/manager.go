@@ -455,12 +455,14 @@ func (m *Manager) HandleHttpValidation(w http.ResponseWriter, r *http.Request) b
 	token := strings.TrimPrefix(r.URL.Path, httpWellKnown)
 	domain := normalizeDomain(r.Host)
 	resp, err := m.httpTokens.Get(ctx, domain.ASCII()+"/"+token)
+	logger.Debug("Get http token", zap.Error(err))
 	if err == nil {
 		_, err = w.Write(resp)
-		logger.Warn("Error write http token answer to response", logDomain(domain), zap.String("token", token), zap.Error(err))
+		log.DebugInfo(logger, err, "Error write http token answer to response", logDomain(domain), zap.String("token", token))
 	} else {
 		logger.Warn("Have no validation token", logDomain(domain), zap.String("token", token), zap.Error(err))
 	}
+	return true
 }
 
 func (m *Manager) putCertToken(ctx context.Context, key DomainName, certificate *tls.Certificate) {

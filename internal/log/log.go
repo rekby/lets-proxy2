@@ -34,18 +34,44 @@ func CertX509(cert *x509.Certificate) zap.Field {
 	return zap.Stringer("certificate", (*certLogger)(cert))
 }
 
+func DebugInfo(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
+	debugInfo(logger, err, mess, fields...)
+}
+
 func DebugError(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
 	debugError(logger, err, mess, fields...)
+}
+
+func InfoError(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
+	infoError(logger, err, mess, fields...)
 }
 
 func DebugErrorCtx(ctx context.Context, err error, mess string, fields ...zap.Field) {
 	debugError(zc.L(ctx), err, mess, fields...)
 }
 
+func debugInfo(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
+	logger = logger.WithOptions(zap.AddCallerSkip(2))
+	if err == nil {
+		logger.Debug(mess, fields...)
+	} else {
+		logger.Info(mess, append(fields, zap.Error(err))...)
+	}
+}
+
 func debugError(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
 	logger = logger.WithOptions(zap.AddCallerSkip(2))
 	if err == nil {
 		logger.Debug(mess, fields...)
+	} else {
+		logger.Error(mess, append(fields, zap.Error(err))...)
+	}
+}
+
+func infoError(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
+	logger = logger.WithOptions(zap.AddCallerSkip(2))
+	if err == nil {
+		logger.Info(mess, fields...)
 	} else {
 		logger.Error(mess, append(fields, zap.Error(err))...)
 	}
