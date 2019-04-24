@@ -38,6 +38,10 @@ func DebugInfo(logger *zap.Logger, err error, mess string, fields ...zap.Field) 
 	debugInfo(logger, err, mess, fields...)
 }
 
+func DebugInfoCtx(ctx context.Context, err error, mess string, fields ...zap.Field) {
+	debugInfo(zc.L(ctx), err, mess, fields...)
+}
+
 func DebugError(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
 	debugError(logger, err, mess, fields...)
 }
