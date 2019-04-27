@@ -1,7 +1,7 @@
 language: go
 
 go:
-  - "stable"
+  - "1.12.4"
   - "master"
 
 env:
