@@ -46,8 +46,29 @@ func DebugError(logger *zap.Logger, err error, mess string, fields ...zap.Field)
 	debugError(logger, err, mess, fields...)
 }
 
+func InfoCtx(ctx context.Context, mess string, fields ...zap.Field) {
+	logger := zc.L(ctx)
+	logger.WithOptions(zap.AddCallerSkip(1)).Info(mess, fields...)
+}
+
 func InfoError(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
 	infoError(logger, err, mess, fields...)
+}
+
+func InfoErrorCtx(ctx context.Context, err error, mess string, fields ...zap.Field) {
+	infoError(zc.L(ctx), err, mess, fields...)
+}
+
+func InfoPanic(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
+	infoPanic(logger, err, mess, fields...)
+}
+
+func InfoDPanicCtx(ctx context.Context, err error, mess string, fields ...zap.Field) {
+	infoDPanic(zc.L(ctx), err, mess, fields...)
+}
+
+func InfoPanicCtx(ctx context.Context, err error, mess string, fields ...zap.Field) {
+	infoPanic(zc.L(ctx), err, mess, fields...)
 }
 
 func DebugErrorCtx(ctx context.Context, err error, mess string, fields ...zap.Field) {
@@ -78,5 +99,23 @@ func infoError(logger *zap.Logger, err error, mess string, fields ...zap.Field) 
 		logger.Info(mess, fields...)
 	} else {
 		logger.Error(mess, append(fields, zap.Error(err))...)
+	}
+}
+
+func infoDPanic(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
+	logger = logger.WithOptions(zap.AddCallerSkip(2))
+	if err == nil {
+		logger.Info(mess, fields...)
+	} else {
+		logger.DPanic(mess, append(fields, zap.Error(err))...)
+	}
+}
+
+func infoPanic(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
+	logger = logger.WithOptions(zap.AddCallerSkip(2))
+	if err == nil {
+		logger.Info(mess, fields...)
+	} else {
+		logger.Panic(mess, append(fields, zap.Error(err))...)
 	}
 }
