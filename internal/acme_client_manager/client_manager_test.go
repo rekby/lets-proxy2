@@ -1,8 +1,13 @@
 package acme_client_manager
 
 import (
+	"crypto/rsa"
+	"encoding/json"
+	"math/big"
 	"net/url"
 	"testing"
+
+	"golang.org/x/crypto/acme"
 
 	"github.com/maxatome/go-testdeep"
 
@@ -14,7 +19,7 @@ import (
 
 const testACMEServer = "http://localhost:4000/directory"
 
-func TestClientManager(t *testing.T) {
+func TestClientManagerCreateNew(t *testing.T) {
 	ctx, flush := th.TestContext()
 	defer flush()
 
@@ -36,6 +41,40 @@ func TestClientManager(t *testing.T) {
 	client, err := manager.GetClient(ctx)
 	td.CmpNoError(err)
 	td.NotNil(client)
+
+	client2, err := manager.GetClient(ctx)
+	td.CmpNoError(err)
+	td.True(client == client2)
+}
+
+func TestClientManagerGetFromCache(t *testing.T) {
+	ctx, flush := th.TestContext()
+	defer flush()
+
+	td := testdeep.NewT(t)
+
+	mc := minimock.NewController(td)
+	defer mc.Finish()
+
+	c := NewCacheMock(mc)
+
+	var err error
+
+	manager := New(ctx, c)
+
+	state := acmeManagerState{
+		AcmeAccount: &acme.Account{},
+		PrivateKey: &rsa.PrivateKey{
+			D: big.NewInt(123),
+		},
+	}
+	stateBytes, _ := json.Marshal(state)
+
+	c.GetMock.Return(stateBytes, nil)
+	client, err := manager.GetClient(ctx)
+	td.CmpNoError(err)
+	td.NotNil(client)
+	td.CmpDeeply(client.Key, state.PrivateKey)
 
 	client2, err := manager.GetClient(ctx)
 	td.CmpNoError(err)
