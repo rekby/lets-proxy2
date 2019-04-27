@@ -26,8 +26,6 @@ func (c *DiskCache) Get(ctx context.Context, key string) ([]byte, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	zc.L(ctx).Debug("Get from disk cache", zap.String("dir", c.Dir), zap.String("key", key))
-
 	res, err := ioutil.ReadFile(c.filepath(key))
 	if os.IsNotExist(err) {
 		err = ErrCacheMiss

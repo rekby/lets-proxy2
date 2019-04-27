@@ -4,7 +4,6 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"math/big"
-	"net/url"
 	"testing"
 
 	"golang.org/x/crypto/acme"
@@ -36,8 +35,7 @@ func TestClientManagerCreateNew(t *testing.T) {
 	manager := New(ctx, c)
 	c.PutMock.Return(nil)
 	c.GetMock.Return(nil, cache.ErrCacheMiss)
-	parsedUrl, _ := url.Parse(testACMEServer)
-	manager.DirectoryUrl = *parsedUrl
+	manager.DirectoryUrl = testACMEServer
 	client, err := manager.GetClient(ctx)
 	td.CmpNoError(err)
 	td.NotNil(client)

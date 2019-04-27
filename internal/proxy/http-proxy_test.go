@@ -86,8 +86,9 @@ func TestHttpProxy_getContextDefault(t *testing.T) {
 	defer func() { _ = listener.Close() }()
 
 	proxy := NewHttpProxy(ctx, listener)
-	ctx2 := proxy.GetContext(nil)
+	ctx2, err := proxy.GetContext(nil)
 	td.NotNil(zc.L(ctx2))
+	td.CmpNoError(err)
 }
 
 func TestHttpProxy_Director(t *testing.T) {
@@ -97,8 +98,8 @@ func TestHttpProxy_Director(t *testing.T) {
 	var req *http.Request
 	td := testdeep.NewT(t)
 	proxy := HttpProxy{}
-	proxy.GetContext = func(req *http.Request) context.Context {
-		return zc.WithLogger(ctx, zap.NewNop())
+	proxy.GetContext = func(req *http.Request) (context.Context, error) {
+		return zc.WithLogger(ctx, zap.NewNop()), nil
 	}
 	proxy.GetDestination = func(ctx context.Context, remoteAddr string) (addr string, err error) {
 		return "1.2.3.4:80", err
@@ -111,7 +112,7 @@ func TestHttpProxy_Director(t *testing.T) {
 
 type HttpProxyTest interface {
 	GetDestination(ctx context.Context, remoteAddr string) (addr string, err error)
-	GetContext(req *http.Request) context.Context
+	GetContext(req *http.Request) (context.Context, error)
 	HandleHttpValidation(w http.ResponseWriter, r *http.Request) bool
 }
 
@@ -148,8 +149,8 @@ func TestNewHttpProxy(t *testing.T) {
 	})
 
 	proxyTest := NewHttpProxyTestMock(mc)
-	proxyTest.GetContextMock.Set(func(req *http.Request) (c1 context.Context) {
-		return ctx
+	proxyTest.GetContextMock.Set(func(req *http.Request) (c1 context.Context, err2 error) {
+		return ctx, nil
 	})
 	proxyTest.HandleHttpValidationMock.Set(func(w http.ResponseWriter, r *http.Request) (b1 bool) {
 		if strings.HasPrefix(r.URL.Path, "/asdf") {

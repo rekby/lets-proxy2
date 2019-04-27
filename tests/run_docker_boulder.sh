@@ -11,7 +11,7 @@ sed -i -e 's/TRAVIS_GO_VERSION/TRAVIS_GO_VERSION_OFF/' docker-compose.yml # alwa
 
 docker-compose up -d
 
-echo -n "Wait for bounder start listen "
+echo -n "Wait for boulder start listen "
 date
 
 while ! curl -q http://localhost:4000 >/dev/null 2>&1; do

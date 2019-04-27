@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
 	"sync"
 	"time"
 
@@ -24,7 +23,7 @@ const rsaKeyLength = 2048
 
 type AcmeManager struct {
 	IgnoreCacheLoad      bool
-	DirectoryUrl         url.URL
+	DirectoryUrl         string
 	AgreeFunction        func(tosurl string) bool
 	RenewAccountInterval time.Duration
 
@@ -69,7 +68,7 @@ func (m *AcmeManager) GetClient(ctx context.Context) (*acme.Client, error) {
 		}
 	}
 
-	client := &acme.Client{DirectoryURL: m.DirectoryUrl.String()}
+	client := &acme.Client{DirectoryURL: m.DirectoryUrl}
 	key, account, err := createAccount(ctx, client, m.AgreeFunction)
 	if err != nil {
 		return nil, err
@@ -80,7 +79,7 @@ func (m *AcmeManager) GetClient(ctx context.Context) (*acme.Client, error) {
 	stateBytes, err := json.Marshal(state)
 	log.InfoPanicCtx(ctx, err, "Marshal account state to json")
 	if m.cache != nil {
-		err = m.cache.Put(ctx, certName(m.DirectoryUrl.Host), stateBytes)
+		err = m.cache.Put(ctx, certName(m.DirectoryUrl), stateBytes)
 		if err != nil {
 			return nil, err
 		}
@@ -121,7 +120,7 @@ func (m *AcmeManager) loadFromCache(ctx context.Context) (err error) {
 		log.DebugErrorCtx(ctx, effectiveError, "Load acme manager from cache.", zap.NamedError("raw_err", err))
 	}()
 
-	content, err := m.cache.Get(ctx, certName(m.DirectoryUrl.Host))
+	content, err := m.cache.Get(ctx, certName(m.DirectoryUrl))
 	if err != nil {
 		return err
 	}
@@ -139,7 +138,7 @@ func (m *AcmeManager) loadFromCache(ctx context.Context) (err error) {
 		return errors.New("empty account info")
 	}
 
-	m.client = &acme.Client{DirectoryURL: m.DirectoryUrl.String(), Key: state.PrivateKey}
+	m.client = &acme.Client{DirectoryURL: m.DirectoryUrl, Key: state.PrivateKey}
 	m.account = state.AcmeAccount
 	go m.accountRenew()
 	return nil

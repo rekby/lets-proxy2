@@ -20,7 +20,7 @@ import (
 type HttpProxyTestMock struct {
 	t minimock.Tester
 
-	funcGetContext          func(req *http.Request) (c1 context.Context)
+	funcGetContext          func(req *http.Request) (c1 context.Context, err error)
 	afterGetContextCounter  uint64
 	beforeGetContextCounter uint64
 	GetContextMock          mHttpProxyTestMockGetContext
@@ -70,7 +70,8 @@ type HttpProxyTestMockGetContextParams struct {
 
 // HttpProxyTestMockGetContextResults contains results of the HttpProxyTest.GetContext
 type HttpProxyTestMockGetContextResults struct {
-	c1 context.Context
+	c1  context.Context
+	err error
 }
 
 // Expect sets up expected params for HttpProxyTest.GetContext
@@ -94,7 +95,7 @@ func (m *mHttpProxyTestMockGetContext) Expect(req *http.Request) *mHttpProxyTest
 }
 
 // Return sets up results that will be returned by HttpProxyTest.GetContext
-func (m *mHttpProxyTestMockGetContext) Return(c1 context.Context) *HttpProxyTestMock {
+func (m *mHttpProxyTestMockGetContext) Return(c1 context.Context, err error) *HttpProxyTestMock {
 	if m.mock.funcGetContext != nil {
 		m.mock.t.Fatalf("HttpProxyTestMock.GetContext mock is already set by Set")
 	}
@@ -102,12 +103,12 @@ func (m *mHttpProxyTestMockGetContext) Return(c1 context.Context) *HttpProxyTest
 	if m.defaultExpectation == nil {
 		m.defaultExpectation = &HttpProxyTestMockGetContextExpectation{mock: m.mock}
 	}
-	m.defaultExpectation.results = &HttpProxyTestMockGetContextResults{c1}
+	m.defaultExpectation.results = &HttpProxyTestMockGetContextResults{c1, err}
 	return m.mock
 }
 
 //Set uses given function f to mock the HttpProxyTest.GetContext method
-func (m *mHttpProxyTestMockGetContext) Set(f func(req *http.Request) (c1 context.Context)) *HttpProxyTestMock {
+func (m *mHttpProxyTestMockGetContext) Set(f func(req *http.Request) (c1 context.Context, err error)) *HttpProxyTestMock {
 	if m.defaultExpectation != nil {
 		m.mock.t.Fatalf("Default expectation is already set for the HttpProxyTest.GetContext method")
 	}
@@ -136,20 +137,20 @@ func (m *mHttpProxyTestMockGetContext) When(req *http.Request) *HttpProxyTestMoc
 }
 
 // Then sets up HttpProxyTest.GetContext return parameters for the expectation previously defined by the When method
-func (e *HttpProxyTestMockGetContextExpectation) Then(c1 context.Context) *HttpProxyTestMock {
-	e.results = &HttpProxyTestMockGetContextResults{c1}
+func (e *HttpProxyTestMockGetContextExpectation) Then(c1 context.Context, err error) *HttpProxyTestMock {
+	e.results = &HttpProxyTestMockGetContextResults{c1, err}
 	return e.mock
 }
 
 // GetContext implements HttpProxyTest
-func (m *HttpProxyTestMock) GetContext(req *http.Request) (c1 context.Context) {
+func (m *HttpProxyTestMock) GetContext(req *http.Request) (c1 context.Context, err error) {
 	atomic.AddUint64(&m.beforeGetContextCounter, 1)
 	defer atomic.AddUint64(&m.afterGetContextCounter, 1)
 
 	for _, e := range m.GetContextMock.expectations {
 		if minimock.Equal(*e.params, HttpProxyTestMockGetContextParams{req}) {
 			atomic.AddUint64(&e.Counter, 1)
-			return e.results.c1
+			return e.results.c1, e.results.err
 		}
 	}
 
@@ -165,7 +166,7 @@ func (m *HttpProxyTestMock) GetContext(req *http.Request) (c1 context.Context) {
 		if results == nil {
 			m.t.Fatal("No results are set for the HttpProxyTestMock.GetContext")
 		}
-		return (*results).c1
+		return (*results).c1, (*results).err
 	}
 	if m.funcGetContext != nil {
 		return m.funcGetContext(req)
