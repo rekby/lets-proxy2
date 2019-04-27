@@ -3,6 +3,7 @@ package proxy
 import (
 	"context"
 	"errors"
+	"math/rand"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -19,9 +20,10 @@ const httpPort = 80
 
 type HttpProxy struct {
 	GetDestination       func(ctx context.Context, remoteAddr string) (addr string, err error)
-	GetContext           func(req *http.Request) context.Context
+	GetContext           func(req *http.Request) (context.Context, error)
 	HandleHttpValidation func(w http.ResponseWriter, r *http.Request) bool
 
+	ctx              context.Context
 	listener         net.Listener
 	httpReverseProxy httputil.ReverseProxy
 }
@@ -34,6 +36,7 @@ func NewHttpProxy(ctx context.Context, listener net.Listener) *HttpProxy {
 		},
 		GetContext: getContext,
 		listener:   listener,
+		ctx:        ctx,
 	}
 	res.httpReverseProxy.Director = res.director
 
@@ -77,12 +80,12 @@ func getDestination(_ context.Context, remoteAddr string) (addr string, err erro
 	return tcpAddr.String(), nil
 }
 
-func getContext(_ *http.Request) context.Context {
-	return zc.WithLogger(context.Background(), zap.NewNop())
+func getContext(_ *http.Request) (context.Context, error) {
+	return zc.WithLogger(context.Background(), zap.NewNop()), nil
 }
 
 func (p *HttpProxy) director(request *http.Request) {
-	ctx := p.GetContext(request)
+	ctx := p.getContext(request)
 	if request.URL == nil {
 		request.URL = &url.URL{}
 	}
@@ -90,4 +93,17 @@ func (p *HttpProxy) director(request *http.Request) {
 	log.DebugErrorCtx(ctx, err, "Get destination", zap.String("dest_addr", dest))
 	request.URL.Scheme = "http"
 	request.URL.Host = dest // If err != nil and dest invalid - is ok, becouse it will error proxy
+}
+
+func (p *HttpProxy) getContext(req *http.Request) context.Context {
+	ctx, err := p.GetContext(req)
+	if err == nil {
+		return ctx
+	}
+
+	connectionId := rand.Int63()
+	logger := zc.L(p.ctx).With(zap.Int64("connection_id", connectionId))
+	logger.DPanic("Http proxy can't receive proxy context. Create own connection_id.")
+	ctx = zc.WithLogger(p.ctx, logger)
+	return ctx
 }

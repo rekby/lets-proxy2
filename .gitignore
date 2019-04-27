@@ -4,10 +4,10 @@
 .idea/
 .vscode/
 lets-proxy.iml
-state.json
-certificates/
 log.txt
-whitelist.txt
+storage/
+config.toml
+
 
 lets-proxy
 lets-proxy2

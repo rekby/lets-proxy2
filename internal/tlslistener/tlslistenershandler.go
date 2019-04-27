@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"sync"
 
+	"golang.org/x/crypto/acme"
+
 	"github.com/rekby/lets-proxy2/internal/log"
 
 	"github.com/rekby/zapcontext"
@@ -23,6 +25,8 @@ type ListenersHandler struct {
 	// listeners which will not handle TLS, but will proxy to self listener. It is comfortable for listen https and http
 	// ports and translate it to one proxy
 	Listeners []net.Listener
+
+	NextProtos []string
 
 	ctx           context.Context
 	ctxCancelFunc func()
@@ -123,7 +127,15 @@ func (p *ListenersHandler) Start(ctx context.Context) error {
 
 func (p *ListenersHandler) init() {
 	p.connListenProxy.connections = make(chan net.Conn)
-	p.tlsConfig = tls.Config{GetCertificate: p.GetCertificate}
+	var nextProtos = p.NextProtos
+	if nextProtos == nil {
+		nextProtos = []string{"h2", "http/1.1"}
+	}
+
+	p.tlsConfig = tls.Config{
+		GetCertificate: p.GetCertificate,
+		NextProtos:     append(nextProtos, acme.ALPNProto),
+	}
 	p.connectionsContext = make(map[string]context.Context)
 }
 
@@ -135,7 +147,7 @@ func (p *ListenersHandler) registerConnection(conn net.Conn) ContextConnextion {
 
 	ctx, exist := p.connectionsContext[key]
 	if !exist {
-		connectionUUID := uuid.NewV1()
+		connectionUUID := uuid.NewV4()
 		logger := p.logger.With(zap.String("connection_id", connectionUUID.String()))
 		ctx = zc.WithLogger(p.ctx, logger)
 		p.connectionsContext[key] = ctx

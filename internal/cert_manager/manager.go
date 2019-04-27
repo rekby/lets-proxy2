@@ -77,13 +77,14 @@ type Manager struct {
 	httpTokens *cache.MemoryCache
 }
 
-func New(ctx context.Context, client *acme.Client) *Manager {
+func New(ctx context.Context, client *acme.Client, c cache.Cache) *Manager {
 	res := Manager{}
 	res.Client = client
 	res.certTokens = make(map[DomainName]*tls.Certificate)
 	res.certState = make(map[certNameType]*certState)
 	res.CertificateIssueTimeout = time.Minute
 	res.httpTokens = cache.NewMemoryCache("Http validation tokens")
+	res.Cache = c
 	res.EnableTlsValidation = true
 	return &res
 }
@@ -133,12 +134,20 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, 
 
 		// Disable check for locked certificates
 		cert, err = validCertDer([]DomainName{needDomain}, cert.Certificate, cert.PrivateKey, time.Now())
-		if err != nil {
-			logger.Debug("In memory cached certificate doesn't valid. Issue new.", log.Cert(cert), zap.Error(err))
+		logger.Debug("Validate certificate from local state", zap.Error(err))
+		if err == nil {
+			return cert, nil
 		}
 	}
 	if err != nil {
 		logger.Debug("Can't get certificate from local state", zap.Error(err))
+	}
+
+	cert, err = getCertificate(ctx, m.Cache, certName, keyRSA)
+	if err == nil {
+		logger.Debug("Certificate loaded from cache")
+		certState.CertSet(ctx, cert)
+		return cert, nil
 	}
 
 	// TODO: check domain
@@ -159,20 +168,18 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, 
 
 func (m *Manager) certStateGet(certName certNameType) *certState {
 	m.certStateMu.Lock()
-	defer m.certStateMu.Unlock()
 
 	res := m.certState[certName]
 	if res == nil {
 		res = &certState{}
 		m.certState[certName] = res
 	}
+	m.certStateMu.Unlock()
 	return res
 }
 
 func (m *Manager) createCertificateForDomains(ctx context.Context, certName certNameType, domainNames []DomainName, needDomain DomainName) (res *tls.Certificate, err error) {
-	logger := zc.L(ctx).With(logCetName(certName))
-	ctx = zc.WithLogger(ctx, logger)
-
+	logger := zc.L(ctx)
 	certState := m.certStateGet(certName)
 	if certState.StartIssue(ctx) {
 		// outer func need for get argument values in defer time
@@ -184,12 +191,6 @@ func (m *Manager) createCertificateForDomains(ctx context.Context, certName cert
 		defer waitTimeoutCancel()
 
 		return certState.WaitFinishIssue(waitTimeout)
-	}
-
-	cachedCert, err := getCertificate(ctx, m.Cache, certName, keyRSA)
-	if err == nil {
-		logger.Debug("Certificate loaded from cache")
-		return cachedCert, nil
 	}
 
 	var authorizeDomainsWg sync.WaitGroup
@@ -323,10 +324,8 @@ func (m *Manager) authorizeDomain(ctx context.Context, domain DomainName) error 
 		}
 
 		receivedAuth, err := m.Client.WaitAuthorization(ctx, authz.URI)
-		if err == nil {
-			logger.Debug("Receive domain authorization", zap.Reflect("authorization", receivedAuth))
-		} else {
-			logger.Error("Dont receive wait authorization", zap.Reflect("authorizarion", receivedAuth), zap.Error(err))
+		log.DebugError(logger, err, "Receive domain authorization", zap.Reflect("authorization", receivedAuth))
+		if err != nil {
 			continue
 		}
 
@@ -568,7 +567,7 @@ func getCertificate(ctx context.Context, cache cache.Cache, certName certNameTyp
 	logger := zc.L(ctx)
 	logger.Debug("Check certificate in cache")
 	defer func() {
-		logger.Debug("Check certificate in cache", log.Cert(cert), zap.Error(err))
+		logger.Debug("Checked certificate in cache", log.Cert(cert), zap.Error(err))
 	}()
 
 	certKeyName := string(certName) + "." + string(keyType) + ".cer"
@@ -585,6 +584,12 @@ func getCertificate(ctx context.Context, cache cache.Cache, certName certNameTyp
 	cert2, err := tls.X509KeyPair(certBytes, keyBytes)
 	if err != nil {
 		return nil, err
+	}
+	if len(cert2.Certificate) > 0 {
+		cert2.Leaf, err = x509.ParseCertificate(cert2.Certificate[0])
+		if err != nil {
+			return nil, err
+		}
 	}
 	return validCertTls(&cert2, nil, time.Now())
 }

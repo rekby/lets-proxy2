@@ -101,3 +101,11 @@ func (s *certState) Cert() (cert *tls.Certificate, lastError error) {
 
 	return cert, lastError
 }
+
+func (s *certState) CertSet(ctx context.Context, cert *tls.Certificate) {
+	zc.L(ctx).Debug("Store certificate in local state", log.Cert(cert))
+
+	s.mu.Lock()
+	s.cert = cert
+	s.mu.Unlock()
+}
