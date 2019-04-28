@@ -25,9 +25,8 @@ func (c *certLogger) String() string {
 func Cert(cert *tls.Certificate) zap.Field {
 	if cert == nil {
 		return zap.String("certificate", "tls nil")
-	} else {
-		return CertX509(cert.Leaf)
 	}
+	return CertX509(cert.Leaf)
 }
 
 func CertX509(cert *x509.Certificate) zap.Field {
@@ -44,6 +43,19 @@ func DebugInfoCtx(ctx context.Context, err error, mess string, fields ...zap.Fie
 
 func DebugError(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
 	debugError(logger, err, mess, fields...)
+}
+
+func DebugDPanic(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
+	debugDpanic(logger, err, mess, fields...)
+}
+
+func debugDpanic(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
+	logger = logger.WithOptions(zap.AddCallerSkip(2))
+	if err == nil {
+		logger.Debug(mess, fields...)
+	} else {
+		logger.DPanic(mess, append(fields, zap.Error(err))...)
+	}
 }
 
 func DebugFatal(logger *zap.Logger, err error, mess string, fields ...zap.Field) {

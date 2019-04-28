@@ -1,5 +1,5 @@
 env:
-  - GO111MODULE=on GOFLAGS=-mod=vendor CGO_ENABLED=0 TAG_PREFIX="v0.20.0"
+  - GO111MODULE=on GOFLAGS=-mod=readonly CGO_ENABLED=0 TAG_PREFIX="v0.20.0"
 
 language: go
 

@@ -2,9 +2,10 @@ package main
 
 import (
 	"errors"
-	"gopkg.in/natefinch/lumberjack.v2"
 	"math"
 	"strings"
+
+	"gopkg.in/natefinch/lumberjack.v2"
 
 	"github.com/rekby/lets-proxy2/internal/log"
 
@@ -26,7 +27,7 @@ func (w *logWriteSyncer) Sync() error {
 func initLogger(config logConfig) *zap.Logger {
 	var writers []zapcore.WriteSyncer
 	if config.EnableLogToFile {
-		lr := lumberjack.Logger{
+		lr := &lumberjack.Logger{
 			Filename: config.File,
 			Compress: config.CompressRotated,
 			MaxSize:  config.RotateBySizeMB, MaxAge: config.MaxDays,
@@ -37,8 +38,8 @@ func initLogger(config logConfig) *zap.Logger {
 			lr.MaxSize = int(math.MaxInt32) // about 2 Petabytes. Really no reachable in this scenario.
 		}
 
-		writeSyncer := logWriteSyncer(lr)
-		writers = append(writers, &writeSyncer)
+		writeSyncer := (*logWriteSyncer)(lr)
+		writers = append(writers, writeSyncer)
 	}
 
 	if config.EnableLogToStdErr {

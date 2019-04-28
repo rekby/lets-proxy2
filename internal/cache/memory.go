@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/rekby/zapcontext"
+	zc "github.com/rekby/zapcontext"
 	"go.uber.org/zap"
 )
 
@@ -32,9 +32,8 @@ func (c *MemoryCache) Get(ctx context.Context, key string) (data []byte, err err
 	defer c.mu.RUnlock()
 	if resp, exist := c.m[key]; exist {
 		return resp, nil
-	} else {
-		return nil, ErrCacheMiss
 	}
+	return nil, ErrCacheMiss
 }
 
 func (c *MemoryCache) Put(ctx context.Context, key string, data []byte) (err error) {

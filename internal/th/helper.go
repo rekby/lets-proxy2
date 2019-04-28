@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rekby/zapcontext"
+	zc "github.com/rekby/zapcontext"
 
 	"go.uber.org/zap"
 )

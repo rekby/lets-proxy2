@@ -20,9 +20,8 @@ func (c ContextConnextion) GetContext() context.Context {
 func (c ContextConnextion) Close() error {
 	if c.CloseFunc == nil {
 		return c.Conn.Close()
-	} else {
-		return c.CloseFunc()
 	}
+	return c.CloseFunc()
 }
 
 func finalizeContextConnection(conn *ContextConnextion) {

@@ -5,19 +5,20 @@ import (
 	"io/ioutil"
 
 	"github.com/pelletier/go-toml"
-	"github.com/rekby/zapcontext"
+	zc "github.com/rekby/zapcontext"
 	"go.uber.org/zap"
 )
 
 type configType struct {
 	IssueTimeout           int    `default:"300" comment:"Seconds for issue every certificate. Cancel issue and return error if timeout."`
 	AutoIssueForSubdomains string `default:"www" comment:"Comma separated for subdomains for try get common used subdomains in one certificate."`
-	HttpsListeners         string `default:"[::]:443" comment:"Comma-separated bindings for listen https.\nSupported formats:\n1.2.3.4:443,0.0.0.0:443,[::]:443,[2001:db8::a123]:443"`
+	HTTPSListeners         string `default:"[::]:443" comment:"Comma-separated bindings for listen https.\nSupported formats:\n1.2.3.4:443,0.0.0.0:443,[::]:443,[2001:db8::a123]:443"`
 	StorageDir             string `default:"storage" comment:"Path to dir, which will store state and certificates"`
 	AcmeServer             string `default:"https://acme-v01.api.letsencrypt.org/directory" comment:"Directory url of acme server.\nTest server: https://acme-staging-v02.api.letsencrypt.org/directory"`
 	Log                    logConfig
 }
 
+//nolint:maligned
 type logConfig struct {
 	EnableLogToFile   bool   `default:"true" comment:""`
 	EnableLogToStdErr bool   `default:"true"`

@@ -404,7 +404,7 @@ type mHttpProxyTestMockHandleHttpValidation struct {
 	expectations       []*HttpProxyTestMockHandleHttpValidationExpectation
 }
 
-// HttpProxyTestMockHandleHttpValidationExpectation specifies expectation struct of the HttpProxyTest.HandleHttpValidation
+// HttpProxyTestMockHandleHttpValidationExpectation specifies expectation struct of the HttpProxyTest.HandleHTTPValidation
 type HttpProxyTestMockHandleHttpValidationExpectation struct {
 	mock    *HttpProxyTestMock
 	params  *HttpProxyTestMockHandleHttpValidationParams
@@ -412,21 +412,21 @@ type HttpProxyTestMockHandleHttpValidationExpectation struct {
 	Counter uint64
 }
 
-// HttpProxyTestMockHandleHttpValidationParams contains parameters of the HttpProxyTest.HandleHttpValidation
+// HttpProxyTestMockHandleHttpValidationParams contains parameters of the HttpProxyTest.HandleHTTPValidation
 type HttpProxyTestMockHandleHttpValidationParams struct {
 	w http.ResponseWriter
 	r *http.Request
 }
 
-// HttpProxyTestMockHandleHttpValidationResults contains results of the HttpProxyTest.HandleHttpValidation
+// HttpProxyTestMockHandleHttpValidationResults contains results of the HttpProxyTest.HandleHTTPValidation
 type HttpProxyTestMockHandleHttpValidationResults struct {
 	b1 bool
 }
 
-// Expect sets up expected params for HttpProxyTest.HandleHttpValidation
+// Expect sets up expected params for HttpProxyTest.HandleHTTPValidation
 func (m *mHttpProxyTestMockHandleHttpValidation) Expect(w http.ResponseWriter, r *http.Request) *mHttpProxyTestMockHandleHttpValidation {
 	if m.mock.funcHandleHttpValidation != nil {
-		m.mock.t.Fatalf("HttpProxyTestMock.HandleHttpValidation mock is already set by Set")
+		m.mock.t.Fatalf("HttpProxyTestMock.HandleHTTPValidation mock is already set by Set")
 	}
 
 	if m.defaultExpectation == nil {
@@ -443,10 +443,10 @@ func (m *mHttpProxyTestMockHandleHttpValidation) Expect(w http.ResponseWriter, r
 	return m
 }
 
-// Return sets up results that will be returned by HttpProxyTest.HandleHttpValidation
+// Return sets up results that will be returned by HttpProxyTest.HandleHTTPValidation
 func (m *mHttpProxyTestMockHandleHttpValidation) Return(b1 bool) *HttpProxyTestMock {
 	if m.mock.funcHandleHttpValidation != nil {
-		m.mock.t.Fatalf("HttpProxyTestMock.HandleHttpValidation mock is already set by Set")
+		m.mock.t.Fatalf("HttpProxyTestMock.HandleHTTPValidation mock is already set by Set")
 	}
 
 	if m.defaultExpectation == nil {
@@ -456,25 +456,25 @@ func (m *mHttpProxyTestMockHandleHttpValidation) Return(b1 bool) *HttpProxyTestM
 	return m.mock
 }
 
-//Set uses given function f to mock the HttpProxyTest.HandleHttpValidation method
+//Set uses given function f to mock the HttpProxyTest.HandleHTTPValidation method
 func (m *mHttpProxyTestMockHandleHttpValidation) Set(f func(w http.ResponseWriter, r *http.Request) (b1 bool)) *HttpProxyTestMock {
 	if m.defaultExpectation != nil {
-		m.mock.t.Fatalf("Default expectation is already set for the HttpProxyTest.HandleHttpValidation method")
+		m.mock.t.Fatalf("Default expectation is already set for the HttpProxyTest.HandleHTTPValidation method")
 	}
 
 	if len(m.expectations) > 0 {
-		m.mock.t.Fatalf("Some expectations are already set for the HttpProxyTest.HandleHttpValidation method")
+		m.mock.t.Fatalf("Some expectations are already set for the HttpProxyTest.HandleHTTPValidation method")
 	}
 
 	m.mock.funcHandleHttpValidation = f
 	return m.mock
 }
 
-// When sets expectation for the HttpProxyTest.HandleHttpValidation which will trigger the result defined by the following
+// When sets expectation for the HttpProxyTest.HandleHTTPValidation which will trigger the result defined by the following
 // Then helper
 func (m *mHttpProxyTestMockHandleHttpValidation) When(w http.ResponseWriter, r *http.Request) *HttpProxyTestMockHandleHttpValidationExpectation {
 	if m.mock.funcHandleHttpValidation != nil {
-		m.mock.t.Fatalf("HttpProxyTestMock.HandleHttpValidation mock is already set by Set")
+		m.mock.t.Fatalf("HttpProxyTestMock.HandleHTTPValidation mock is already set by Set")
 	}
 
 	expectation := &HttpProxyTestMockHandleHttpValidationExpectation{
@@ -485,13 +485,13 @@ func (m *mHttpProxyTestMockHandleHttpValidation) When(w http.ResponseWriter, r *
 	return expectation
 }
 
-// Then sets up HttpProxyTest.HandleHttpValidation return parameters for the expectation previously defined by the When method
+// Then sets up HttpProxyTest.HandleHTTPValidation return parameters for the expectation previously defined by the When method
 func (e *HttpProxyTestMockHandleHttpValidationExpectation) Then(b1 bool) *HttpProxyTestMock {
 	e.results = &HttpProxyTestMockHandleHttpValidationResults{b1}
 	return e.mock
 }
 
-// HandleHttpValidation implements HttpProxyTest
+// HandleHTTPValidation implements HttpProxyTest
 func (m *HttpProxyTestMock) HandleHttpValidation(w http.ResponseWriter, r *http.Request) (b1 bool) {
 	atomic.AddUint64(&m.beforeHandleHttpValidationCounter, 1)
 	defer atomic.AddUint64(&m.afterHandleHttpValidationCounter, 1)
@@ -508,33 +508,33 @@ func (m *HttpProxyTestMock) HandleHttpValidation(w http.ResponseWriter, r *http.
 		want := m.HandleHttpValidationMock.defaultExpectation.params
 		got := HttpProxyTestMockHandleHttpValidationParams{w, r}
 		if want != nil && !minimock.Equal(*want, got) {
-			m.t.Errorf("HttpProxyTestMock.HandleHttpValidation got unexpected parameters, want: %#v, got: %#v%s\n", *want, got, minimock.Diff(*want, got))
+			m.t.Errorf("HttpProxyTestMock.HandleHTTPValidation got unexpected parameters, want: %#v, got: %#v%s\n", *want, got, minimock.Diff(*want, got))
 		}
 
 		results := m.HandleHttpValidationMock.defaultExpectation.results
 		if results == nil {
-			m.t.Fatal("No results are set for the HttpProxyTestMock.HandleHttpValidation")
+			m.t.Fatal("No results are set for the HttpProxyTestMock.HandleHTTPValidation")
 		}
 		return (*results).b1
 	}
 	if m.funcHandleHttpValidation != nil {
 		return m.funcHandleHttpValidation(w, r)
 	}
-	m.t.Fatalf("Unexpected call to HttpProxyTestMock.HandleHttpValidation. %v %v", w, r)
+	m.t.Fatalf("Unexpected call to HttpProxyTestMock.HandleHTTPValidation. %v %v", w, r)
 	return
 }
 
-// HandleHttpValidationAfterCounter returns a count of finished HttpProxyTestMock.HandleHttpValidation invocations
+// HandleHttpValidationAfterCounter returns a count of finished HttpProxyTestMock.HandleHTTPValidation invocations
 func (m *HttpProxyTestMock) HandleHttpValidationAfterCounter() uint64 {
 	return atomic.LoadUint64(&m.afterHandleHttpValidationCounter)
 }
 
-// HandleHttpValidationBeforeCounter returns a count of HttpProxyTestMock.HandleHttpValidation invocations
+// HandleHttpValidationBeforeCounter returns a count of HttpProxyTestMock.HandleHTTPValidation invocations
 func (m *HttpProxyTestMock) HandleHttpValidationBeforeCounter() uint64 {
 	return atomic.LoadUint64(&m.beforeHandleHttpValidationCounter)
 }
 
-// MinimockHandleHttpValidationDone returns true if the count of the HandleHttpValidation invocations corresponds
+// MinimockHandleHttpValidationDone returns true if the count of the HandleHTTPValidation invocations corresponds
 // the number of defined expectations
 func (m *HttpProxyTestMock) MinimockHandleHttpValidationDone() bool {
 	for _, e := range m.HandleHttpValidationMock.expectations {
@@ -558,17 +558,17 @@ func (m *HttpProxyTestMock) MinimockHandleHttpValidationDone() bool {
 func (m *HttpProxyTestMock) MinimockHandleHttpValidationInspect() {
 	for _, e := range m.HandleHttpValidationMock.expectations {
 		if atomic.LoadUint64(&e.Counter) < 1 {
-			m.t.Errorf("Expected call to HttpProxyTestMock.HandleHttpValidation with params: %#v", *e.params)
+			m.t.Errorf("Expected call to HttpProxyTestMock.HandleHTTPValidation with params: %#v", *e.params)
 		}
 	}
 
 	// if default expectation was set then invocations count should be greater than zero
 	if m.HandleHttpValidationMock.defaultExpectation != nil && atomic.LoadUint64(&m.afterHandleHttpValidationCounter) < 1 {
-		m.t.Errorf("Expected call to HttpProxyTestMock.HandleHttpValidation with params: %#v", *m.HandleHttpValidationMock.defaultExpectation.params)
+		m.t.Errorf("Expected call to HttpProxyTestMock.HandleHTTPValidation with params: %#v", *m.HandleHttpValidationMock.defaultExpectation.params)
 	}
 	// if func was set then invocations count should be greater than zero
 	if m.funcHandleHttpValidation != nil && atomic.LoadUint64(&m.afterHandleHttpValidationCounter) < 1 {
-		m.t.Error("Expected call to HttpProxyTestMock.HandleHttpValidation")
+		m.t.Error("Expected call to HttpProxyTestMock.HandleHTTPValidation")
 	}
 }
 

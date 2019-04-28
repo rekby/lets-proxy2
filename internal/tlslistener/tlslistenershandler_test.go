@@ -104,7 +104,7 @@ func TestProxyTLS(t *testing.T) {
 
 	proxy := ListenersHandler{
 		GetCertificate:        dummyGetCertificate,
-		ListenersForHandleTls: []net.Listener{listenerForTLS1, listenerForTLS2},
+		ListenersForHandleTLS: []net.Listener{listenerForTLS1, listenerForTLS2},
 		Listeners:             []net.Listener{listenerForTCP1, listenerForTCP2},
 	}
 
@@ -146,6 +146,7 @@ func TestProxyTLS(t *testing.T) {
 	httpClient := http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
+				//nolint:gosec
 				InsecureSkipVerify: true,
 			},
 		},
@@ -154,24 +155,28 @@ func TestProxyTLS(t *testing.T) {
 	resp, err = httpClient.Get("https://" + listenerForTLS1.Addr().String())
 	td.CmpNoError(err)
 	body, err = ioutil.ReadAll(resp.Body)
+	td.CmpNoError(err)
 	_ = resp.Body.Close()
 	td.CmpDeeply(body, []byte{3, 2, 1})
 
 	resp, err = httpClient.Get("https://" + listenerForTLS2.Addr().String())
 	td.CmpNoError(err)
 	body, err = ioutil.ReadAll(resp.Body)
+	td.CmpNoError(err)
 	_ = resp.Body.Close()
 	td.CmpDeeply(body, []byte{3, 2, 1})
 
 	resp, err = httpClient.Get("http://" + listenerForTCP1.Addr().String())
 	td.CmpNoError(err)
 	body, err = ioutil.ReadAll(resp.Body)
+	td.CmpNoError(err)
 	_ = resp.Body.Close()
 	td.CmpDeeply(body, []byte{3, 2, 1})
 
 	resp, err = httpClient.Get("http://" + listenerForTCP2.Addr().String())
 	td.CmpNoError(err)
 	body, err = ioutil.ReadAll(resp.Body)
+	td.CmpNoError(err)
 	_ = resp.Body.Close()
 	td.CmpDeeply(body, []byte{3, 2, 1})
 

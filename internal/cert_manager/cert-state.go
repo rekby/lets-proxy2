@@ -1,3 +1,4 @@
+//nolint:golint
 package cert_manager
 
 import (
@@ -7,7 +8,7 @@ import (
 	"sync"
 
 	"github.com/rekby/lets-proxy2/internal/log"
-	"github.com/rekby/zapcontext"
+	zc "github.com/rekby/zapcontext"
 
 	"go.uber.org/zap"
 )
@@ -36,9 +37,8 @@ func (s *certState) StartIssue(ctx context.Context) (res bool) {
 	if s.issueContext == nil {
 		s.issueContext, s.issueContextCancel = context.WithCancel(context.Background())
 		return true
-	} else {
-		return false
 	}
+	return false
 }
 
 // Must call after StartIssue issue certificate
