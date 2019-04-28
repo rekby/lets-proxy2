@@ -2,6 +2,8 @@
 github.com/davecgh/go-spew/spew
 # github.com/gojuno/minimock v0.0.0-20190201083043-bbb4f602d884
 github.com/gojuno/minimock
+# github.com/kardianos/minwinsvc v0.0.0-20151122163309-cad6b2b879b0
+github.com/kardianos/minwinsvc
 # github.com/maxatome/go-testdeep v1.0.8
 github.com/maxatome/go-testdeep
 github.com/maxatome/go-testdeep/helpers/tdutil
@@ -33,6 +35,9 @@ go.uber.org/zap/internal/exit
 golang.org/x/crypto/acme
 # golang.org/x/net v0.0.0-20190415214537-1da14a5a36f2
 golang.org/x/net/idna
+# golang.org/x/sys v0.0.0-20190403152447-81d4e9dc473e
+golang.org/x/sys/windows/svc
+golang.org/x/sys/windows
 # golang.org/x/text v0.3.0
 golang.org/x/text/secure/bidirule
 golang.org/x/text/unicode/bidi

@@ -9,19 +9,15 @@ import (
 	"os"
 	"strings"
 
-	"github.com/rekby/lets-proxy2/internal/proxy"
-
-	"github.com/rekby/lets-proxy2/internal/tlslistener"
-
-	"github.com/rekby/lets-proxy2/internal/cert_manager"
-
 	"github.com/rekby/lets-proxy2/internal/acme_client_manager"
 	"github.com/rekby/lets-proxy2/internal/cache"
-
+	"github.com/rekby/lets-proxy2/internal/cert_manager"
 	"github.com/rekby/lets-proxy2/internal/log"
+	"github.com/rekby/lets-proxy2/internal/proxy"
+	"github.com/rekby/lets-proxy2/internal/tlslistener"
 
+	_ "github.com/kardianos/minwinsvc"
 	zc "github.com/rekby/zapcontext"
-
 	"go.uber.org/zap"
 )
 
