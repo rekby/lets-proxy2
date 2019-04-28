@@ -49,6 +49,7 @@ func TestCertStateManyIssuers(t *testing.T) {
 	const pause = 1
 	const checkEvery = 1000
 
+	//nolint[:govet]
 	timeoutCtx, _ := context.WithTimeout(ctx, time.Second)
 
 	type lockTimeStruct struct {
@@ -145,12 +146,14 @@ func TestCertState_WaitFinishIssue(t *testing.T) {
 
 	const timeout = time.Millisecond * 10
 
+	//nolint[:govet]
 	ctxTimeout, _ := context.WithTimeout(ctx, timeout)
 	rCert, rErr := s.WaitFinishIssue(ctxTimeout)
 	td.CmpNil(t, rCert)
 	td.CmpNil(t, rErr)
 
 	s.StartIssue(ctx)
+	//nolint[:govet]
 	ctxTimeout, _ = context.WithTimeout(ctx, timeout)
 	rCert, rErr = s.WaitFinishIssue(ctxTimeout)
 	td.CmpNil(t, rCert)
@@ -161,9 +164,11 @@ func TestCertState_WaitFinishIssue(t *testing.T) {
 		time.Sleep(timeout / 2)
 		s.FinishIssue(ctx, cert1, nil)
 	}()
+	//nolint[:govet]
 	ctxTimeout, _ = context.WithTimeout(ctx, timeout)
 	rCert, rErr = s.WaitFinishIssue(ctxTimeout)
 	td.CmpNoError(t, rErr)
+	td.CmpDeeply(t, rCert, cert1)
 
 	s.StartIssue(ctx)
 	err2 := errors.New("2")
@@ -171,6 +176,7 @@ func TestCertState_WaitFinishIssue(t *testing.T) {
 		time.Sleep(timeout / 2)
 		s.FinishIssue(ctx, nil, err2)
 	}()
+	//nolint[:govet]
 	ctxTimeout, _ = context.WithTimeout(ctx, timeout)
 	rCert, rErr = s.WaitFinishIssue(ctxTimeout)
 	td.CmpNil(t, rCert)

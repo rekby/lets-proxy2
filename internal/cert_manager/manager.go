@@ -34,11 +34,12 @@ const (
 )
 
 var (
-	globalAllowedChallenges = []string{tlsAlpn01}
-	domainKeyRSALength      = 2048
+	domainKeyRSALength = 2048
 )
 
 var haveNoCert = errors.New("have no certificate for domain")
+
+//nolint[:varcheck]
 var notImplementedError = errors.New("not implemented yet")
 
 type GetContext interface {
@@ -97,7 +98,7 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, 
 	if getContext, ok := hello.Conn.(GetContext); ok {
 		ctx = getContext.GetContext()
 	} else {
-		defaultLogger := zc.L(nil)
+		defaultLogger := zc.L(context.Background())
 		defaultLogger.DPanic("hello.Conn must implement GetContext interface")
 		ctx = zc.WithLogger(context.Background(), defaultLogger)
 	}
@@ -347,21 +348,23 @@ func (m *Manager) issueCertificate(ctx context.Context, certName certNameType, d
 		return nil, err
 	}
 	csr, err := createCertRequest(key, domains[0], domains...)
-	der, _, err := m.Client.CreateCert(ctx, csr, 0, true)
-
+	log.DebugDPanic(logger, err, "Create certificate request")
 	if err != nil {
-		logger.Error("Can't issue certificate", zap.Error(err))
+		return nil, err
+	}
+
+	der, _, err := m.Client.CreateCert(ctx, csr, 0, true)
+	log.InfoError(logger, err, "Receive certificate from acme server")
+	if err != nil {
 		return nil, err
 	}
 
 	cert, err := validCertDer(domains, der, key, time.Now())
-
+	log.DebugDPanic(logger, err, "Check certificate is valid")
 	if err == nil {
-		logger.Info("Certificated issued")
 		storeCertificate(ctx, m.Cache, certName, cert)
 		return cert, nil
 	} else {
-		logger.Error("Receive invalid certificate", zap.Error(err))
 		return nil, err
 	}
 }
@@ -389,6 +392,7 @@ func (m *Manager) certKeyGetOrCreate(ctx context.Context, certName certNameType,
 	key, err := getCertificateKey(ctx, m.Cache, certName, keyType)
 	if err == nil {
 		logger.Debug("Got certificate key from cache and reuse old key")
+		return key, nil
 	} else {
 		if err == cache.ErrCacheMiss {
 			logger.Debug("Cert key no in cache. Create new.")
@@ -425,7 +429,8 @@ func (m *Manager) fulfill(ctx context.Context, challenge *acme.Challenge, domain
 		}
 		key := domain.ASCII() + "/" + challenge.Token
 		err = m.httpTokens.Put(ctx, key, []byte(resp))
-		return func(localContext context.Context) { _ = m.httpTokens.Delete(localContext, key) }, nil
+		log.DebugError(logger, err, "Put token for http-01", zap.String("key", key))
+		return func(localContext context.Context) { _ = m.httpTokens.Delete(localContext, key) }, err
 	default:
 		logger.Error("Unknow challenge type", zap.Reflect("challenge", challenge))
 		return nil, errors.New("unknown challenge type")

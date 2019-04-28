@@ -4,11 +4,6 @@ import "go.uber.org/zap"
 
 type certNameType string
 
-type certDescription struct {
-	Name   certNameType // Internal name of certificate. It may not related to domain names in future.
-	Domain string       // Domain in certificate, it will slice in future.
-}
-
 func certNameFromDomain(domain DomainName) certNameType {
 	return certNameType(domain)
 }

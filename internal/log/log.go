@@ -46,6 +46,19 @@ func DebugError(logger *zap.Logger, err error, mess string, fields ...zap.Field)
 	debugError(logger, err, mess, fields...)
 }
 
+func DebugDPanic(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
+	debugDpanic(logger, err, mess, fields...)
+}
+
+func debugDpanic(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
+	logger = logger.WithOptions(zap.AddCallerSkip(2))
+	if err == nil {
+		logger.Debug(mess, fields...)
+	} else {
+		logger.DPanic(mess, append(fields, zap.Error(err))...)
+	}
+}
+
 func DebugFatal(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
 	debugFatal(logger, err, mess, fields...)
 }

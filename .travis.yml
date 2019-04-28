@@ -19,6 +19,7 @@ install:
 
 script:
   - go test -v -covermode=count -coverprofile=coverage.out ./...
+  - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin v1.16.0
 
 after_script:
   # Install and upload test coverage must not failure for test build

@@ -16,8 +16,6 @@ import (
 	zc "github.com/rekby/zapcontext"
 )
 
-const httpPort = 80
-
 type HttpProxy struct {
 	GetDestination       func(ctx context.Context, remoteAddr string) (addr string, err error)
 	GetContext           func(req *http.Request) (context.Context, error)

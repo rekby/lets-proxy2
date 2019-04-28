@@ -154,24 +154,28 @@ func TestProxyTLS(t *testing.T) {
 	resp, err = httpClient.Get("https://" + listenerForTLS1.Addr().String())
 	td.CmpNoError(err)
 	body, err = ioutil.ReadAll(resp.Body)
+	td.CmpNoError(err)
 	_ = resp.Body.Close()
 	td.CmpDeeply(body, []byte{3, 2, 1})
 
 	resp, err = httpClient.Get("https://" + listenerForTLS2.Addr().String())
 	td.CmpNoError(err)
 	body, err = ioutil.ReadAll(resp.Body)
+	td.CmpNoError(err)
 	_ = resp.Body.Close()
 	td.CmpDeeply(body, []byte{3, 2, 1})
 
 	resp, err = httpClient.Get("http://" + listenerForTCP1.Addr().String())
 	td.CmpNoError(err)
 	body, err = ioutil.ReadAll(resp.Body)
+	td.CmpNoError(err)
 	_ = resp.Body.Close()
 	td.CmpDeeply(body, []byte{3, 2, 1})
 
 	resp, err = httpClient.Get("http://" + listenerForTCP2.Addr().String())
 	td.CmpNoError(err)
 	body, err = ioutil.ReadAll(resp.Body)
+	td.CmpNoError(err)
 	_ = resp.Body.Close()
 	td.CmpDeeply(body, []byte{3, 2, 1})
 

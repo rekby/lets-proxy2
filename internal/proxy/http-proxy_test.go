@@ -110,12 +110,6 @@ func TestHttpProxy_Director(t *testing.T) {
 	td.CmpDeeply(req, &http.Request{URL: &url.URL{Host: "1.2.3.4:80", Scheme: "http"}})
 }
 
-type HttpProxyTest interface {
-	GetDestination(ctx context.Context, remoteAddr string) (addr string, err error)
-	GetContext(req *http.Request) (context.Context, error)
-	HandleHttpValidation(w http.ResponseWriter, r *http.Request) bool
-}
-
 func TestNewHttpProxy(t *testing.T) {
 	var resp *http.Response
 	var res []byte

@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"net"
-	"net/http/httputil"
 	"runtime"
 	"sync"
 
@@ -31,7 +30,6 @@ type ListenersHandler struct {
 	ctx           context.Context
 	ctxCancelFunc func()
 	tlsConfig     tls.Config
-	proxy         httputil.ReverseProxy
 	logger        *zap.Logger
 
 	connListenProxy listenerType
