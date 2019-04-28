@@ -15,6 +15,20 @@ type configType struct {
 	HttpsListeners         string `default:"[::]:443" comment:"Comma-separated bindings for listen https.\nSupported formats:\n1.2.3.4:443,0.0.0.0:443,[::]:443,[2001:db8::a123]:443"`
 	StorageDir             string `default:"storage" comment:"Path to dir, which will store state and certificates"`
 	AcmeServer             string `default:"https://acme-v01.api.letsencrypt.org/directory" comment:"Directory url of acme server.\nTest server: https://acme-staging-v02.api.letsencrypt.org/directory"`
+	Log                    logConfig
+}
+
+type logConfig struct {
+	EnableLogToFile   bool   `default:"true" comment:""`
+	EnableLogToStdErr bool   `default:"true"`
+	LogLevel          string `default:"info" comment:"verbose level of log, one of: debug, info, warning, error, fatal"`
+	EnableRotate      bool   `default:"true" comment:"Enable self log rotating"`
+	DeveloperMode     bool   `default:"false" comment:"Enable developer mode: more stacktraces and panic (stop program) on some internal errors."`
+	File              string `default:"lets-proxy2.log" comment:"Path to log file"`
+	RotateBySizeMB    int    `default:"100" comment:"Rotate log if current file size more than X MB"`
+	CompressRotated   bool   `default:"false" comment:"Compress old log with gzip after rotate"`
+	MaxDays           int    `default:"10" comment:"Delete old backups after X days. 0 for disable."`
+	MaxCount          int    `default:"10" comment:"Delete old backups if old file number more then X. 0 for disable."`
 }
 
 var (
@@ -53,6 +67,8 @@ func readConfig(ctx context.Context, file string) (configType, error) {
 	var err error
 	if file == "" {
 		logger.Info("Use default config.")
+		// Workaround https://github.com/pelletier/go-toml/issues/274
+		fileBytes = []byte("[Log]")
 	} else {
 		fileBytes, err = ioutil.ReadFile(file)
 	}
