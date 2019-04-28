@@ -1,36 +1,45 @@
 language: go
 
+addons:
+  apt:
+    packages:
+      - dos2unix
+
 go:
   - "1.12.4"
-  - "master"
 
 env:
-  global:
-    - GO111MODULE=on
-  matrix:
-    - GOFLAGS=
-    - GOFLAGS=-mod=vendor
-matrix:
-  exclude:
-    - go: "master"
-      env: GOFLAGS=-mod=vendor
-  fast_finish: true
-  allow_failures:
-    - go: "master"
-    - env: GOFLAGS=
-
+  - GO111MODULE=on GOFLAGS=-mod=vendor
 
 services:
   - docker
 
 install:
-  - bash tests/prepare.sh
+  - "true" # bash tests/prepare.sh
 
 script:
-  - go test -v -covermode=count -coverprofile=coverage.out ./...
+  - "true" # go test -v -covermode=count -coverprofile=coverage.out ./...
 
 after_script:
   # Install and upload test coverage must not failure for test build
   - go get -mod= golang.org/x/tools/cmd/cover
   - go get -mod= github.com/mattn/goveralls
   - goveralls -coverprofile=coverage.out -service=travis-ci -repotoken $COVERALLS_TOKEN
+
+before_deploy:
+  - go get -mod= github.com/mitchellh/gox
+  - mkdir -p output
+  - gox --ldflags "-X \"main.VERSION=$TRAVIS_TAG commit $TRAVIS_COMMIT\"" --output="output/lets-proxy_{{.OS}}_{{.Arch}}" -verbose --rebuild
+  - bash tests/make_archives.sh
+
+deploy:
+  skip_cleanup: true
+#  tags: true
+  provider: releases
+  on:
+    repo: rekby/lets-proxy2
+#    tags: true
+  api_key: $GITHUB_TOKEN
+  file_glob: true
+  file: binaries/*
+
