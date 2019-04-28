@@ -1,24 +1,15 @@
+env:
+  - GO111MODULE=on GOFLAGS=-mod=vendor CGO_ENABLED=0 TAG_PREFIX="v0.20.0"
+
 language: go
+
+addons:
+  apt:
+    packages:
+      - dos2unix
 
 go:
   - "1.12.4"
-  - "master"
-
-env:
-  global:
-    - GO111MODULE=on
-  matrix:
-    - GOFLAGS=
-    - GOFLAGS=-mod=vendor
-matrix:
-  exclude:
-    - go: "master"
-      env: GOFLAGS=-mod=vendor
-  fast_finish: true
-  allow_failures:
-    - go: "master"
-    - env: GOFLAGS=
-
 
 services:
   - docker
@@ -34,3 +25,25 @@ after_script:
   - go get -mod= golang.org/x/tools/cmd/cover
   - go get -mod= github.com/mattn/goveralls
   - goveralls -coverprofile=coverage.out -service=travis-ci -repotoken $COVERALLS_TOKEN
+
+before_deploy:
+  - git config --local user.name "$GIT_NAME"
+  - git config --local user.email "$GIT_EMAIL"
+  - export TRAVIS_TAG="$TAG_PREFIX.$TRAVIS_BUILD_NUMBER"
+  - git tag $TRAVIS_TAG
+  - go get -mod= github.com/mitchellh/gox
+  - mkdir -p output
+  - OS_ARCH_BUILDS="darwin/amd64 linux/386 linux/amd64 linux/arm freebsd/386 freebsd/amd64 freebsd/arm windows/386 windows/amd64"
+  - gox --mod=vendor -osarch "$OS_ARCH_BUILDS" --ldflags "-X \"main.VERSION=$TRAVIS_TAG commit $TRAVIS_COMMIT\"" --output="output/lets-proxy_{{.OS}}_{{.Arch}}" -verbose --rebuild ./cmd/
+  - bash tests/make_archives.sh
+
+deploy:
+  skip_cleanup: true
+  provider: releases
+  on:
+    repo: rekby/lets-proxy2
+    branch: master
+  api_key: $GITHUB_TOKEN
+  file_glob: true
+  file: output/*
+

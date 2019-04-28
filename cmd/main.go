@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"runtime"
 	"strings"
 
 	_ "github.com/kardianos/minwinsvc"
@@ -20,6 +21,8 @@ import (
 	"go.uber.org/zap"
 )
 
+var VERSION = "custom" // need be var becouse it redefine by --ldflags "-X main.VERSION" during autobuild
+
 const defaultDirMode = 0700
 
 func main() {
@@ -31,6 +34,11 @@ func main() {
 	if *defaultConfigP {
 		fmt.Println(string(defaultConfig(globalContext)))
 		os.Exit(0)
+	}
+
+	if *versionP {
+		fmt.Printf("Version: '%v', Os: '%v', Arch: '%v'\n", VERSION, runtime.GOOS, runtime.GOARCH)
+		return
 	}
 
 	startProgram(getConfig(globalContext))
