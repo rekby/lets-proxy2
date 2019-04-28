@@ -104,7 +104,7 @@ func TestProxyTLS(t *testing.T) {
 
 	proxy := ListenersHandler{
 		GetCertificate:        dummyGetCertificate,
-		ListenersForHandleTls: []net.Listener{listenerForTLS1, listenerForTLS2},
+		ListenersForHandleTLS: []net.Listener{listenerForTLS1, listenerForTLS2},
 		Listeners:             []net.Listener{listenerForTCP1, listenerForTCP2},
 	}
 
@@ -146,6 +146,7 @@ func TestProxyTLS(t *testing.T) {
 	httpClient := http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
+				//nolint:gosec
 				InsecureSkipVerify: true,
 			},
 		},

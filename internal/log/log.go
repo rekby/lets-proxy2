@@ -25,9 +25,8 @@ func (c *certLogger) String() string {
 func Cert(cert *tls.Certificate) zap.Field {
 	if cert == nil {
 		return zap.String("certificate", "tls nil")
-	} else {
-		return CertX509(cert.Leaf)
 	}
+	return CertX509(cert.Leaf)
 }
 
 func CertX509(cert *x509.Certificate) zap.Field {

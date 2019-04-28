@@ -50,7 +50,7 @@ func TestGetDestination(t *testing.T) {
 func TestHttpProxy_SetTransport(t *testing.T) {
 	td := testdeep.NewT(t)
 
-	proxy := HttpProxy{}
+	proxy := HTTPProxy{}
 	transport := NewRoundTripperMock(t)
 	proxy.SetTransport(transport)
 
@@ -70,8 +70,8 @@ func TestHttpProxy_HandleHttpValidationDefault(t *testing.T) {
 	td.CmpNoError(err)
 	defer func() { _ = listener.Close() }()
 
-	proxy := NewHttpProxy(ctx, listener)
-	td.False(proxy.HandleHttpValidation(&httptest.ResponseRecorder{}, nil))
+	proxy := NewHTTPProxy(ctx, listener)
+	td.False(proxy.HandleHTTPValidation(&httptest.ResponseRecorder{}, nil))
 }
 
 func TestHttpProxy_getContextDefault(t *testing.T) {
@@ -85,7 +85,7 @@ func TestHttpProxy_getContextDefault(t *testing.T) {
 	td.CmpNoError(err)
 	defer func() { _ = listener.Close() }()
 
-	proxy := NewHttpProxy(ctx, listener)
+	proxy := NewHTTPProxy(ctx, listener)
 	ctx2, err := proxy.GetContext(nil)
 	td.NotNil(zc.L(ctx2))
 	td.CmpNoError(err)
@@ -97,7 +97,7 @@ func TestHttpProxy_Director(t *testing.T) {
 
 	var req *http.Request
 	td := testdeep.NewT(t)
-	proxy := HttpProxy{}
+	proxy := HTTPProxy{}
 	proxy.GetContext = func(req *http.Request) (context.Context, error) {
 		return zc.WithLogger(ctx, zap.NewNop()), nil
 	}
@@ -151,18 +151,18 @@ func TestNewHttpProxy(t *testing.T) {
 			w.WriteHeader(http.StatusAccepted)
 			_, _ = w.Write([]byte{3, 4})
 			return true
-		} else {
-			return false
 		}
+		return false
 	})
 
-	proxy := NewHttpProxy(ctx, listener)
+	proxy := NewHTTPProxy(ctx, listener)
 	proxy.GetContext = proxyTest.GetContext
 	proxy.GetDestination = proxyTest.GetDestination
-	proxy.HandleHttpValidation = proxyTest.HandleHttpValidation
+	proxy.HandleHTTPValidation = proxyTest.HandleHttpValidation
 	proxy.SetTransport(transport)
 	proxyTest.GetDestinationMock.Return("1.2.3.4:80", nil)
 
+	//nolint:gosec
 	resp, err = http.Get(prefix)
 	td.CmpNoError(err)
 	td.CmpDeeply(http.StatusOK, resp.StatusCode)

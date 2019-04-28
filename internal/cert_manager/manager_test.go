@@ -1,3 +1,4 @@
+//nolint:golint
 package cert_manager
 
 import (
@@ -16,7 +17,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/rekby/zapcontext"
+	zc "github.com/rekby/zapcontext"
 
 	"github.com/gojuno/minimock"
 
@@ -38,6 +39,7 @@ func (c contextConnection) GetContext() context.Context {
 	return c.Context
 }
 
+//nolint:gochecknoinits
 func init() {
 	logger, err := zap.NewDevelopment()
 	if err != nil {
@@ -173,6 +175,7 @@ func TestManager_GetCertificateTls(t *testing.T) {
 		}
 	})
 
+	//nolint[:dupl]
 	t.Run("ParallelCert", func(t *testing.T) {
 		// change top loevel logger
 		// no parallelize
@@ -233,8 +236,8 @@ func TestManager_GetCertificateHttp01(t *testing.T) {
 	})
 
 	manager := New(ctx, createTestClient(t), cacheMock)
-	manager.EnableTlsValidation = false
-	manager.EnableHttpValidation = true
+	manager.EnableTLSValidation = false
+	manager.EnableHTTPValidation = true
 
 	lisneter, err := net.ListenTCP("tcp", &net.TCPAddr{Port: 5002})
 
@@ -249,7 +252,7 @@ func TestManager_GetCertificateHttp01(t *testing.T) {
 		mux := http.ServeMux{}
 		mux.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 			request = request.WithContext(ctx)
-			if manager.isHttpValidationRequest(request) {
+			if manager.isHTTPValidationRequest(request) {
 				logger.Info("Handle validation request", zap.Reflect("request", request))
 				manager.HandleHttpValidation(writer, request)
 			} else {
@@ -328,6 +331,7 @@ func TestManager_GetCertificateHttp01(t *testing.T) {
 		}
 	})
 
+	//nolint[:dupl]
 	t.Run("ParallelCert", func(t *testing.T) {
 		// change top loevel logger
 		// no parallelize
@@ -375,6 +379,7 @@ func createTestClient(t *testing.T) *acme.Client {
 	client.HTTPClient = &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
+				//nolint:gosec
 				InsecureSkipVerify: true,
 			},
 		},
@@ -396,6 +401,7 @@ func TestStoreCertificate(t *testing.T) {
 	ctx, flush := th.TestContext()
 	defer flush()
 
+	//nolint:gosec
 	key, _ := rsa.GenerateKey(rand.Reader, 512)
 
 	cert := &tls.Certificate{Certificate: [][]byte{

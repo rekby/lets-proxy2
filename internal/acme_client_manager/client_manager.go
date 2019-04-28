@@ -1,10 +1,11 @@
+//nolint:golint
 package acme_client_manager
 
 import (
 	"context"
-	"crypto/md5"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -23,7 +24,7 @@ const rsaKeyLength = 2048
 
 type AcmeManager struct {
 	IgnoreCacheLoad      bool
-	DirectoryUrl         string
+	DirectoryURL         string
 	AgreeFunction        func(tosurl string) bool
 	RenewAccountInterval time.Duration
 
@@ -68,7 +69,7 @@ func (m *AcmeManager) GetClient(ctx context.Context) (*acme.Client, error) {
 		}
 	}
 
-	client := &acme.Client{DirectoryURL: m.DirectoryUrl}
+	client := &acme.Client{DirectoryURL: m.DirectoryURL}
 	key, account, err := createAccount(ctx, client, m.AgreeFunction)
 	if err != nil {
 		return nil, err
@@ -79,7 +80,7 @@ func (m *AcmeManager) GetClient(ctx context.Context) (*acme.Client, error) {
 	stateBytes, err := json.Marshal(state)
 	log.InfoPanicCtx(ctx, err, "Marshal account state to json")
 	if m.cache != nil {
-		err = m.cache.Put(ctx, certName(m.DirectoryUrl), stateBytes)
+		err = m.cache.Put(ctx, certName(m.DirectoryURL), stateBytes)
 		if err != nil {
 			return nil, err
 		}
@@ -120,7 +121,7 @@ func (m *AcmeManager) loadFromCache(ctx context.Context) (err error) {
 		log.DebugErrorCtx(ctx, effectiveError, "Load acme manager from cache.", zap.NamedError("raw_err", err))
 	}()
 
-	content, err := m.cache.Get(ctx, certName(m.DirectoryUrl))
+	content, err := m.cache.Get(ctx, certName(m.DirectoryURL))
 	if err != nil {
 		return err
 	}
@@ -138,7 +139,7 @@ func (m *AcmeManager) loadFromCache(ctx context.Context) (err error) {
 		return errors.New("empty account info")
 	}
 
-	m.client = &acme.Client{DirectoryURL: m.DirectoryUrl, Key: state.PrivateKey}
+	m.client = &acme.Client{DirectoryURL: m.DirectoryURL, Key: state.PrivateKey}
 	m.account = state.AcmeAccount
 	go m.accountRenew()
 	return nil
@@ -156,7 +157,7 @@ func createAccount(ctx context.Context, client *acme.Client, agreeFunction func(
 }
 
 func certName(url string) string {
-	sum := md5.Sum([]byte(url))
+	sum := sha256.New().Sum([]byte(url))
 	sumPrefix := sum[:4]
 	return fmt.Sprintf("account_info_%x.client_manager.json", sumPrefix)
 }

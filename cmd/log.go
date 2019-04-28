@@ -2,9 +2,10 @@ package main
 
 import (
 	"errors"
-	"gopkg.in/natefinch/lumberjack.v2"
 	"math"
 	"strings"
+
+	"gopkg.in/natefinch/lumberjack.v2"
 
 	"github.com/rekby/lets-proxy2/internal/log"
 

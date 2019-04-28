@@ -12,14 +12,14 @@ import (
 
 	"github.com/rekby/lets-proxy2/internal/log"
 
-	"github.com/rekby/zapcontext"
-	"github.com/satori/go.uuid"
+	zc "github.com/rekby/zapcontext"
+	uuid "github.com/satori/go.uuid"
 	"go.uber.org/zap"
 )
 
 type ListenersHandler struct {
 	GetCertificate        func(*tls.ClientHelloInfo) (*tls.Certificate, error)
-	ListenersForHandleTls []net.Listener // listener which will handle TLS
+	ListenersForHandleTLS []net.Listener // listener which will handle TLS
 
 	// listeners which will not handle TLS, but will proxy to self listener. It is comfortable for listen https and http
 	// ports and translate it to one proxy
@@ -66,7 +66,7 @@ func (p *ListenersHandler) Start(ctx context.Context) error {
 
 	logger := zc.L(ctx)
 	logger.Info("Start handleListeners")
-	for _, listenerForTls := range p.ListenersForHandleTls {
+	for _, listenerForTLS := range p.ListenersForHandleTLS {
 		go func(l net.Listener) {
 			for {
 				conn, err := l.Accept()
@@ -80,9 +80,9 @@ func (p *ListenersHandler) Start(ctx context.Context) error {
 					listenerClosed <- struct{}{}
 					return
 				}
-				go p.handleTcpTLSConnection(ctx, conn)
+				go p.handleTCPTLSConnection(ctx, conn)
 			}
-		}(listenerForTls)
+		}(listenerForTLS)
 	}
 
 	for _, listener := range p.Listeners {
@@ -99,14 +99,14 @@ func (p *ListenersHandler) Start(ctx context.Context) error {
 					listenerClosed <- struct{}{}
 					return
 				}
-				go p.handleTcpConnection(ctx, conn)
+				go p.handleTCPConnection(ctx, conn)
 			}
 		}(listener)
 
 	}
 
 	go func() {
-		listenersCount := len(p.ListenersForHandleTls) + len(p.Listeners)
+		listenersCount := len(p.ListenersForHandleTLS) + len(p.Listeners)
 		for i := 0; i < listenersCount; i++ {
 			select {
 			case <-ctx.Done():
@@ -189,7 +189,7 @@ func (p *ListenersHandler) GetConnectionContext(remoteAddr, localAddr string) (c
 	return nil, errors.New("not found registered connection")
 }
 
-func (p *ListenersHandler) handleTcpConnection(ctx context.Context, conn net.Conn) {
+func (p *ListenersHandler) handleTCPConnection(ctx context.Context, conn net.Conn) {
 	contextConn := p.registerConnection(conn)
 	logger := zc.L(contextConn.Context)
 
@@ -205,7 +205,7 @@ func (p *ListenersHandler) handleTcpConnection(ctx context.Context, conn net.Con
 	}
 }
 
-func (p *ListenersHandler) handleTcpTLSConnection(ctx context.Context, conn net.Conn) {
+func (p *ListenersHandler) handleTCPTLSConnection(ctx context.Context, conn net.Conn) {
 	contextConn := p.registerConnection(conn)
 	logger := zc.L(contextConn.Context)
 
@@ -250,9 +250,8 @@ func (l *listenerType) Accept() (net.Conn, error) {
 	conn, ok := <-l.connections
 	if ok {
 		return conn, nil
-	} else {
-		return nil, errors.New("listener closed")
 	}
+	return nil, errors.New("listener closed")
 }
 
 func (l *listenerType) Close() error {

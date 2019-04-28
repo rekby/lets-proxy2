@@ -1,3 +1,4 @@
+//nolint:golint
 package cert_manager
 
 import (
@@ -22,7 +23,7 @@ import (
 
 	"github.com/rekby/lets-proxy2/internal/log"
 
-	"github.com/rekby/zapcontext"
+	zc "github.com/rekby/zapcontext"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/acme"
 )
@@ -33,14 +34,12 @@ const (
 	httpWellKnown = "/.well-known/acme-challenge/"
 )
 
-var (
-	domainKeyRSALength = 2048
-)
+const domainKeyRSALength = 2048
 
-var haveNoCert = errors.New("have no certificate for domain")
+var errHaveNoCert = errors.New("have no certificate for domain")
 
-//nolint[:varcheck]
-var notImplementedError = errors.New("not implemented yet")
+//nolint:varcheck,deadcode,unused
+var errNotImplementedError = errors.New("not implemented yet")
 
 type GetContext interface {
 	GetContext() context.Context
@@ -50,7 +49,7 @@ type keyType string
 
 const keyRSA keyType = "rsa"
 
-// Interface inspired to https://godoc.org/golang.org/x/crypto/acme/autocert#Manager but not compatible gurantee
+// Interface inspired to https://godoc.org/golang.org/x/crypto/acme/autocert#Manager but not compatible guarantee
 type Manager struct {
 	CertificateIssueTimeout time.Duration
 	Cache                   cache.Cache
@@ -64,8 +63,8 @@ type Manager struct {
 	//
 	// Mutating the field after the first call of GetCertificate method will have no effect.
 	Client               *acme.Client
-	EnableHttpValidation bool
-	EnableTlsValidation  bool
+	EnableHTTPValidation bool
+	EnableTLSValidation  bool
 
 	// will rewrite to Cache in future
 	// https://github.com/rekby/lets-proxy2/issues/32
@@ -86,7 +85,7 @@ func New(ctx context.Context, client *acme.Client, c cache.Cache) *Manager {
 	res.CertificateIssueTimeout = time.Minute
 	res.httpTokens = cache.NewMemoryCache("Http validation tokens")
 	res.Cache = c
-	res.EnableTlsValidation = true
+	res.EnableTLSValidation = true
 	return &res
 }
 
@@ -107,7 +106,7 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, 
 
 	logger := zc.L(ctx).With(logDomain(needDomain))
 	logger.Info("Get certificate", zap.String("original_domain", hello.ServerName))
-	if isTlsAlpn01Hello(hello) {
+	if isTLSALPN01Hello(hello) {
 		logger.Debug("It is tls-alpn-01 token request.")
 
 		m.certTokensMu.RLock()
@@ -116,7 +115,7 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, 
 
 		if cert == nil {
 			logger.Warn("Doesn't have token for request domain")
-			return nil, haveNoCert
+			return nil, errHaveNoCert
 		}
 		return cert, nil
 	}
@@ -156,15 +155,16 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, 
 	defer cancelFunc()
 
 	// TODO: receive cert for domain and subdomains same time
-	res, err := m.createCertificateForDomains(certIssueContext, certName, domainNamesFromCertificateName(certName), needDomain)
+	res, err := m.createCertificateForDomains(certIssueContext, certName, domainNamesFromCertificateName(certName),
+		needDomain)
 	if err == nil {
 		logger.Info("Certificate issued.", log.Cert(res),
 			zap.Time("expire", res.Leaf.NotAfter))
 		return res, nil
-	} else {
-		logger.Warn("Can't issue certificate", zap.Error(err))
-		return nil, haveNoCert
 	}
+	logger.Warn("Can't issue certificate", zap.Error(err))
+	return nil, errHaveNoCert
+
 }
 
 func (m *Manager) certStateGet(certName certNameType) *certState {
@@ -179,7 +179,9 @@ func (m *Manager) certStateGet(certName certNameType) *certState {
 	return res
 }
 
-func (m *Manager) createCertificateForDomains(ctx context.Context, certName certNameType, domainNames []DomainName, needDomain DomainName) (res *tls.Certificate, err error) {
+func (m *Manager) createCertificateForDomains(ctx context.Context, certName certNameType,
+	domainNames []DomainName, needDomain DomainName) (res *tls.Certificate, err error) {
+
 	logger := zc.L(ctx)
 	certState := m.certStateGet(certName)
 	if certState.StartIssue(ctx) {
@@ -254,7 +256,8 @@ func (m *Manager) authorizeDomain(ctx context.Context, domain DomainName) error 
 			authUries = append(authUries, k)
 		}
 
-		logger.Info("Start detached process for revoke pending authorizations", zap.Strings("uries", authUries))
+		logger.Info("Start detached process for revoke pending authorizations",
+			zap.Strings("uries", authUries))
 
 		revokeContext := context.Background()
 		revokeContext = zc.WithLogger(revokeContext, logger.With(zap.Bool("detached", true)))
@@ -262,10 +265,10 @@ func (m *Manager) authorizeDomain(ctx context.Context, domain DomainName) error 
 	}()
 
 	var allowedChallenges []string
-	if m.EnableTlsValidation {
+	if m.EnableTLSValidation {
 		allowedChallenges = append(allowedChallenges, tlsAlpn01)
 	}
-	if m.EnableHttpValidation {
+	if m.EnableHTTPValidation {
 		allowedChallenges = append(allowedChallenges, http01)
 	}
 
@@ -304,9 +307,8 @@ func (m *Manager) authorizeDomain(ctx context.Context, domain DomainName) error 
 		if chal == nil {
 			logger.Warn("Unable to authorize domain. No compatible challenges.")
 			return errors.New("unable authorize domain")
-		} else {
-			logger.Debug("Select challenge for authorize", zap.Reflect("challenge", chal))
 		}
+		logger.Debug("Select challenge for authorize", zap.Reflect("challenge", chal))
 
 		cleanup, err := m.fulfill(ctx, chal, domain)
 		if err != nil {
@@ -364,9 +366,8 @@ func (m *Manager) issueCertificate(ctx context.Context, certName certNameType, d
 	if err == nil {
 		storeCertificate(ctx, m.Cache, certName, cert)
 		return cert, nil
-	} else {
-		return nil, err
 	}
+	return nil, err
 }
 
 func (m *Manager) revokePendingAuthorizations(ctx context.Context, uries []string) {
@@ -393,13 +394,12 @@ func (m *Manager) certKeyGetOrCreate(ctx context.Context, certName certNameType,
 	if err == nil {
 		logger.Debug("Got certificate key from cache and reuse old key")
 		return key, nil
+	}
+	if err == cache.ErrCacheMiss {
+		logger.Debug("Cert key no in cache. Create new.")
 	} else {
-		if err == cache.ErrCacheMiss {
-			logger.Debug("Cert key no in cache. Create new.")
-		} else {
-			logger.Error("Error while check cert key in cache", zap.Error(err))
-			return nil, err
-		}
+		logger.Error("Error while check cert key in cache", zap.Error(err))
+		return nil, err
 	}
 
 	logger.Debug("Generate new rsa key")
@@ -437,7 +437,7 @@ func (m *Manager) fulfill(ctx context.Context, challenge *acme.Challenge, domain
 	}
 }
 
-func (m *Manager) isHttpValidationRequest(r *http.Request) bool {
+func (m *Manager) isHTTPValidationRequest(r *http.Request) bool {
 	if r == nil || r.URL == nil {
 		return false
 	}
@@ -449,7 +449,7 @@ func (m *Manager) isHttpValidationRequest(r *http.Request) bool {
 }
 
 func (m *Manager) HandleHttpValidation(w http.ResponseWriter, r *http.Request) bool {
-	if !m.isHttpValidationRequest(r) {
+	if !m.isHTTPValidationRequest(r) {
 		return false
 	}
 
@@ -461,6 +461,7 @@ func (m *Manager) HandleHttpValidation(w http.ResponseWriter, r *http.Request) b
 	resp, err := m.httpTokens.Get(ctx, domain.ASCII()+"/"+token)
 	logger.Debug("Get http token", zap.Error(err))
 	if err == nil {
+		w.WriteHeader(http.StatusOK)
 		_, err = w.Write(resp)
 		log.DebugInfo(logger, err, "Error write http token answer to response", logDomain(domain), zap.String("token", token))
 	} else {
@@ -596,7 +597,7 @@ func getCertificate(ctx context.Context, cache cache.Cache, certName certNameTyp
 			return nil, err
 		}
 	}
-	return validCertTls(&cert2, nil, time.Now())
+	return validCertTLS(&cert2, nil, time.Now())
 }
 
 func getCertificateKeyBytes(ctx context.Context, cache cache.Cache, certName certNameType, keyType keyType) ([]byte, error) {
@@ -624,7 +625,8 @@ func parsePrivateKey(keyPEMBlock []byte) (crypto.Signer, error) {
 	for {
 		keyDERBlock, keyPEMBlock = pem.Decode(keyPEMBlock)
 		if keyDERBlock == nil {
-			return fail(fmt.Errorf("tls: failed to find PEM block with type ending in \"PRIVATE KEY\" in key input after skipping PEM blocks of the following types: %v", skippedBlockTypes))
+			return fail(fmt.Errorf("tls: failed to find PEM block with type ending in \"PRIVATE KEY\" in key "+
+				"input after skipping PEM blocks of the following types: %v", skippedBlockTypes))
 		}
 		if keyDERBlock.Type == "PRIVATE KEY" || strings.HasSuffix(keyDERBlock.Type, " PRIVATE KEY") {
 			break

@@ -5,11 +5,11 @@ import (
 	"net"
 	"testing"
 
+	"github.com/rekby/lets-proxy2/internal/cert_manager"
+
 	"github.com/rekby/lets-proxy2/internal/th"
 
 	"github.com/maxatome/go-testdeep"
-
-	"github.com/rekby/lets-proxy2/internal/cert_manager"
 )
 
 var (

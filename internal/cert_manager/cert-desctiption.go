@@ -1,3 +1,4 @@
+//nolint:golint
 package cert_manager
 
 import "go.uber.org/zap"

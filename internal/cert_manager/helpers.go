@@ -1,3 +1,4 @@
+//nolint:golint
 package cert_manager
 
 import (
@@ -13,7 +14,7 @@ import (
 	"golang.org/x/crypto/acme"
 )
 
-func isTlsAlpn01Hello(hello *tls.ClientHelloInfo) bool {
+func isTLSALPN01Hello(hello *tls.ClientHelloInfo) bool {
 	return len(hello.SupportedProtos) == 1 && hello.SupportedProtos[0] == acme.ALPNProto
 }
 
@@ -67,10 +68,10 @@ func validCertDer(domains []DomainName, der [][]byte, key crypto.PrivateKey, now
 		Leaf:        leaf,
 	}
 
-	return validCertTls(cert, domains, now)
+	return validCertTLS(cert, domains, now)
 }
 
-func validCertTls(cert *tls.Certificate, domains []DomainName, now time.Time) (validCert *tls.Certificate, err error) {
+func validCertTLS(cert *tls.Certificate, domains []DomainName, now time.Time) (validCert *tls.Certificate, err error) {
 	if cert == nil {
 		return nil, errors.New("certificate is nil")
 	}

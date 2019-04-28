@@ -10,10 +10,11 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/rekby/lets-proxy2/internal/cert_manager"
+
 	_ "github.com/kardianos/minwinsvc"
 	"github.com/rekby/lets-proxy2/internal/acme_client_manager"
 	"github.com/rekby/lets-proxy2/internal/cache"
-	"github.com/rekby/lets-proxy2/internal/cert_manager"
 	"github.com/rekby/lets-proxy2/internal/log"
 	"github.com/rekby/lets-proxy2/internal/proxy"
 	"github.com/rekby/lets-proxy2/internal/tlslistener"
@@ -21,7 +22,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var VERSION = "custom" // need be var becouse it redefine by --ldflags "-X main.VERSION" during autobuild
+var VERSION = "custom" // need be var because it redefine by --ldflags "-X main.VERSION" during autobuild
 
 const defaultDirMode = 0700
 
@@ -56,7 +57,7 @@ func startProgram(config *configType) {
 
 	logger.Info("Start program version", zap.String("version", version()))
 
-	httpsListeners := createHttpsListeners(ctx, config.HttpsListeners)
+	httpsListeners := createHTTPSListeners(ctx, config.HTTPSListeners)
 
 	if len(httpsListeners) == 0 {
 		logger.Fatal("Can't start any listener")
@@ -67,21 +68,21 @@ func startProgram(config *configType) {
 
 	storage := &cache.DiskCache{Dir: config.StorageDir}
 	clientManager := acme_client_manager.New(ctx, storage)
-	clientManager.DirectoryUrl = config.AcmeServer
+	clientManager.DirectoryURL = config.AcmeServer
 	acmeClient, err := clientManager.GetClient(ctx)
 	log.DebugFatal(logger, err, "Get acme client")
 
 	certManager := cert_manager.New(ctx, acmeClient, storage)
 
 	tlsListener := &tlslistener.ListenersHandler{
-		ListenersForHandleTls: httpsListeners,
+		ListenersForHandleTLS: httpsListeners,
 		GetCertificate:        certManager.GetCertificate,
 	}
 
 	err = tlsListener.Start(ctx)
 	log.DebugFatal(logger, err, "Start tls listener")
 
-	p := proxy.NewHttpProxy(ctx, tlsListener)
+	p := proxy.NewHTTPProxy(ctx, tlsListener)
 	p.GetContext = func(req *http.Request) (i context.Context, e error) {
 		localAddr := req.Context().Value(http.LocalAddrContextKey).(net.Addr)
 		return tlsListener.GetConnectionContext(req.RemoteAddr, localAddr.String())
@@ -92,7 +93,7 @@ func startProgram(config *configType) {
 	<-a
 }
 
-func createHttpsListeners(ctx context.Context, bindings string) (res []net.Listener) {
+func createHTTPSListeners(ctx context.Context, bindings string) (res []net.Listener) {
 	addresses := strings.Split(bindings, ",")
 	for _, address := range addresses {
 		address = strings.TrimSpace(address)

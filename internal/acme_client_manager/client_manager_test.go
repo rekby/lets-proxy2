@@ -1,3 +1,4 @@
+//nolint:golint
 package acme_client_manager
 
 import (
@@ -35,7 +36,7 @@ func TestClientManagerCreateNew(t *testing.T) {
 	manager := New(ctx, c)
 	c.PutMock.Return(nil)
 	c.GetMock.Return(nil, cache.ErrCacheMiss)
-	manager.DirectoryUrl = testACMEServer
+	manager.DirectoryURL = testACMEServer
 	client, err := manager.GetClient(ctx)
 	td.CmpNoError(err)
 	td.NotNil(client)
