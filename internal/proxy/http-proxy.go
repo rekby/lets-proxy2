@@ -50,7 +50,7 @@ func NewHTTPProxy(ctx context.Context, listener net.Listener) *HTTPProxy {
 	go func() {
 		<-ctx.Done()
 		err := httpServer.Close()
-		log.DebugErrorCtx(ctx, err, "Http builtin reverse proxy stop becouse context cancelled")
+		log.DebugErrorCtx(ctx, err, "Http builtin reverse proxy stop because context cancelled")
 	}()
 
 	go func() {
