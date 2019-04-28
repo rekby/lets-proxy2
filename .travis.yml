@@ -38,6 +38,7 @@ deploy:
   provider: releases
   on:
     repo: rekby/lets-proxy2
+    branch: devel
 #    tags: true
   api_key: $GITHUB_TOKEN
   file_glob: true
