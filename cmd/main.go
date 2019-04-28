@@ -9,14 +9,13 @@ import (
 	"os"
 	"strings"
 
+	_ "github.com/kardianos/minwinsvc"
 	"github.com/rekby/lets-proxy2/internal/acme_client_manager"
 	"github.com/rekby/lets-proxy2/internal/cache"
 	"github.com/rekby/lets-proxy2/internal/cert_manager"
 	"github.com/rekby/lets-proxy2/internal/log"
 	"github.com/rekby/lets-proxy2/internal/proxy"
 	"github.com/rekby/lets-proxy2/internal/tlslistener"
-
-	_ "github.com/kardianos/minwinsvc"
 	zc "github.com/rekby/zapcontext"
 	"go.uber.org/zap"
 )
@@ -38,7 +37,7 @@ func main() {
 }
 
 func startProgram(config *configType) {
-	logger := initLogger()
+	logger := initLogger(config.Log)
 	ctx := zc.WithLogger(context.Background(), logger)
 	httpsListeners := createHttpsListeners(ctx, config.HttpsListeners)
 
@@ -74,14 +73,6 @@ func startProgram(config *configType) {
 	// work in background
 	var a chan struct{}
 	<-a
-}
-
-func initLogger() *zap.Logger {
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		panic(err)
-	}
-	return logger
 }
 
 func createHttpsListeners(ctx context.Context, bindings string) (res []net.Listener) {
