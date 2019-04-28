@@ -37,16 +37,25 @@ func main() {
 	}
 
 	if *versionP {
-		fmt.Printf("Version: '%v', Os: '%v', Arch: '%v'\n", VERSION, runtime.GOOS, runtime.GOARCH)
+		fmt.Println(version())
+		fmt.Println("Website: https://github.com/rekby/lets-proxy")
+		fmt.Println("Developer: timofey@koolin.ru")
 		return
 	}
 
 	startProgram(getConfig(globalContext))
 }
 
+func version() string {
+	return fmt.Sprintf("Version: '%v', Os: '%v', Arch: '%v'", VERSION, runtime.GOOS, runtime.GOARCH)
+}
+
 func startProgram(config *configType) {
 	logger := initLogger(config.Log)
 	ctx := zc.WithLogger(context.Background(), logger)
+
+	logger.Info("Start program version", zap.String("version", version()))
+
 	httpsListeners := createHttpsListeners(ctx, config.HttpsListeners)
 
 	if len(httpsListeners) == 0 {
