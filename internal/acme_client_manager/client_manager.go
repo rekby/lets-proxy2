@@ -99,7 +99,7 @@ func (m *AcmeManager) accountRenew() {
 	for {
 		select {
 		case <-ctxDone:
-			log.InfoCtx(m.ctx, "Stop renew acme account becouse cancel context", zap.Error(m.ctx.Err()))
+			log.InfoCtx(m.ctx, "Stop renew acme account because cancel context", zap.Error(m.ctx.Err()))
 			return
 		case <-ticker.C:
 			newAccount := renewTos(m.ctx, m.client, m.account)

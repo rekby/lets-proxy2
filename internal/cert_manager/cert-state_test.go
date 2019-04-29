@@ -136,7 +136,7 @@ func TestCertStateManyIssuers(t *testing.T) {
 			t.Error()
 		}
 	}
-	t.Logf("Succesful locks: %d", len(lockTimesSlice))
+	t.Logf("Successful locks: %d", len(lockTimesSlice))
 }
 
 func TestCertState_WaitFinishIssue(t *testing.T) {

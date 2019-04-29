@@ -9,7 +9,20 @@ linters-settings:
     line-length: 200
   misspell:
     locale: US
+  gocyclo:
+    min-complexity: 20
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+
 linters:
   enable-all: true
   disable:
     - gochecknoglobals
+
