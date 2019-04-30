@@ -91,7 +91,7 @@ func New(ctx context.Context, client *acme.Client, c cache.Cache) *Manager {
 
 // GetCertificate implements the tls.Config.GetCertificate hook.
 //
-func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, error) {
+func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Certificate, err error) {
 	// TODO: get context of connection
 	var ctx context.Context
 	if getContext, ok := hello.Conn.(GetContext); ok {
@@ -120,20 +120,25 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, 
 		return cert, nil
 	}
 
-	// TODO: check disk cache
-
 	certName := certNameFromDomain(needDomain)
 
 	logger = logger.With(logCetName(certName))
 	ctx = zc.WithLogger(ctx, zc.L(ctx).With(logCetName(certName)))
+
+	now := time.Now()
+	defer func() {
+		if isNeedRenew(resultCert, now) {
+			go m.renewCertInBackground(ctx, certName)
+		}
+	}()
 
 	certState := m.certStateGet(certName)
 	cert, err := certState.Cert()
 	if cert != nil {
 		logger.Debug("Got certificate from local state", log.Cert(cert))
 
-		// Disable check for locked certificates
-		cert, err = validCertDer([]DomainName{needDomain}, cert.Certificate, cert.PrivateKey, time.Now())
+		// TODO: Disable check for locked certificates https://github.com/rekby/lets-proxy2/issues/48
+		cert, err = validCertDer([]DomainName{needDomain}, cert.Certificate, cert.PrivateKey, now)
 		logger.Debug("Validate certificate from local state", zap.Error(err))
 		if err == nil {
 			return cert, nil
@@ -146,8 +151,14 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (*tls.Certificate, 
 	cert, err = getCertificate(ctx, m.Cache, certName, keyRSA)
 	if err == nil {
 		logger.Debug("Certificate loaded from cache")
-		certState.CertSet(ctx, cert)
-		return cert, nil
+
+		// TODO: Disable check for locked certificates https://github.com/rekby/lets-proxy2/issues/48
+		cert, err = validCertDer([]DomainName{needDomain}, cert.Certificate, cert.PrivateKey, now)
+		logger.Debug("Check if certificate ok", zap.Error(err))
+		if err == nil {
+			certState.CertSet(ctx, cert)
+			return cert, nil
+		}
 	}
 
 	// TODO: check domain
@@ -368,6 +379,26 @@ func (m *Manager) issueCertificate(ctx context.Context, certName certNameType, d
 		return cert, nil
 	}
 	return nil, err
+}
+
+func (m *Manager) renewCertInBackground(ctx context.Context, certName certNameType) {
+	// detach from request lifetime, but save log context
+	logger := zc.L(ctx).Named("background")
+	ctx, ctxCancel := context.WithTimeout(context.Background(), m.CertificateIssueTimeout)
+	defer ctxCancel()
+
+	ctx = zc.WithLogger(ctx, logger)
+	certState := m.certStateGet(certName)
+
+	if !certState.StartIssue(ctx) {
+		// already has other cert issue process
+		return
+	}
+	domains := domainNamesFromCertificateName(certName)
+	logger.Info("Start background certificate issue")
+	cert, err := m.createCertificateForDomains(ctx, certName, domains, "")
+	certState.FinishIssue(ctx, cert, err)
+	log.InfoError(logger, err, "Renew certificate in background finished", log.Cert(cert))
 }
 
 func (m *Manager) revokePendingAuthorizations(ctx context.Context, uries []string) {
@@ -662,4 +693,11 @@ func parsePrivateKey(keyPEMBlock []byte) (crypto.Signer, error) {
 	}
 
 	return nil, errors.New("tls: failed to parse private key")
+}
+
+func isNeedRenew(cert *tls.Certificate, now time.Time) bool {
+	if cert == nil || cert.Leaf == nil {
+		return false
+	}
+	return cert.Leaf.NotAfter.Add(-time.Hour * 24 * 30).Before(now)
 }
