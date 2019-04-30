@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net"
 	"net/http"
@@ -21,6 +22,7 @@ import (
 
 	"github.com/gojuno/minimock"
 
+	"github.com/maxatome/go-testdeep"
 	td "github.com/maxatome/go-testdeep"
 	"github.com/rekby/lets-proxy2/internal/th"
 
@@ -70,7 +72,7 @@ func TestManager_GetCertificateTls(t *testing.T) {
 		return nil
 	})
 
-	manager := New(ctx, createTestClient(t), cacheMock)
+	manager := New(createTestClient(t), cacheMock)
 
 	lisneter, err := net.ListenTCP("tcp", &net.TCPAddr{Port: 5001})
 
@@ -208,7 +210,7 @@ func TestManager_GetCertificateTls(t *testing.T) {
 		cert := <-chanCerts
 		for i := 0; i < len(chanCerts)-1; i++ {
 			cert2 := <-chanCerts
-			td.CmpDeeply(t, cert2, cert)
+			testdeep.CmpDeeply(t, cert2, cert)
 		}
 	})
 }
@@ -235,7 +237,7 @@ func TestManager_GetCertificateHttp01(t *testing.T) {
 		return nil
 	})
 
-	manager := New(ctx, createTestClient(t), cacheMock)
+	manager := New(createTestClient(t), cacheMock)
 	manager.EnableTLSValidation = false
 	manager.EnableHTTPValidation = true
 
@@ -419,4 +421,14 @@ func TestStoreCertificate(t *testing.T) {
 	})
 
 	storeCertificate(ctx, cacheMock, "asd", cert)
+}
+
+func TestIsNeedRenew(t *testing.T) {
+	td := testdeep.NewT(t)
+	var cert = &tls.Certificate{}
+	cert.Leaf = &x509.Certificate{NotAfter: time.Date(2000, 7, 31, 0, 0, 0, 0, time.UTC)}
+	td.True(isNeedRenew(cert, time.Date(2000, 7, 31, 0, 0, 0, 1, time.UTC)))
+	td.True(isNeedRenew(cert, time.Date(2000, 7, 1, 0, 0, 0, 1, time.UTC)))
+	td.False(isNeedRenew(cert, time.Date(2000, 7, 1, 0, 0, 0, 0, time.UTC)))
+	td.False(isNeedRenew(cert, time.Date(2000, 6, 30, 0, 0, 0, 0, time.UTC)))
 }

@@ -39,7 +39,7 @@ func main() {
 
 	if *versionP {
 		fmt.Println(version())
-		fmt.Println("Website: https://github.com/rekby/lets-proxy")
+		fmt.Println("Website: https://github.com/rekby/lets-proxy2")
 		fmt.Println("Developer: timofey@koolin.ru")
 		return
 	}
@@ -72,7 +72,7 @@ func startProgram(config *configType) {
 	acmeClient, err := clientManager.GetClient(ctx)
 	log.DebugFatal(logger, err, "Get acme client")
 
-	certManager := cert_manager.New(ctx, acmeClient, storage)
+	certManager := cert_manager.New(acmeClient, storage)
 
 	tlsListener := &tlslistener.ListenersHandler{
 		ListenersForHandleTLS: httpsListeners,
