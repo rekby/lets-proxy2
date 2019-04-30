@@ -69,7 +69,7 @@ type Manager struct {
 	certForDomainAuthorize cache.Value
 
 	certStateMu sync.Mutex
-	certState   map[certNameType]*certState
+	certState   cache.Value
 
 	httpTokens *cache.MemoryCache
 }
@@ -78,7 +78,7 @@ func New(client *acme.Client, c cache.Cache) *Manager {
 	res := Manager{}
 	res.Client = client
 	res.certForDomainAuthorize = cache.NewMemoryValueLRU("authcert")
-	res.certState = make(map[certNameType]*certState)
+	res.certState = cache.NewMemoryValueLRU("certstate")
 	res.CertificateIssueTimeout = time.Minute
 	res.httpTokens = cache.NewMemoryCache("Http validation tokens")
 	res.Cache = c
@@ -87,7 +87,6 @@ func New(client *acme.Client, c cache.Cache) *Manager {
 }
 
 // GetCertificate implements the tls.Config.GetCertificate hook.
-//
 func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Certificate, err error) {
 	var ctx context.Context
 	if getContext, ok := hello.Conn.(GetContext); ok {
@@ -129,7 +128,7 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 		}
 	}()
 
-	certState := m.certStateGet(certName)
+	certState := m.certStateGet(ctx, certName)
 	cert, err := certState.Cert()
 	if cert != nil {
 		logger.Debug("Got certificate from local state", log.Cert(cert))
@@ -175,23 +174,28 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 
 }
 
-func (m *Manager) certStateGet(certName certNameType) *certState {
+func (m *Manager) certStateGet(ctx context.Context, certName certNameType) *certState {
 	m.certStateMu.Lock()
+	defer m.certStateMu.Unlock()
 
-	res := m.certState[certName]
-	if res == nil {
-		res = &certState{}
-		m.certState[certName] = res
+	resInterface, err := m.certState.Get(ctx, certName.String())
+	if err == cache.ErrCacheMiss {
+		err = nil
 	}
-	m.certStateMu.Unlock()
-	return res
+	log.DebugFatalCtx(ctx, err, "Got cert state from cache")
+	if resInterface == nil {
+		resInterface = &certState{}
+		err = m.certState.Put(ctx, certName.String(), resInterface)
+		log.DebugFatalCtx(ctx, err, "Put empty cert state to cache")
+	}
+	return resInterface.(*certState)
 }
 
 func (m *Manager) createCertificateForDomains(ctx context.Context, certName certNameType,
 	domainNames []DomainName, needDomain DomainName) (res *tls.Certificate, err error) {
 
 	logger := zc.L(ctx)
-	certState := m.certStateGet(certName)
+	certState := m.certStateGet(ctx, certName)
 	if certState.StartIssue(ctx) {
 		// outer func need for get argument values in defer time
 		defer func() {
@@ -388,7 +392,7 @@ func (m *Manager) renewCertInBackground(ctx context.Context, certName certNameTy
 	defer ctxCancel()
 
 	ctx = zc.WithLogger(ctx, logger)
-	certState := m.certStateGet(certName)
+	certState := m.certStateGet(ctx, certName)
 
 	if !certState.StartIssue(ctx) {
 		// already has other cert issue process

@@ -5,6 +5,10 @@ import "go.uber.org/zap"
 
 type certNameType string
 
+func (n certNameType) String() string {
+	return string(n)
+}
+
 func certNameFromDomain(domain DomainName) certNameType {
 	return certNameType(domain)
 }

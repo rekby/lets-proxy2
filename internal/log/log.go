@@ -66,6 +66,10 @@ func DebugFatal(logger *zap.Logger, err error, mess string, fields ...zap.Field)
 	debugFatal(logger, err, mess, fields...)
 }
 
+func DebugFatalCtx(ctx context.Context, err error, mess string, fields ...zap.Field) {
+	debugFatal(zc.L(ctx), err, mess, fields...)
+}
+
 func debugFatal(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
 	logger = logger.WithOptions(zap.AddCallerSkip(2))
 	if err == nil {
