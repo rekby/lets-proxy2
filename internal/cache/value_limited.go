@@ -2,9 +2,10 @@ package cache
 
 import (
 	"context"
+	"math"
 	"sort"
 	"sync"
-	"time"
+	"sync/atomic"
 
 	zc "github.com/rekby/zapcontext"
 	"go.uber.org/zap"
@@ -17,7 +18,7 @@ type memoryValueItem struct {
 	value interface{}
 
 	m            sync.Mutex // sync update lastUsedTime in Get method
-	lastUsedTime time.Time
+	lastUsedTime uint64
 }
 
 type MemoryValue struct {
@@ -26,8 +27,9 @@ type MemoryValue struct {
 	MaxSize    int
 	CleanCount int
 
-	mu sync.RWMutex
-	m  map[string]*memoryValueItem // stored always non nil item
+	lastTime uint64
+	mu       sync.RWMutex
+	m        map[string]*memoryValueItem // stored always non nil item
 }
 
 func NewMemoryValue(name string) *MemoryValue {
@@ -47,9 +49,10 @@ func (c *MemoryValue) Get(ctx context.Context, key string) (value interface{}, e
 
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+
 	if resp, exist := c.m[key]; exist {
 		resp.m.Lock()
-		resp.lastUsedTime = time.Now()
+		resp.lastUsedTime = c.time()
 		resp.m.Unlock()
 		return resp.value, nil
 	}
@@ -63,7 +66,7 @@ func (c *MemoryValue) Put(ctx context.Context, key string, value interface{}) (e
 	}()
 
 	c.mu.Lock()
-	c.m[key] = &memoryValueItem{key: key, value: value, lastUsedTime: time.Now()}
+	c.m[key] = &memoryValueItem{key: key, value: value, lastUsedTime: c.time()}
 	if len(c.m) > c.MaxSize {
 		go c.clean()
 	}
@@ -85,6 +88,36 @@ func (c *MemoryValue) Delete(ctx context.Context, key string) (err error) {
 	return nil
 }
 
+func (c *MemoryValue) time() uint64 {
+	res := atomic.AddUint64(&c.lastTime, 1)
+	if res == math.MaxUint64/2 {
+		go c.renumberTime()
+	}
+	return res
+}
+
+func (c *MemoryValue) renumberTime() {
+	c.mu.Lock()
+	items := c.getSortedItems()
+	for i, item := range items {
+		item.lastUsedTime = uint64(i) + 1
+	}
+	c.mu.Unlock()
+}
+
+// must called from locked state
+func (c *MemoryValue) getSortedItems() []*memoryValueItem {
+	items := make([]*memoryValueItem, 0, len(c.m))
+	for _, item := range c.m {
+		items = append(items, item)
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].lastUsedTime < items[j].lastUsedTime
+	})
+	return items
+}
+
 func (c *MemoryValue) clean() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -102,14 +135,7 @@ func (c *MemoryValue) clean() {
 		return
 	}
 
-	items := make([]memoryValueItem, 0, len(c.m))
-	for _, item := range c.m {
-		items = append(items, *item)
-	}
-
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].lastUsedTime.Before(items[j].lastUsedTime)
-	})
+	items := c.getSortedItems()
 
 	for i := 0; i < c.CleanCount; i++ {
 		delete(c.m, items[i].key)
