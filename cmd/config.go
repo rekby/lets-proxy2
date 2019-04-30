@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"io/ioutil"
+
+	"github.com/rekby/lets-proxy2/internal/log"
 
 	"github.com/pelletier/go-toml"
 	zc "github.com/rekby/zapcontext"
@@ -58,8 +61,10 @@ func applyFlags(ctx context.Context, config *configType) {
 
 func defaultConfig(ctx context.Context) []byte {
 	config, _ := readConfig(ctx, "")
-	configBytes, _ := toml.Marshal(&config)
-	return configBytes
+	buf := &bytes.Buffer{}
+	err := toml.NewEncoder(buf).Order(toml.OrderPreserve).Encode(config)
+	log.DebugDPanicCtx(ctx, err, "Encode default config")
+	return buf.Bytes()
 }
 
 func readConfig(ctx context.Context, file string) (configType, error) {
