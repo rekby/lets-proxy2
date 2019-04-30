@@ -89,7 +89,6 @@ func New(client *acme.Client, c cache.Cache) *Manager {
 // GetCertificate implements the tls.Config.GetCertificate hook.
 //
 func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Certificate, err error) {
-	// TODO: get context of connection
 	var ctx context.Context
 	if getContext, ok := hello.Conn.(GetContext); ok {
 		ctx = getContext.GetContext()
