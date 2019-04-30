@@ -322,12 +322,15 @@ func (m *Manager) authorizeDomain(ctx context.Context, domain DomainName) error 
 		logger.Debug("Select challenge for authorize", zap.Reflect("challenge", chal))
 
 		cleanup, err := m.fulfill(ctx, chal, domain)
+		if cleanup != nil {
+			//noinspection GoDeferInLoop
+			defer cleanup(ctx)
+		}
+
 		if err != nil {
 			logger.Error("Can't set domain token", zap.Reflect("chal", chal), zap.Error(err))
 			continue
 		}
-		//noinspection GoDeferInLoop
-		defer cleanup(ctx)
 
 		receivedChallenge, err := m.Client.Accept(ctx, chal)
 		if err == nil {

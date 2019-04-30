@@ -13,9 +13,11 @@ import (
 const defaultMemoryLimitSize = 1000
 
 type memoryValueItem struct {
+	key   string
+	value interface{}
+
+	m            sync.Mutex // sync update lastUsedTime in Get method
 	lastUsedTime time.Time
-	key          string
-	value        interface{}
 }
 
 type MemoryValue struct {
@@ -25,13 +27,13 @@ type MemoryValue struct {
 	CleanCount int
 
 	mu sync.RWMutex
-	m  map[string]memoryValueItem
+	m  map[string]*memoryValueItem // stored always non nil item
 }
 
 func NewMemoryValue(name string) *MemoryValue {
 	return &MemoryValue{
 		Name:       name,
-		m:          make(map[string]memoryValueItem, defaultMemoryLimitSize+1),
+		m:          make(map[string]*memoryValueItem, defaultMemoryLimitSize+1),
 		MaxSize:    defaultMemoryLimitSize,
 		CleanCount: 300,
 	}
@@ -46,6 +48,9 @@ func (c *MemoryValue) Get(ctx context.Context, key string) (value interface{}, e
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	if resp, exist := c.m[key]; exist {
+		resp.m.Lock()
+		resp.lastUsedTime = time.Now()
+		resp.m.Unlock()
 		return resp.value, nil
 	}
 	return nil, ErrCacheMiss
@@ -58,7 +63,7 @@ func (c *MemoryValue) Put(ctx context.Context, key string, value interface{}) (e
 	}()
 
 	c.mu.Lock()
-	c.m[key] = memoryValueItem{key: key, value: value, lastUsedTime: time.Now()}
+	c.m[key] = &memoryValueItem{key: key, value: value, lastUsedTime: time.Now()}
 	if len(c.m) > c.MaxSize {
 		go c.clean()
 	}
@@ -93,13 +98,13 @@ func (c *MemoryValue) clean() {
 	}
 
 	if c.CleanCount >= c.MaxSize {
-		c.m = make(map[string]memoryValueItem, c.MaxSize+1)
+		c.m = make(map[string]*memoryValueItem, c.MaxSize+1)
 		return
 	}
 
 	items := make([]memoryValueItem, 0, len(c.m))
 	for _, item := range c.m {
-		items = append(items, item)
+		items = append(items, *item)
 	}
 
 	sort.Slice(items, func(i, j int) bool {
