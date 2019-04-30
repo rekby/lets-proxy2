@@ -60,7 +60,6 @@ func applyFlags(ctx context.Context, config *configType) {
 		zc.L(ctx).Info("Set test acme server by command line flag")
 		config.AcmeServer = "https://acme-staging-v02.api.letsencrypt.org/directory"
 	}
-	return
 }
 
 func defaultConfig(ctx context.Context) []byte {

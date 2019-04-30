@@ -111,9 +111,8 @@ func TestValueLRULimitClean(t *testing.T) {
 	defer flush()
 
 	td := testdeep.NewT(t)
-	var c *MemoryValueLRU
 
-	c = NewMemoryValueLRU("test")
+	var c = NewMemoryValueLRU("test")
 
 	c.MaxSize = 5
 	c.CleanCount = 0
@@ -241,9 +240,7 @@ func TestLimitValueRenumberItems(t *testing.T) {
 	defer flush()
 
 	td := testdeep.NewT(t)
-	var c *MemoryValueLRU
-
-	c = NewMemoryValueLRU("test")
+	var c = NewMemoryValueLRU("test")
 
 	c.m = make(map[string]*memoryValueLRUItem)
 	c.m["1"] = &memoryValueLRUItem{key: "1", value: 1, lastUsedTime: 100}
