@@ -66,10 +66,7 @@ type Manager struct {
 	EnableHTTPValidation bool
 	EnableTLSValidation  bool
 
-	// will rewrite to Cache in future
-	// https://github.com/rekby/lets-proxy2/issues/32
-	certTokensMu sync.RWMutex
-	certTokens   map[DomainName]*tls.Certificate
+	certForDomainAuthorize cache.Value
 
 	certStateMu sync.Mutex
 	certState   map[certNameType]*certState
@@ -80,7 +77,7 @@ type Manager struct {
 func New(ctx context.Context, client *acme.Client, c cache.Cache) *Manager {
 	res := Manager{}
 	res.Client = client
-	res.certTokens = make(map[DomainName]*tls.Certificate)
+	res.certForDomainAuthorize = cache.NewMemoryValue("authcert")
 	res.certState = make(map[certNameType]*certState)
 	res.CertificateIssueTimeout = time.Minute
 	res.httpTokens = cache.NewMemoryCache("Http validation tokens")
@@ -109,9 +106,10 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 	if isTLSALPN01Hello(hello) {
 		logger.Debug("It is tls-alpn-01 token request.")
 
-		m.certTokensMu.RLock()
-		cert := m.certTokens[needDomain]
-		m.certTokensMu.RUnlock()
+		certInterface, err := m.certForDomainAuthorize.Get(ctx, needDomain.String())
+		logger.Debug("Got authcert from cache", zap.Error(err))
+
+		cert, _ := certInterface.(*tls.Certificate)
 
 		if cert == nil {
 			logger.Warn("Doesn't have token for request domain")
@@ -505,44 +503,13 @@ func (m *Manager) HandleHttpValidation(w http.ResponseWriter, r *http.Request) b
 }
 
 func (m *Manager) putCertToken(ctx context.Context, key DomainName, certificate *tls.Certificate) {
-	logger := zc.L(ctx)
-	logger.Debug("Put cert token", zap.String("key", string(key)))
-
-	var overwriteToken bool
-
-	defer func() {
-		if overwriteToken {
-			logger.Warn("Unexpected cert token already exist", zap.String("key", key.String()))
-		}
-	}()
-
-	m.certTokensMu.Lock()
-	defer m.certTokensMu.Unlock()
-
-	if m.certTokens == nil {
-		m.certTokens = make(map[DomainName]*tls.Certificate)
-	}
-
-	_, overwriteToken = m.certTokens[key]
-	m.certTokens[key] = certificate
+	err := m.certForDomainAuthorize.Put(ctx, key.String(), certificate)
+	log.DebugDPanicCtx(ctx, err, "Put cert token", zap.String("key", string(key)))
 }
 
 func (m *Manager) deleteCertToken(ctx context.Context, key DomainName) {
-	logger := zc.L(ctx)
-	logger.Debug("Delete cert token", zap.String("key", key.String()))
-
-	var exist bool
-	defer func() {
-		if !exist {
-			logger.Warn("Cert token for delete doesn't exist", zap.String("key", string(key)))
-		}
-	}()
-
-	m.certTokensMu.Lock()
-	defer m.certTokensMu.Unlock()
-
-	_, exist = m.certTokens[key]
-	delete(m.certTokens, key)
+	err := m.certForDomainAuthorize.Delete(ctx, key.String())
+	log.DebugDPanicCtx(ctx, err, "Delete cert token", zap.String("key", key.String()))
 }
 
 // It isn't atomic syncronized - caller must not save two certificates with same name same time
