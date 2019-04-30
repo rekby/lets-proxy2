@@ -39,7 +39,7 @@ func main() {
 
 	if *versionP {
 		fmt.Println(version())
-		fmt.Println("Website: https://github.com/rekby/lets-proxy")
+		fmt.Println("Website: https://github.com/rekby/lets-proxy2")
 		fmt.Println("Developer: timofey@koolin.ru")
 		return
 	}
