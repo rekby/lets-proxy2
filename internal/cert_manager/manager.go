@@ -74,10 +74,10 @@ type Manager struct {
 	httpTokens *cache.MemoryCache
 }
 
-func New(ctx context.Context, client *acme.Client, c cache.Cache) *Manager {
+func New(client *acme.Client, c cache.Cache) *Manager {
 	res := Manager{}
 	res.Client = client
-	res.certForDomainAuthorize = cache.NewMemoryValue("authcert")
+	res.certForDomainAuthorize = cache.NewMemoryValueLRU("authcert")
 	res.certState = make(map[certNameType]*certState)
 	res.CertificateIssueTimeout = time.Minute
 	res.httpTokens = cache.NewMemoryCache("Http validation tokens")

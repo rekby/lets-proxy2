@@ -72,7 +72,7 @@ func TestManager_GetCertificateTls(t *testing.T) {
 		return nil
 	})
 
-	manager := New(ctx, createTestClient(t), cacheMock)
+	manager := New(createTestClient(t), cacheMock)
 
 	lisneter, err := net.ListenTCP("tcp", &net.TCPAddr{Port: 5001})
 
@@ -237,7 +237,7 @@ func TestManager_GetCertificateHttp01(t *testing.T) {
 		return nil
 	})
 
-	manager := New(ctx, createTestClient(t), cacheMock)
+	manager := New(createTestClient(t), cacheMock)
 	manager.EnableTLSValidation = false
 	manager.EnableHTTPValidation = true
 
