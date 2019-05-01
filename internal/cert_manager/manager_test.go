@@ -121,7 +121,7 @@ type testManagerContext struct {
 	httpTokens             *CacheMock
 }
 
-func TestManager_CertForDeniedDomain(t *testing.T) {
+func TestManager_CertForLockedDomain(t *testing.T) {
 	td := testdeep.NewT(t)
 	c, cancel := createManager(t)
 	defer cancel()
@@ -133,6 +133,20 @@ func TestManager_CertForDeniedDomain(t *testing.T) {
 		}
 		return nil, cache.ErrCacheMiss
 	})
+
+	res, err := c.manager.GetCertificate(&tls.ClientHelloInfo{Conn: c.connContext, ServerName: "test.ru"})
+	td.Nil(res)
+	td.CmpError(err)
+}
+
+func TestManager_CertForDenied(t *testing.T) {
+	td := testdeep.NewT(t)
+	c, cancel := createManager(t)
+	defer cancel()
+
+	c.certState.GetMock.Return(&certState{}, nil)
+	c.cache.GetMock.Return(nil, cache.ErrCacheMiss)
+	c.domainChecker.IsDomainAllowedMock.Return(false, nil)
 
 	res, err := c.manager.GetCertificate(&tls.ClientHelloInfo{Conn: c.connContext, ServerName: "test.ru"})
 	td.Nil(res)
