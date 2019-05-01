@@ -62,7 +62,7 @@ type Manager struct {
 	// generated and, if Cache is not nil, stored in cache.
 	//
 	// Mutating the field after the first call of GetCertificate method will have no effect.
-	Client               *acme.Client
+	Client               AcmeClient
 	DomainChecker        DomainChecker
 	EnableHTTPValidation bool
 	EnableTLSValidation  bool
