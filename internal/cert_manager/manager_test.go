@@ -43,21 +43,14 @@ func (c contextConnection) GetContext() context.Context {
 
 //nolint:gochecknoinits
 func init() {
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		panic(err)
-	}
-	zc.SetDefaultLogger(logger)
+	zc.SetDefaultLogger(zap.NewNop())
 }
 
 func TestManager_GetCertificateTls(t *testing.T) {
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	ctx, flush := th.TestContext()
 	defer flush()
+
+	logger := zc.L(ctx)
 
 	mc := minimock.NewController(t)
 	defer mc.Finish()
@@ -65,6 +58,11 @@ func TestManager_GetCertificateTls(t *testing.T) {
 	cacheMock := NewCacheMock(mc)
 	cacheMock.GetMock.Set(func(ctx context.Context, key string) (ba1 []byte, err error) {
 		zc.L(ctx).Debug("Cache mock get", zap.String("key", key))
+
+		if key == "locked.ru.lock" {
+			return []byte{}, nil
+		}
+
 		return nil, cache.ErrCacheMiss
 	})
 	cacheMock.PutMock.Set(func(ctx context.Context, key string, data []byte) (err error) {
@@ -135,6 +133,14 @@ func TestManager_GetCertificateTls(t *testing.T) {
 		if cert.Leaf.VerifyHostname("www."+domain) != nil {
 			t.Error(cert.Leaf.VerifyHostname(domain))
 		}
+	})
+
+	t.Run("Locked", func(t *testing.T) {
+		domain := "locked.ru"
+
+		cert, err := manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain, Conn: contextConnection{Context: ctx}})
+		td.CmpError(t, err)
+		td.CmpNil(t, cert)
 	})
 
 	t.Run("punycode-domain", func(t *testing.T) {
@@ -216,13 +222,10 @@ func TestManager_GetCertificateTls(t *testing.T) {
 }
 
 func TestManager_GetCertificateHttp01(t *testing.T) {
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	ctx, flush := th.TestContext()
 	defer flush()
+
+	logger := zc.L(ctx)
 
 	mc := minimock.NewController(t)
 	defer mc.Finish()
@@ -230,6 +233,11 @@ func TestManager_GetCertificateHttp01(t *testing.T) {
 	cacheMock := NewCacheMock(mc)
 	cacheMock.GetMock.Set(func(ctx context.Context, key string) (ba1 []byte, err error) {
 		zc.L(ctx).Debug("Cache mock get", zap.String("key", key))
+
+		if key == "locked.ru.lock" {
+			return []byte{}, nil
+		}
+
 		return nil, cache.ErrCacheMiss
 	})
 	cacheMock.PutMock.Set(func(ctx context.Context, key string, data []byte) (err error) {
@@ -291,6 +299,14 @@ func TestManager_GetCertificateHttp01(t *testing.T) {
 		if cert.Leaf.VerifyHostname("www."+domain) != nil {
 			t.Error(cert.Leaf.VerifyHostname(domain))
 		}
+	})
+
+	t.Run("Locked", func(t *testing.T) {
+		domain := "locked.ru"
+
+		cert, err := manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain, Conn: contextConnection{Context: ctx}})
+		td.CmpError(t, err)
+		td.CmpNil(t, cert)
 	})
 
 	t.Run("punycode-domain", func(t *testing.T) {
@@ -419,6 +435,7 @@ func TestStoreCertificate(t *testing.T) {
 		fmt.Println(string(data))
 		return nil
 	})
+	cacheMock.GetMock.Return(nil, cache.ErrCacheMiss)
 
 	storeCertificate(ctx, cacheMock, "asd", cert)
 }

@@ -2,8 +2,6 @@ package th
 
 import (
 	"context"
-	"fmt"
-	"time"
 
 	zc "github.com/rekby/zapcontext"
 
@@ -11,17 +9,9 @@ import (
 )
 
 func TestContext() (ctx context.Context, flush func()) {
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		fmt.Print()
-		panic(err)
-	}
-
-	ctx, cancel := context.WithCancel(zc.WithLogger(context.Background(), logger))
+	ctx, cancel := context.WithCancel(zc.WithLogger(context.Background(), zap.NewNop()))
 	flush = func() {
 		cancel()
-		time.Sleep(time.Millisecond)
-		_ = logger.Sync()
 	}
 	return ctx, flush
 }
