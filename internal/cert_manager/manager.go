@@ -72,7 +72,7 @@ type Manager struct {
 	certStateMu sync.Mutex
 	certState   cache.Value
 
-	httpTokens *cache.MemoryCache
+	httpTokens cache.Cache
 }
 
 func New(client *acme.Client, c cache.Cache) *Manager {
@@ -557,6 +557,10 @@ func (m *Manager) HandleHttpValidation(w http.ResponseWriter, r *http.Request) b
 	token := strings.TrimPrefix(r.URL.Path, httpWellKnown)
 	domain, err := normalizeDomain(r.Host)
 	log.DebugInfo(logger, err, "Domain normalization", zap.String("original", r.Host), logDomain(domain))
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return true
+	}
 	resp, err := m.httpTokens.Get(ctx, domain.ASCII()+"/"+token)
 	logger.Debug("Get http token", zap.Error(err))
 	if err == nil {
