@@ -133,8 +133,7 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 	if cert != nil {
 		logger.Debug("Got certificate from local state", log.Cert(cert))
 
-		// TODO: Disable check for locked certificates https://github.com/rekby/lets-proxy2/issues/48
-		cert, err = validCertDer([]DomainName{needDomain}, cert.Certificate, cert.PrivateKey, now)
+		cert, err = validCertDer([]DomainName{needDomain}, cert.Certificate, cert.PrivateKey, certState.GetLocked(), now)
 		logger.Debug("Validate certificate from local state", zap.Error(err))
 		if err == nil {
 			return cert, nil
@@ -144,24 +143,29 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 		logger.Debug("Can't get certificate from local state", zap.Error(err))
 	}
 
+	locked, err := isCertLocked(ctx, m.Cache, certName)
+	log.DebugDPanic(logger, err, "Check if certificate locked")
+
 	cert, err = getCertificate(ctx, m.Cache, certName, keyRSA)
 	if err == nil {
 		logger.Debug("Certificate loaded from cache")
 
-		// TODO: Disable check for locked certificates https://github.com/rekby/lets-proxy2/issues/48
-		cert, err = validCertDer([]DomainName{needDomain}, cert.Certificate, cert.PrivateKey, now)
+		cert, err = validCertDer([]DomainName{needDomain}, cert.Certificate, cert.PrivateKey, locked, now)
 		logger.Debug("Check if certificate ok", zap.Error(err))
 		if err == nil {
-			certState.CertSet(ctx, cert)
+			certState.CertSet(ctx, locked, cert)
 			return cert, nil
 		}
+	}
+
+	if locked {
+		return nil, errHaveNoCert
 	}
 
 	// TODO: check domain
 	certIssueContext, cancelFunc := context.WithTimeout(ctx, m.CertificateIssueTimeout)
 	defer cancelFunc()
 
-	// TODO: receive cert for domain and subdomains same time
 	res, err := m.createCertificateForDomains(certIssueContext, certName, domainNamesFromCertificateName(certName),
 		needDomain)
 	if err == nil {
@@ -376,7 +380,7 @@ func (m *Manager) issueCertificate(ctx context.Context, certName certNameType, d
 		return nil, err
 	}
 
-	cert, err := validCertDer(domains, der, key, time.Now())
+	cert, err := validCertDer(domains, der, key, false, time.Now())
 	log.DebugDPanic(logger, err, "Check certificate is valid")
 	if err == nil {
 		storeCertificate(ctx, m.Cache, certName, cert)
@@ -524,6 +528,11 @@ func storeCertificate(ctx context.Context, cache cache.Cache, certName certNameT
 		return
 	}
 
+	locked, _ := isCertLocked(ctx, cache, certName)
+	if locked {
+		logger.Panic("Logical error - try to save to locked certificate")
+	}
+
 	var keyType keyType
 
 	var certBuf bytes.Buffer
@@ -601,7 +610,11 @@ func getCertificate(ctx context.Context, cache cache.Cache, certName certNameTyp
 			return nil, err
 		}
 	}
-	return validCertTLS(&cert2, nil, time.Now())
+	locked, err := isCertLocked(ctx, cache, certName)
+	if err != nil {
+		return nil, err
+	}
+	return validCertTLS(&cert2, nil, locked, time.Now())
 }
 
 func getCertificateKeyBytes(ctx context.Context, cache cache.Cache, certName certNameType, keyType keyType) ([]byte, error) {
@@ -673,4 +686,17 @@ func isNeedRenew(cert *tls.Certificate, now time.Time) bool {
 		return false
 	}
 	return cert.Leaf.NotAfter.Add(-time.Hour * 24 * 30).Before(now)
+}
+
+func isCertLocked(ctx context.Context, storage cache.Cache, certName certNameType) (bool, error) {
+	lockName := certName.String() + ".lock"
+	_, err := storage.Get(ctx, lockName)
+	switch err {
+	case cache.ErrCacheMiss:
+		return false, nil
+	case nil:
+		return true, nil
+	default:
+		return false, err
+	}
 }
