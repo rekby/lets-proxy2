@@ -63,6 +63,7 @@ type Manager struct {
 	//
 	// Mutating the field after the first call of GetCertificate method will have no effect.
 	Client               *acme.Client
+	DomainChecker        DomainChecker
 	EnableHTTPValidation bool
 	EnableTLSValidation  bool
 
@@ -83,6 +84,7 @@ func New(client *acme.Client, c cache.Cache) *Manager {
 	res.httpTokens = cache.NewMemoryCache("Http validation tokens")
 	res.Cache = c
 	res.EnableTLSValidation = true
+	res.DomainChecker = managerDefaults{}
 	return &res
 }
 
@@ -97,9 +99,15 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 		ctx = zc.WithLogger(context.Background(), defaultLogger)
 	}
 
-	needDomain := normalizeDomain(hello.ServerName)
+	logger := zc.L(ctx)
 
-	logger := zc.L(ctx).With(logDomain(needDomain))
+	needDomain, err := normalizeDomain(hello.ServerName)
+	log.DebugInfo(logger, err, "Domain name normalization", zap.String("original", hello.ServerName), logDomain(needDomain))
+	if err != nil {
+		return nil, errHaveNoCert
+	}
+
+	logger = logger.With(logDomain(needDomain))
 	logger.Info("Get certificate", zap.String("original_domain", hello.ServerName))
 	if isTLSALPN01Hello(hello) {
 		logger.Debug("It is tls-alpn-01 token request.")
@@ -162,12 +170,21 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 		return nil, errHaveNoCert
 	}
 
+	allowed, err := m.DomainChecker.IsDomainAllowed(ctx, needDomain.ASCII())
+	log.DebugError(logger, err, "Check if domain allowed for certificate", zap.Bool("allowed", allowed))
+
+	if err != nil {
+		return nil, errHaveNoCert
+	}
+
 	// TODO: check domain
 	certIssueContext, cancelFunc := context.WithTimeout(ctx, m.CertificateIssueTimeout)
 	defer cancelFunc()
 
-	res, err := m.createCertificateForDomains(certIssueContext, certName, domainNamesFromCertificateName(certName),
-		needDomain)
+	domains := domainNamesFromCertificateName(certName)
+	domains, err = filterDomains(ctx, m.DomainChecker, domains, needDomain)
+
+	res, err := m.createCertificateForDomains(certIssueContext, certName, domains, needDomain)
 	if err == nil {
 		logger.Info("Certificate issued.", log.Cert(res),
 			zap.Time("expire", res.Leaf.NotAfter))
@@ -176,6 +193,48 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 	logger.Warn("Can't issue certificate", zap.Error(err))
 	return nil, errHaveNoCert
 
+}
+
+func filterDomains(ctx context.Context, checker DomainChecker, originalDomains []DomainName, needDomain DomainName) ([]DomainName, error) {
+	logger := zc.L(ctx)
+	logger.Debug("filter domains from certificate list", logDomains(originalDomains))
+	var allowedDomains = make(chan DomainName, len(originalDomains))
+	var hasNeedDomain bool
+
+	var wg sync.WaitGroup
+	wg.Add(len(originalDomains))
+	for _, domain := range originalDomains {
+		domain := domain // pin var
+
+		go func() {
+			defer wg.Done()
+
+			allow, err := checker.IsDomainAllowed(ctx, domain.ASCII())
+			logger.Debug("Check domain", logDomain(domain), zap.Bool("allowed", allow), zap.Error(err))
+			if !allow {
+				return
+			}
+
+			if domain == needDomain {
+				hasNeedDomain = true
+			}
+
+			allowedDomains <- domain
+		}()
+	}
+
+	wg.Wait()
+	close(allowedDomains)
+
+	if !hasNeedDomain {
+		return nil, errors.New("need domain doesn't contained to cert list domains after filter")
+	}
+
+	res := make([]DomainName, 0, len(allowedDomains))
+	for domain := range allowedDomains {
+		res = append(res, domain)
+	}
+	return res, nil
 }
 
 func (m *Manager) certStateGet(ctx context.Context, certName certNameType) *certState {
@@ -195,8 +254,8 @@ func (m *Manager) certStateGet(ctx context.Context, certName certNameType) *cert
 	return resInterface.(*certState)
 }
 
-func (m *Manager) createCertificateForDomains(ctx context.Context, certName certNameType,
-	domainNames []DomainName, needDomain DomainName) (res *tls.Certificate, err error) {
+func (m *Manager) createCertificateForDomains(ctx context.Context, certName certNameType, domainNames []DomainName,
+	needDomain DomainName) (res *tls.Certificate, err error) {
 
 	logger := zc.L(ctx)
 	certState := m.certStateGet(ctx, certName)
@@ -496,7 +555,8 @@ func (m *Manager) HandleHttpValidation(w http.ResponseWriter, r *http.Request) b
 	logger := zc.L(ctx)
 
 	token := strings.TrimPrefix(r.URL.Path, httpWellKnown)
-	domain := normalizeDomain(r.Host)
+	domain, err := normalizeDomain(r.Host)
+	log.DebugInfo(logger, err, "Domain normalization", zap.String("original", r.Host), logDomain(domain))
 	resp, err := m.httpTokens.Get(ctx, domain.ASCII()+"/"+token)
 	logger.Debug("Get http token", zap.Error(err))
 	if err == nil {

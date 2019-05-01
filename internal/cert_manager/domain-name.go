@@ -16,11 +16,7 @@ func (d DomainName) String() string {
 }
 
 func (d DomainName) ASCII() string {
-	ascii, err := idna.ToASCII(string(d))
-	if err != nil {
-		ascii += "[err: " + err.Error() + "]"
-	}
-	return ascii
+	return string(d)
 }
 
 func (d DomainName) Unicode() string {
@@ -56,10 +52,10 @@ func logDomainsNamed(name string, domains []DomainName) zap.Field {
 	return zap.Array(name, domainsType(domains))
 }
 
-func normalizeDomain(domain string) DomainName {
-	domain = strings.TrimSpace(domain)
+var domainNormalizationProfile = idna.New(idna.ValidateForRegistration(), idna.MapForLookup())
+
+func normalizeDomain(domain string) (DomainName, error) {
+	domain, err := domainNormalizationProfile.ToASCII(domain)
 	domain = strings.TrimSuffix(domain, ".")
-	domain = strings.ToLower(domain)
-	domain = DomainName(domain).ASCII()
-	return DomainName(domain)
+	return DomainName(domain), err
 }
