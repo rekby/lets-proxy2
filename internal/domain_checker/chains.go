@@ -1,3 +1,4 @@
+//nolint:golint
 package domain_checker
 
 import "context"

@@ -1,3 +1,4 @@
+//nolint:golint
 package domain_checker
 
 import (
@@ -27,10 +28,20 @@ func TestAny(t *testing.T) {
 	var res bool
 	var err error
 
+	res, err = NewAny(nil).IsDomainAllowed(ctx, "bbb")
+	td.False(res)
+	td.CmpNoError(err)
+
 	m1.IsDomainAllowedMock.Expect(ctx, "aaa").Return(true, nil)
-	m1.IsDomainAllowedMock.Expect(ctx, "aaa").Return(true, nil)
+	m2.IsDomainAllowedMock.Expect(ctx, "aaa").Return(true, nil)
 	res, err = any.IsDomainAllowed(ctx, "aaa")
 	td.True(res)
+	td.CmpNoError(err)
+
+	m1.IsDomainAllowedMock.Expect(ctx, "aaa").Return(false, nil)
+	m2.IsDomainAllowedMock.Expect(ctx, "aaa").Return(false, nil)
+	res, err = any.IsDomainAllowed(ctx, "aaa")
+	td.False(res)
 	td.CmpNoError(err)
 
 	m1.IsDomainAllowedMock.Expect(ctx, "bbb").Return(false, nil)
@@ -73,6 +84,10 @@ func TestAll(t *testing.T) {
 	any := NewAll([]DomainChecker{m1, m2})
 	var res bool
 	var err error
+
+	res, err = NewAll(nil).IsDomainAllowed(ctx, "aaa")
+	td.True(res)
+	td.CmpNoError(err)
 
 	m1.IsDomainAllowedMock.Expect(ctx, "aaa").Return(true, nil)
 	m2.IsDomainAllowedMock.Expect(ctx, "aaa").Return(true, nil)
