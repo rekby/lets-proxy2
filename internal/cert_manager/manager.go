@@ -75,7 +75,7 @@ type Manager struct {
 	httpTokens cache.Cache
 }
 
-func New(client *acme.Client, c cache.Cache) *Manager {
+func New(client AcmeClient, c cache.Cache) *Manager {
 	res := Manager{}
 	res.Client = client
 	res.certForDomainAuthorize = cache.NewMemoryValueLRU("authcert")
