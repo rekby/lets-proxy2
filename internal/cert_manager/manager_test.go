@@ -43,21 +43,14 @@ func (c contextConnection) GetContext() context.Context {
 
 //nolint:gochecknoinits
 func init() {
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		panic(err)
-	}
-	zc.SetDefaultLogger(logger)
+	zc.SetDefaultLogger(zap.NewNop())
 }
 
 func TestManager_GetCertificateTls(t *testing.T) {
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	ctx, flush := th.TestContext()
 	defer flush()
+
+	logger := zc.L(ctx)
 
 	mc := minimock.NewController(t)
 	defer mc.Finish()
@@ -229,13 +222,10 @@ func TestManager_GetCertificateTls(t *testing.T) {
 }
 
 func TestManager_GetCertificateHttp01(t *testing.T) {
-	logger, err := zap.NewDevelopment()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	ctx, flush := th.TestContext()
 	defer flush()
+
+	logger := zc.L(ctx)
 
 	mc := minimock.NewController(t)
 	defer mc.Finish()
