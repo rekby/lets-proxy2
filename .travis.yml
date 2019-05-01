@@ -15,16 +15,16 @@ services:
   - docker
 
 install:
-  - bash tests/prepare.sh
+  - test -n "$TRAVIS_TAG" || bash tests/prepare.sh
 
 script:
-  - go test -v -covermode=count -coverprofile=coverage.out ./...
+  - test -n "$TRAVIS_TAG" || go test -v -covermode=count -coverprofile=coverage.out ./...
 
 after_script:
   # Install and upload test coverage must not failure for test build
-  - go get -mod= golang.org/x/tools/cmd/cover
-  - go get -mod= github.com/mattn/goveralls
-  - goveralls -coverprofile=coverage.out -service=travis-ci -repotoken $COVERALLS_TOKEN
+  - test -n "$TRAVIS_TAG" || go get -mod= golang.org/x/tools/cmd/cover
+  - test -n "$TRAVIS_TAG" || go get -mod= github.com/mattn/goveralls
+  - test -n "$TRAVIS_TAG" || goveralls -coverprofile=coverage.out -service=travis-ci -repotoken $COVERALLS_TOKEN
 
 before_deploy:
   - git config --local user.name "$GIT_NAME"
