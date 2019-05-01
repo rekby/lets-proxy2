@@ -30,21 +30,21 @@ before_deploy:
   - git config --local user.name "$GIT_NAME"
   - git config --local user.email "$GIT_EMAIL"
   - export TRAVIS_TAG="$TAG_PREFIX.$TRAVIS_BUILD_NUMBER"
-  - BUILD_TIME=$(TZ=UTC date --rfc-3339=seconds)
+  - BUILD_TIME=$(TZ=UTC date --rfc-3339=seconds | cut -d '+' -f 1 | tr -d - | tr ' ' '-' | tr -d :)
   - git tag $TRAVIS_TAG
   - go get -mod= github.com/mitchellh/gox
   - mkdir -p output
   - OS_ARCH_BUILDS="darwin/amd64 linux/386 linux/amd64 linux/arm freebsd/386 freebsd/amd64 freebsd/arm windows/386 windows/amd64"
-  - gox --mod=vendor -osarch "$OS_ARCH_BUILDS" --ldflags "-X \"main.VERSION=$TRAVIS_TAG commit $TRAVIS_COMMIT builded '$BUILD_TIME' buildNumber $TRAVIS_BUILD_NUMBER\"" --output="output/lets-proxy_{{.OS}}_{{.Arch}}" -verbose --rebuild ./cmd/
+  - gox --mod=vendor -osarch "$OS_ARCH_BUILDS" --ldflags "-X \"main.VERSION=$TRAVIS_TAG+build-$TRAVIS_BUILD_NUMBER, Build time $BUILD_TIME, commit $TRAVIS_COMMIT\"" --output="output/lets-proxy_{{.OS}}_{{.Arch}}" -verbose --rebuild ./cmd/
   - bash tests/make_archives.sh
 
 deploy:
   skip_cleanup: true
   provider: releases
-  draft: true
+  tags: true
   on:
     repo: rekby/lets-proxy2
-    branch: master
+    tags: true
   api_key: $GITHUB_TOKEN
   file_glob: true
   file: output/*
