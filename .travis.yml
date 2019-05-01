@@ -1,5 +1,5 @@
 env:
-  - GO111MODULE=on GOFLAGS=-mod=vendor CGO_ENABLED=0 TAG_PREFIX="v0.20.0"
+  - GO111MODULE=on GOFLAGS=-mod=vendor CGO_ENABLED=0
 
 language: go
 
@@ -29,7 +29,7 @@ after_script:
 before_deploy:
   - git config --local user.name "$GIT_NAME"
   - git config --local user.email "$GIT_EMAIL"
-  - BUILD_TIME=$(TZ=UTC date --rfc-3339=seconds | cut -d '+' -f 1 | tr -d - | tr ' ' '-' | tr -d :)
+  - BUILD_TIME=$(TZ=UTC date --rfc-3339=seconds)
   - go get -mod= github.com/mitchellh/gox
   - mkdir -p output
   - OS_ARCH_BUILDS="darwin/amd64 linux/386 linux/amd64 linux/arm freebsd/386 freebsd/amd64 freebsd/arm windows/386 windows/amd64"
