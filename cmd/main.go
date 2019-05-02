@@ -74,6 +74,9 @@ func startProgram(config *configType) {
 
 	certManager := cert_manager.New(acmeClient, storage)
 
+	certManager.DomainChecker, err = config.CheckDomains.CreateDomainChecker(ctx)
+	log.DebugFatal(logger, err, "Config domain checkers.")
+
 	tlsListener := &tlslistener.ListenersHandler{
 		ListenersForHandleTLS: httpsListeners,
 		GetCertificate:        certManager.GetCertificate,
