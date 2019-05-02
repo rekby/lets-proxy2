@@ -65,7 +65,7 @@ func TestGetBindedIpAddress(t *testing.T) {
 		}, nil
 	}
 
-	res := GetBindedIpAddress(ctx, f)
+	res := getBindedIpAddress(ctx, f)
 	td.CmpDeeply(res, []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("161.32.6.19"), net.ParseIP("::1"),
 		net.ParseIP("1.2.3.4"),
 		net.ParseIP("2a02:6b8::feed:0ff")})
@@ -77,7 +77,7 @@ func TestFilterPublicOnlyIPs(t *testing.T) {
 	ips := []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("161.32.6.19"), net.ParseIP("::1"),
 		net.ParseIP("1.2.3.4"), net.ParseIP("2a02:6b8::feed:0ff")}
 
-	res := FilterPublicOnlyIPs(ips)
+	res := filterPublicOnlyIPs(ips)
 	td.CmpDeeply(res, []net.IP{net.ParseIP("161.32.6.19"), net.ParseIP("1.2.3.4"),
 		net.ParseIP("2a02:6b8::feed:0ff")})
 }
@@ -197,6 +197,7 @@ func TestSelfPublicIP_IsDomainAllowed(t *testing.T) {
 	td := testdeep.NewT(t)
 	resolver := NewResolverMock(td)
 	defer resolver.MinimockFinish()
+
 	var res bool
 	var err error
 
@@ -231,6 +232,43 @@ func TestSelfPublicIP_IsDomainAllowed(t *testing.T) {
 	td.False(res)
 	td.CmpError(err)
 
+	resolver.LookupIPAddrMock.Expect(ctx2, "asd6").Return([]net.IPAddr{
+		{IP: net.ParseIP("1.2.3.4")}, {IP: net.ParseIP("::1234")},
+	}, nil)
+	res, err = s.IsDomainAllowed(ctx2, "asd6")
+	td.True(res)
+	td.CmpNoError(err)
+
+	resolver.LookupIPAddrMock.Expect(ctx2, "asd7").Return([]net.IPAddr{
+		{IP: net.ParseIP("1.2.3.4")}, {IP: net.ParseIP("::1:1234")},
+	}, nil)
+	res, err = s.IsDomainAllowed(ctx2, "asd7")
+	td.False(res)
+	td.CmpNoError(err)
+
+	resolver.LookupIPAddrMock.Expect(ctx2, "asd8").Return(nil, errors.New("test"))
+	res, err = s.IsDomainAllowed(ctx2, "asd8")
+	td.False(res)
+	td.CmpError(err)
+
+}
+
+func TestSelfPublicIP_IsDomainAllowed_CanceledMainContext(t *testing.T) {
+	ctx, cancel := th.TestContext()
+	defer cancel()
+
+	mainCtx, mainCtxCancel := context.WithCancel(context.Background())
+	mainCtx = zc.WithLogger(mainCtx, zap.NewNop())
+	mainCtxCancel()
+
+	td := testdeep.NewT(t)
+
+	s := NewIPList(mainCtx, func(ctx context.Context) (ips []net.IP, e error) {
+		return nil, nil
+	})
+	res, err := s.IsDomainAllowed(ctx, "asd")
+	td.False(res)
+	td.CmpError(err)
 }
 
 func TestIPList_DoubleStart(t *testing.T) {
@@ -253,4 +291,24 @@ func TestIPList_DoubleStart(t *testing.T) {
 		s.ctx = ctx
 		s.StartAutoRenew()
 	})
+}
+
+func TestCreateGetSelfPublicBinded(t *testing.T) {
+	ctx, cancel := th.TestContext()
+	defer cancel()
+
+	td := testdeep.NewT(t)
+
+	var binded InterfacesAddrFunc = func() (addrs []net.Addr, e error) {
+		return []net.Addr{
+			&net.IPNet{IP: net.ParseIP("1.2.3.4"), Mask: net.CIDRMask(32, 32)},
+			&net.IPNet{IP: net.ParseIP("127.0.0.1"), Mask: net.CIDRMask(32, 32)},
+		}, nil
+	}
+
+	f := CreateGetSelfPublicBinded(binded)
+	ips, err := f(ctx)
+	td.CmpDeeply(len(ips), 1)
+	td.True(ips[0].Equal(net.ParseIP("1.2.3.4")))
+	td.CmpNoError(err)
 }

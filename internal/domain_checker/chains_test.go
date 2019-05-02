@@ -24,11 +24,11 @@ func TestAny(t *testing.T) {
 
 	m1 := NewDomainCheckerMock(mc)
 	m2 := NewDomainCheckerMock(mc)
-	any := NewAny([]DomainChecker{m1, m2})
+	any := NewAny(m1, m2)
 	var res bool
 	var err error
 
-	res, err = NewAny(nil).IsDomainAllowed(ctx, "bbb")
+	res, err = NewAny().IsDomainAllowed(ctx, "bbb")
 	td.False(res)
 	td.CmpNoError(err)
 
@@ -81,11 +81,11 @@ func TestAll(t *testing.T) {
 
 	m1 := NewDomainCheckerMock(mc)
 	m2 := NewDomainCheckerMock(mc)
-	any := NewAll([]DomainChecker{m1, m2})
+	any := NewAll(m1, m2)
 	var res bool
 	var err error
 
-	res, err = NewAll(nil).IsDomainAllowed(ctx, "aaa")
+	res, err = NewAll().IsDomainAllowed(ctx, "aaa")
 	td.True(res)
 	td.CmpNoError(err)
 

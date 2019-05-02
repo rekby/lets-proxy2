@@ -3,6 +3,7 @@ package domain_checker
 
 import (
 	"context"
+	"errors"
 	"net"
 	"sync"
 	"time"
@@ -81,15 +82,19 @@ func NewIPList(ctx context.Context, addresses AllowedIPAddresses) *IPList {
 }
 
 func (s *IPList) IsDomainAllowed(ctx context.Context, domain string) (bool, error) {
-	logger := zc.L(ctx)
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	if s.ctx.Err() != nil {
+		return false, errors.New("iplist main context canceled")
+	}
 
+	logger := zc.L(ctx)
 	ips, err := s.Resolver.LookupIPAddr(ctx, domain)
 	log.DebugInfo(logger, err, "Resolve domain ip addresses", zap.Any("ips", ips))
 	if err != nil {
 		return false, err
 	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
 hostIP:
 	for _, ip := range ips {
@@ -150,7 +155,7 @@ func (s *IPList) updateIPsByTimer() {
 
 type InterfacesAddrFunc func() ([]net.Addr, error)
 
-func GetBindedIpAddress(ctx context.Context, interfacesAddr InterfacesAddrFunc) []net.IP {
+func getBindedIpAddress(ctx context.Context, interfacesAddr InterfacesAddrFunc) []net.IP {
 	logger := zc.L(ctx)
 	binded, err := interfacesAddr()
 	log.DebugDPanic(logger, err, "Get system addresses", zap.Any("addresses", binded))
@@ -170,7 +175,7 @@ func GetBindedIpAddress(ctx context.Context, interfacesAddr InterfacesAddrFunc) 
 	return parsed
 }
 
-func FilterPublicOnlyIPs(ips []net.IP) []net.IP {
+func filterPublicOnlyIPs(ips []net.IP) []net.IP {
 	var public = make([]net.IP, 0, len(ips))
 	for _, ip := range ips {
 		if isPublicIp(ip) {
@@ -178,6 +183,15 @@ func FilterPublicOnlyIPs(ips []net.IP) []net.IP {
 		}
 	}
 	return public
+}
+
+func CreateGetSelfPublicBinded(binded InterfacesAddrFunc) AllowedIPAddresses {
+	var f AllowedIPAddresses = func(ctx context.Context) ([]net.IP, error) {
+		ips := getBindedIpAddress(ctx, binded)
+		ips = filterPublicOnlyIPs(ips)
+		return ips, nil
+	}
+	return f
 }
 
 func mustParseNet(s string) net.IPNet {

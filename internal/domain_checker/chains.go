@@ -18,8 +18,8 @@ func (any Any) IsDomainAllowed(ctx context.Context, domain string) (bool, error)
 	return false, nil
 }
 
-func NewAny(slise []DomainChecker) Any {
-	return Any(slise)
+func NewAny(checkers ...DomainChecker) Any {
+	return Any(checkers)
 }
 
 type All []DomainChecker
@@ -37,6 +37,6 @@ func (all All) IsDomainAllowed(ctx context.Context, domain string) (bool, error)
 	return true, nil
 }
 
-func NewAll(slise []DomainChecker) All {
-	return All(slise)
+func NewAll(checkers ...DomainChecker) All {
+	return All(checkers)
 }
