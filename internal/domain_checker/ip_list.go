@@ -50,10 +50,10 @@ var (
 	}
 )
 
-type SelfPublicIP struct {
-	Addresses          InterfacesAddrFunc
+type IPList struct {
+	Addresses          AllowedIPAddresses
 	Resolver           Resolver
-	AutoUpdateInterval time.Duration
+	AutoUpdateInterval time.Duration // Set zero for disable autorenew.
 
 	ctx     context.Context
 	mu      sync.RWMutex
@@ -65,14 +65,14 @@ type Resolver interface {
 	LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error)
 }
 
-type InterfacesAddrFunc func() ([]net.Addr, error)
+type AllowedIPAddresses func(ctx context.Context) ([]net.IP, error)
 
-// After create can change settings fields, than must call Start()
-// Fields must not change after start.
-func NewSelfIP(ctx context.Context) *SelfPublicIP {
-	res := &SelfPublicIP{
+// After create can change settings fields, than can call StartAutoRenew
+// struct fields MUST NOT changes after call StartAutoRenew or concurrency with usage.
+func NewIPList(ctx context.Context, addresses AllowedIPAddresses) *IPList {
+	res := &IPList{
 		ctx:                ctx,
-		Addresses:          net.InterfaceAddrs,
+		Addresses:          addresses,
 		Resolver:           net.DefaultResolver,
 		AutoUpdateInterval: time.Hour,
 	}
@@ -80,7 +80,7 @@ func NewSelfIP(ctx context.Context) *SelfPublicIP {
 	return res
 }
 
-func (s *SelfPublicIP) IsDomainAllowed(ctx context.Context, domain string) (bool, error) {
+func (s *IPList) IsDomainAllowed(ctx context.Context, domain string) (bool, error) {
 	logger := zc.L(ctx)
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -105,7 +105,8 @@ hostIP:
 	return true, nil
 }
 
-func (s *SelfPublicIP) Start() {
+// Can called most once - for autorenew internal ips
+func (s *IPList) StartAutoRenew() {
 	s.updateIPs()
 
 	s.mu.Lock()
@@ -115,19 +116,24 @@ func (s *SelfPublicIP) Start() {
 		zc.L(s.ctx).DPanic("Double started self public ip")
 	}
 	s.started = true
-
-	go s.updateIPsByTimer()
+	if s.AutoUpdateInterval > 0 {
+		go s.updateIPsByTimer()
+	}
 }
 
-func (s *SelfPublicIP) updateIPs() {
-	ips := getSelfPublicIPs(s.ctx, s.Addresses)
+func (s *IPList) updateIPs() {
+	ips, err := s.Addresses(s.ctx)
+	log.DebugDPanicCtx(s.ctx, err, "Got ips while auto update", zap.Any("ips", ips))
+	if err != nil {
+		return
+	}
 
 	s.mu.Lock()
 	s.ips = ips
 	s.mu.Unlock()
 }
 
-func (s *SelfPublicIP) updateIPsByTimer() {
+func (s *IPList) updateIPsByTimer() {
 	contextDone := s.ctx.Done()
 	ticker := time.NewTicker(s.AutoUpdateInterval)
 	defer ticker.Stop()
@@ -142,7 +148,9 @@ func (s *SelfPublicIP) updateIPsByTimer() {
 	}
 }
 
-func getSelfPublicIPs(ctx context.Context, interfacesAddr InterfacesAddrFunc) []net.IP {
+type InterfacesAddrFunc func() ([]net.Addr, error)
+
+func GetBindedIpAddress(ctx context.Context, interfacesAddr InterfacesAddrFunc) []net.IP {
 	logger := zc.L(ctx)
 	binded, err := interfacesAddr()
 	log.DebugDPanic(logger, err, "Get system addresses", zap.Any("addresses", binded))
@@ -155,21 +163,21 @@ func getSelfPublicIPs(ctx context.Context, interfacesAddr InterfacesAddrFunc) []
 		if ip == nil {
 			continue
 		}
+
 		logger.Debug("Parse ip", zap.Stringer("ip", ip))
 		parsed = append(parsed, ip)
 	}
+	return parsed
+}
 
-	var public = make([]net.IP, 0, len(parsed))
-	for _, ip := range parsed {
+func FilterPublicOnlyIPs(ips []net.IP) []net.IP {
+	var public = make([]net.IP, 0, len(ips))
+	for _, ip := range ips {
 		if isPublicIp(ip) {
 			public = append(public, ip)
 		}
 	}
-
-	// Truncate pre_allocated_memory
-	var res = make([]net.IP, len(public))
-	copy(res, public)
-	return res
+	return public
 }
 
 func mustParseNet(s string) net.IPNet {

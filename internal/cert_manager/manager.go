@@ -331,7 +331,7 @@ func (m *Manager) authorizeDomain(ctx context.Context, domain DomainName) error 
 			authUries = append(authUries, k)
 		}
 
-		logger.Info("Start detached process for revoke pending authorizations",
+		logger.Info("StartAutoRenew detached process for revoke pending authorizations",
 			zap.Strings("uries", authUries))
 
 		revokeContext := context.Background()
@@ -349,7 +349,7 @@ func (m *Manager) authorizeDomain(ctx context.Context, domain DomainName) error 
 
 	var nextChallengeTypeIndex int
 	for {
-		// Start domain authorization and get the challenge.
+		// StartAutoRenew domain authorization and get the challenge.
 		authz, err := m.Client.Authorize(ctx, domain.String())
 		if err == nil {
 			logger.Debug("Got authorization description.", zap.Reflect("auth_object", authz))
@@ -462,7 +462,7 @@ func (m *Manager) renewCertInBackground(ctx context.Context, certName certNameTy
 		return
 	}
 	domains := domainNamesFromCertificateName(certName)
-	logger.Info("Start background certificate issue")
+	logger.Info("StartAutoRenew background certificate issue")
 	cert, err := m.createCertificateForDomains(ctx, certName, domains, "")
 	certState.FinishIssue(ctx, cert, err)
 	log.InfoError(logger, err, "Renew certificate in background finished", log.Cert(cert))

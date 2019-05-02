@@ -48,7 +48,7 @@ func TestIsPublicIp(t *testing.T) {
 	td.False(isPublicIp(net.ParseIP("FF02:0:0:0:0:1:FF00::441")))
 }
 
-func TestGetSelfPublicIPs(t *testing.T) {
+func TestGetBindedIpAddress(t *testing.T) {
 	ctx, cancel := th.TestContext()
 	defer cancel()
 
@@ -65,12 +65,72 @@ func TestGetSelfPublicIPs(t *testing.T) {
 		}, nil
 	}
 
-	res := getSelfPublicIPs(ctx, f)
+	res := GetBindedIpAddress(ctx, f)
+	td.CmpDeeply(res, []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("161.32.6.19"), net.ParseIP("::1"),
+		net.ParseIP("1.2.3.4"),
+		net.ParseIP("2a02:6b8::feed:0ff")})
+}
+
+func TestFilterPublicOnlyIPs(t *testing.T) {
+	td := testdeep.NewT(t)
+
+	ips := []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("161.32.6.19"), net.ParseIP("::1"),
+		net.ParseIP("1.2.3.4"), net.ParseIP("2a02:6b8::feed:0ff")}
+
+	res := FilterPublicOnlyIPs(ips)
 	td.CmpDeeply(res, []net.IP{net.ParseIP("161.32.6.19"), net.ParseIP("1.2.3.4"),
 		net.ParseIP("2a02:6b8::feed:0ff")})
 }
 
-func TestNewSelfIP_UpdateByTimer(t *testing.T) {
+func TestIPList_Update(t *testing.T) {
+	ctx, cancel := th.TestContext()
+	defer cancel()
+
+	td := testdeep.NewT(t)
+
+	var retError = false
+	l := NewIPList(ctx, func(ctx context.Context) (ips []net.IP, e error) {
+		if retError {
+			return nil, errors.New("test")
+		}
+		return nil, nil
+	})
+
+	l.ctx = zc.WithLogger(context.Background(), zap.NewNop())
+	retError = false
+	td.CmpNotPanic(func() {
+		l.updateIPs()
+	})
+
+	retError = true
+	td.CmpNotPanic(func() {
+		l.updateIPs()
+	})
+
+	retError = false
+	td.CmpNotPanic(func() {
+		l.updateIPs()
+	})
+
+	l.ctx = zc.WithLogger(context.Background(), zap.NewNop().WithOptions(zap.Development()))
+	retError = false
+	td.CmpNotPanic(func() {
+		l.updateIPs()
+	})
+
+	retError = true
+	td.CmpPanic(func() {
+		l.updateIPs()
+	}, testdeep.NotNil())
+
+	retError = false
+	td.CmpNotPanic(func() {
+		l.updateIPs()
+	})
+
+}
+
+func TestIPList_UpdateByTimer(t *testing.T) {
 	ctx, cancel := th.TestContext()
 	defer cancel()
 
@@ -78,44 +138,39 @@ func TestNewSelfIP_UpdateByTimer(t *testing.T) {
 
 	var ctxPanic, ctxPanicCancel = context.WithCancel(context.Background())
 
-	var firstTimeCalled = true
+	var callCounter = 0
 
-	var f InterfacesAddrFunc = func() (addrs []net.Addr, e error) {
-		if firstTimeCalled {
-			firstTimeCalled = false
-			return []net.Addr{
-				&net.IPNet{IP: net.ParseIP("127.0.0.1"), Mask: net.CIDRMask(8, 32)},
-				&net.IPNet{IP: net.ParseIP("1.2.3.4"), Mask: net.CIDRMask(32, 32)},
+	var f AllowedIPAddresses = func(ctx context.Context) (addrs []net.IP, e error) {
+		callCounter++
+		if callCounter <= 2 {
+			return []net.IP{
+				net.ParseIP("1.2.3.4"),
 			}, nil
 		}
 
 		if ctxPanic.Err() == nil {
-			return []net.Addr{
-				&net.IPNet{IP: net.ParseIP("127.0.0.1"), Mask: net.CIDRMask(8, 32)},
-				&net.IPNet{IP: net.ParseIP("161.32.6.19"), Mask: net.CIDRMask(32, 32)},
-				&net.IPNet{IP: net.ParseIP("::1"), Mask: net.CIDRMask(128, 128)},
-				&net.IPNet{IP: net.ParseIP("1.2.3.4"), Mask: net.CIDRMask(32, 32)},
-				&net.IPNet{IP: net.ParseIP(""), Mask: net.CIDRMask(32, 32)},
-				&net.IPNet{IP: net.ParseIP("2a02:6b8::feed:0ff"), Mask: net.CIDRMask(64, 128)},
+			return []net.IP{
+				net.ParseIP("161.32.6.19"), net.ParseIP("1.2.3.4"), net.ParseIP("2a02:6b8::feed:0ff"),
 			}, nil
 		}
 		panic("must not called")
 	}
 
-	s := NewSelfIP(ctx)
+	s := NewIPList(ctx, f)
 	s.Addresses = f
 	s.AutoUpdateInterval = 10 * time.Millisecond
 
-	s.Start()
 	s.mu.RLock()
-	td.True(len(s.ips) == 1)
+	td.CmpDeeply(len(s.ips), 1)
 	td.True(s.ips[0].Equal(net.ParseIP("1.2.3.4")))
 	s.mu.RUnlock()
+
+	s.StartAutoRenew()
 
 	time.Sleep(50 * time.Millisecond)
 
 	s.mu.RLock()
-	td.True(len(s.ips) == 3)
+	td.CmpDeeply(len(s.ips), 3)
 	td.True(s.ips[0].Equal(net.ParseIP("161.32.6.19")))
 	td.True(s.ips[1].Equal(net.ParseIP("1.2.3.4")))
 	td.True(s.ips[2].Equal(net.ParseIP("2a02:6b8::feed:0ff")))
@@ -131,7 +186,7 @@ func TestNewSelfIP_UpdateByTimer(t *testing.T) {
 }
 
 func TestSelfPublicIP_IsDomainAllowed(t *testing.T) {
-	var _ DomainChecker = &SelfPublicIP{}
+	var _ DomainChecker = &IPList{}
 
 	ctx, cancel := th.TestContext()
 	defer cancel()
@@ -145,10 +200,11 @@ func TestSelfPublicIP_IsDomainAllowed(t *testing.T) {
 	var res bool
 	var err error
 
-	s := NewSelfIP(ctx)
-	s.Resolver = resolver
-	s.ips = []net.IP{net.ParseIP("1.2.3.4"), net.ParseIP("::ffff:2.2.2.2"), net.ParseIP("::1234")}
+	s := NewIPList(ctx, func(ctx context.Context) (ips []net.IP, e error) {
+		return []net.IP{net.ParseIP("1.2.3.4"), net.ParseIP("::ffff:2.2.2.2"), net.ParseIP("::1234")}, nil
+	})
 
+	s.Resolver = resolver
 	resolver.LookupIPAddrMock.Expect(ctx2, "asd").Return([]net.IPAddr{{IP: net.ParseIP("1.2.3.4")}}, nil)
 	res, err = s.IsDomainAllowed(ctx2, "asd")
 	td.True(res)
@@ -177,22 +233,24 @@ func TestSelfPublicIP_IsDomainAllowed(t *testing.T) {
 
 }
 
-func TestNewSelfIP_DoubleStart(t *testing.T) {
+func TestIPList_DoubleStart(t *testing.T) {
 	ctx, cancel := th.TestContext()
 	defer cancel()
 
 	td := testdeep.NewT(t)
 
-	s := NewSelfIP(ctx)
-	s.Start()
+	s := NewIPList(ctx, func(ctx context.Context) (ips []net.IP, e error) {
+		return nil, nil
+	})
+	s.StartAutoRenew()
 
 	td.CmpPanic(func() {
 		s.ctx = zc.WithLogger(ctx, zap.NewNop().WithOptions(zap.Development()))
-		s.Start()
+		s.StartAutoRenew()
 	}, testdeep.NotNil())
 
 	td.CmpNotPanic(func() {
 		s.ctx = ctx
-		s.Start()
+		s.StartAutoRenew()
 	})
 }

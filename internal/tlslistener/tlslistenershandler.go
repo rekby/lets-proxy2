@@ -54,7 +54,7 @@ func (p *ListenersHandler) Addr() net.Addr {
 
 // Block until finish work (by context or start error)
 // It can stop by cancel context.
-// Now Start return immedantly after cancel context - without wait to finish background processes.
+// Now StartAutoRenew return immedantly after cancel context - without wait to finish background processes.
 // It can change in future.
 func (p *ListenersHandler) Start(ctx context.Context) error {
 	p.logger = zc.L(ctx)
@@ -65,7 +65,7 @@ func (p *ListenersHandler) Start(ctx context.Context) error {
 	listenerClosed := make(chan struct{})
 
 	logger := zc.L(ctx)
-	logger.Info("Start handleListeners")
+	logger.Info("StartAutoRenew handleListeners")
 	for _, listenerForTLS := range p.ListenersForHandleTLS {
 		go func(l net.Listener) {
 			for {

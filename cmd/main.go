@@ -55,7 +55,7 @@ func startProgram(config *configType) {
 	logger := initLogger(config.Log)
 	ctx := zc.WithLogger(context.Background(), logger)
 
-	logger.Info("Start program version", zap.String("version", version()))
+	logger.Info("StartAutoRenew program version", zap.String("version", version()))
 
 	httpsListeners := createHTTPSListeners(ctx, config.HTTPSListeners)
 
@@ -80,7 +80,7 @@ func startProgram(config *configType) {
 	}
 
 	err = tlsListener.Start(ctx)
-	log.DebugFatal(logger, err, "Start tls listener")
+	log.DebugFatal(logger, err, "StartAutoRenew tls listener")
 
 	p := proxy.NewHTTPProxy(ctx, tlsListener)
 	p.GetContext = func(req *http.Request) (i context.Context, e error) {
@@ -102,7 +102,7 @@ func createHTTPSListeners(ctx context.Context, bindings string) (res []net.Liste
 		}
 		var lc net.ListenConfig
 		listener, err := lc.Listen(ctx, "tcp", address)
-		log.InfoErrorCtx(ctx, err, "Start https listener", zap.String("address", address))
+		log.InfoErrorCtx(ctx, err, "StartAutoRenew https listener", zap.String("address", address))
 		if err == nil {
 			res = append(res, listener)
 		}
