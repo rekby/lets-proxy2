@@ -12,14 +12,16 @@ import (
 )
 
 type Config struct {
-	SelfIP    bool   `default:"true",comment:"Enable check domain for it resolved to IPs of this server only.\n"`
-	BlackList string `default:"",comment:"Regexp in golang syntax of blacklisted domain for issue certificate.\nThis list overrided by whitelist."`
-	WhiteList string `default:"",comment:"Regexp in golang syntax of whitelist domains for issue certificate.\nWhitelist need for allow part of domains, which excluded by blacklist.\n"`
+	IPSelf      bool   `default:"true",comment:"Allow domain if it resolver for one of public IPs of this server."`
+	IPWhiteList string `default:"",comment:"Allow domain if it resolver for one of the ips."`
+	BlackList   string `default:"",comment:"Regexp in golang syntax of blacklisted domain for issue certificate.\nThis list overrided by whitelist."`
+	WhiteList   string `default:"",comment:"Regexp in golang syntax of whitelist domains for issue certificate.\nWhitelist need for allow part of domains, which excluded by blacklist.\n"`
 }
 
 func (c *Config) CreateDomainChecker(ctx context.Context) (DomainChecker, error) {
 	logger := zc.L(ctx)
-	var res DomainChecker = True{}
+
+	var listCheckers DomainChecker = True{}
 
 	if c.BlackList != "" {
 		r, err := regexp.Compile(c.BlackList)
@@ -27,7 +29,7 @@ func (c *Config) CreateDomainChecker(ctx context.Context) (DomainChecker, error)
 		if err != nil {
 			return nil, err
 		}
-		res = NewAll(NewNot(NewRegexp(r)), res)
+		listCheckers = NewAll(NewNot(NewRegexp(r)), listCheckers)
 	}
 
 	if c.WhiteList != "" {
@@ -36,13 +38,36 @@ func (c *Config) CreateDomainChecker(ctx context.Context) (DomainChecker, error)
 		if err != nil {
 			return nil, err
 		}
-		res = NewAny(NewRegexp(r), res)
+		listCheckers = NewAny(listCheckers, NewRegexp(r))
 	}
 
-	if c.SelfIP {
-		ipList := NewIPList(ctx, CreateGetSelfPublicBinded(net.InterfaceAddrs))
-		ipList.StartAutoRenew()
-		res = NewAll(res, ipList)
+	var ipCheckers Any
+
+	if c.IPSelf {
+		selfPublicIpList := NewIPList(ctx, CreateGetSelfPublicBinded(net.InterfaceAddrs))
+		selfPublicIpList.StartAutoRenew()
+		ipCheckers = append(ipCheckers, selfPublicIpList)
 	}
+
+	if c.IPWhiteList != "" {
+		ips, err := ParseIPs(ctx, c.IPWhiteList)
+		log.DebugError(logger, err, "Parse ip whitelist")
+		if err != nil {
+			return nil, err
+		}
+		whiteIpList := NewIPList(ctx, func(ctx context.Context) ([]net.IP, error) {
+			return ips, nil
+		})
+		// ipList.StartAutoRenew() - doesn't need renew, becouse list static
+		ipCheckers = append(ipCheckers, whiteIpList)
+	}
+
+	// If no ip checks - allow domain without ip check
+	// If have one or more ip checks - allow
+	if len(ipCheckers) == 0 {
+		ipCheckers = NewAny(True{})
+	}
+
+	res := NewAll(listCheckers, ipCheckers)
 	return res, nil
 }

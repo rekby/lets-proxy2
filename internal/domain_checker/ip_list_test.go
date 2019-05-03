@@ -312,3 +312,17 @@ func TestCreateGetSelfPublicBinded(t *testing.T) {
 	td.True(ips[0].Equal(net.ParseIP("1.2.3.4")))
 	td.CmpNoError(err)
 }
+
+func TestTruncatedCopyIPs(t *testing.T) {
+	td := testdeep.NewT(t)
+	td.Nil(truncatedCopyIPs(nil))
+	td.Nil(truncatedCopyIPs(make([]net.IP, 0, 10)))
+
+	res := truncatedCopyIPs([]net.IP{nil})
+	td.CmpDeeply(res, []net.IP{nil})
+	td.CmpDeeply(cap(res), 1)
+
+	res = truncatedCopyIPs(make([]net.IP, 2, 10))
+	td.CmpDeeply(res, []net.IP{nil, nil})
+	td.CmpDeeply(cap(res), 2)
+}

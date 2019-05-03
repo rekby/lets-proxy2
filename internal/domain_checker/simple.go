@@ -29,9 +29,6 @@ func (n Not) IsDomainAllowed(ctx context.Context, domain string) (bool, error) {
 	}
 	return false, err
 }
-func NewNot(origin DomainChecker) Not {
-	return Not{origin: origin}
-}
 
 type Regexp regexp.Regexp
 

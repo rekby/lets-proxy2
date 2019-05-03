@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -189,9 +190,32 @@ func CreateGetSelfPublicBinded(binded InterfacesAddrFunc) AllowedIPAddresses {
 	var f AllowedIPAddresses = func(ctx context.Context) ([]net.IP, error) {
 		ips := getBindedIpAddress(ctx, binded)
 		ips = filterPublicOnlyIPs(ips)
+		ips = truncatedCopyIPs(ips)
 		return ips, nil
 	}
 	return f
+}
+
+func ParseIPs(ctx context.Context, s string) ([]net.IP, error) {
+	logger := zc.L(ctx)
+	parts := strings.Split(s, ",")
+	var parsed = make([]net.IP, 0, len(parts))
+	for _, stringIP := range parts {
+		stringIP = strings.TrimSpace(stringIP)
+		if stringIP == "" {
+			continue
+		}
+		ip := net.ParseIP(stringIP)
+		if ip == nil {
+			logger.Error("Can't parse ip", zap.String("ip", stringIP))
+			return nil, errors.New("can't parse ip")
+		}
+		logger.Debug("Parse ip", zap.Stringer("ip", ip))
+		parsed = append(parsed, ip)
+	}
+
+	res := truncatedCopyIPs(parsed)
+	return res, nil
 }
 
 func mustParseNet(s string) net.IPNet {
@@ -213,4 +237,16 @@ func isPublicIp(ip net.IP) bool {
 		}
 	}
 	return true
+}
+
+// return copy of ips, with cap truncated for len
+// return nil if len(ips) == 0
+func truncatedCopyIPs(ips []net.IP) []net.IP {
+	if len(ips) == 0 {
+		return nil
+	}
+
+	var res = make([]net.IP, len(ips))
+	copy(res, ips)
+	return res
 }

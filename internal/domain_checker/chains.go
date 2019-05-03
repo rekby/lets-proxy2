@@ -40,3 +40,7 @@ func (all All) IsDomainAllowed(ctx context.Context, domain string) (bool, error)
 func NewAll(checkers ...DomainChecker) All {
 	return All(checkers)
 }
+
+func NewNot(origin DomainChecker) Not {
+	return Not{origin: origin}
+}

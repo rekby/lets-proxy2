@@ -106,12 +106,12 @@ func TestConfig_CreateDomainCheckerSelfIPOnly(t *testing.T) {
 	resolver.LookupIPAddrMock.Return(nil, errors.New("unknown domain"))
 
 	cfg := Config{
-		SelfIP: true,
+		IPSelf: true,
 	}
 
 	checker, err := cfg.CreateDomainChecker(ctx)
 	td.CmpNoError(err)
-	ipList := checker.(All)[1].(*IPList)
+	ipList := checker.(All)[1].(Any)[0].(*IPList)
 
 	ipList.mu.Lock()
 	ipList.Resolver = resolver
@@ -134,6 +134,40 @@ func TestConfig_CreateDomainCheckerSelfIPOnly(t *testing.T) {
 	td.CmpError(err)
 }
 
+func TestConfig_CreateDomainCheckerWhitelist(t *testing.T) {
+	ctx, cancel := th.TestContext()
+	defer cancel()
+
+	td := testdeep.NewT(t)
+	mc := minimock.NewController(td)
+	defer mc.Finish()
+
+	resolver := NewResolverMock(mc)
+	resolver.LookupIPAddrMock.When(ctx, "whitelist").Then([]net.IPAddr{{IP: net.ParseIP("3.3.3.3")}}, nil)
+	resolver.LookupIPAddrMock.When(ctx, "unknown").Then(nil, errors.New("unknown domain"))
+
+	cfg := Config{
+		IPWhiteList: "2.3.4.5,3.3.3.3",
+	}
+
+	checker, err := cfg.CreateDomainChecker(ctx)
+	td.CmpNoError(err)
+	whiteIpList := checker.(All)[1].(Any)[0].(*IPList)
+
+	whiteIpList.mu.Lock()
+	whiteIpList.Resolver = resolver
+	whiteIpList.mu.Unlock()
+	whiteIpList.updateIPs()
+
+	res, err := checker.IsDomainAllowed(ctx, "whitelist")
+	td.True(res)
+	td.CmpNoError(err)
+
+	res, err = checker.IsDomainAllowed(ctx, "unknown")
+	td.False(res)
+	td.CmpError(err)
+}
+
 func TestConfig_CreateDomainCheckerComplex(t *testing.T) {
 	ctx, cancel := th.TestContext()
 	defer cancel()
@@ -147,25 +181,33 @@ func TestConfig_CreateDomainCheckerComplex(t *testing.T) {
 	resolver.LookupIPAddrMock.When(ctx, "ok.test.com").Then([]net.IPAddr{{IP: net.ParseIP("1.2.3.4")}}, nil)
 	resolver.LookupIPAddrMock.When(ctx, "bad.ru").Then([]net.IPAddr{{IP: net.ParseIP("127.0.0.1")}}, nil)
 	resolver.LookupIPAddrMock.When(ctx, "ok.ru").Then([]net.IPAddr{{IP: net.ParseIP("1.2.3.4")}}, nil)
+	resolver.LookupIPAddrMock.When(ctx, "whitelist").Then([]net.IPAddr{{IP: net.ParseIP("3.3.3.3")}}, nil)
 	resolver.LookupIPAddrMock.When(ctx, "unknown").Then(nil, errors.New("unknown domain"))
 
 	cfg := Config{
-		BlackList: `.*\.com`,
-		WhiteList: `(.*\.)?test\.com`,
-		SelfIP:    true,
+		BlackList:   `.*\.com`,
+		WhiteList:   `(.*\.)?test\.com`,
+		IPSelf:      true,
+		IPWhiteList: "2.3.4.5,3.3.3.3",
 	}
 
 	checker, err := cfg.CreateDomainChecker(ctx)
 	td.CmpNoError(err)
-	ipList := checker.(All)[1].(*IPList)
 
-	ipList.mu.Lock()
-	ipList.Resolver = resolver
-	ipList.Addresses = func(ctx context.Context) (ips []net.IP, e error) {
+	selfIpList := checker.(All)[1].(Any)[0].(*IPList)
+	selfIpList.mu.Lock()
+	selfIpList.Resolver = resolver
+	selfIpList.Addresses = func(ctx context.Context) (ips []net.IP, e error) {
 		return []net.IP{net.ParseIP("1.2.3.4")}, nil
 	}
-	ipList.mu.Unlock()
-	ipList.updateIPs()
+	selfIpList.mu.Unlock()
+	selfIpList.updateIPs()
+
+	whiteIpList := checker.(All)[1].(Any)[1].(*IPList)
+	whiteIpList.mu.Lock()
+	whiteIpList.Resolver = resolver
+	whiteIpList.mu.Unlock()
+	whiteIpList.updateIPs()
 
 	res, err := checker.IsDomainAllowed(ctx, "any.com")
 	td.False(res)
@@ -184,6 +226,10 @@ func TestConfig_CreateDomainCheckerComplex(t *testing.T) {
 	td.CmpNoError(err)
 
 	res, err = checker.IsDomainAllowed(ctx, "ok.ru")
+	td.True(res)
+	td.CmpNoError(err)
+
+	res, err = checker.IsDomainAllowed(ctx, "whitelist")
 	td.True(res)
 	td.CmpNoError(err)
 
