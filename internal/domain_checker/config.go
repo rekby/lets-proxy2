@@ -1,3 +1,4 @@
+//nolint:golint
 package domain_checker
 
 import (
@@ -12,10 +13,10 @@ import (
 )
 
 type Config struct {
-	IPSelf      bool   `default:"true",comment:"Allow domain if it resolver for one of public IPs of this server."`
-	IPWhiteList string `default:"",comment:"Allow domain if it resolver for one of the ips."`
-	BlackList   string `default:"",comment:"Regexp in golang syntax of blacklisted domain for issue certificate.\nThis list overrided by whitelist."`
-	WhiteList   string `default:"",comment:"Regexp in golang syntax of whitelist domains for issue certificate.\nWhitelist need for allow part of domains, which excluded by blacklist.\n"`
+	IPSelf      bool   `default:"true" comment:"Allow domain if it resolver for one of public IPs of this server."`
+	IPWhiteList string `default:"" comment:"Allow domain if it resolver for one of the ips."`
+	BlackList   string `default:"" comment:"Regexp in golang syntax of blacklisted domain for issue certificate.\nThis list overrided by whitelist."`
+	WhiteList   string `default:"" comment:"Regexp in golang syntax of whitelist domains for issue certificate.\nWhitelist need for allow part of domains, which excluded by blacklist.\n"`
 }
 
 func (c *Config) CreateDomainChecker(ctx context.Context) (DomainChecker, error) {
@@ -58,7 +59,7 @@ func (c *Config) CreateDomainChecker(ctx context.Context) (DomainChecker, error)
 		whiteIpList := NewIPList(ctx, func(ctx context.Context) ([]net.IP, error) {
 			return ips, nil
 		})
-		// ipList.StartAutoRenew() - doesn't need renew, becouse list static
+		// ipList.StartAutoRenew() - doesn't need renew, because list static
 		ipCheckers = append(ipCheckers, whiteIpList)
 	}
 

@@ -1,3 +1,4 @@
+//nolint:golint
 package domain_checker
 
 import (
@@ -152,12 +153,12 @@ func TestConfig_CreateDomainCheckerWhitelist(t *testing.T) {
 
 	checker, err := cfg.CreateDomainChecker(ctx)
 	td.CmpNoError(err)
-	whiteIpList := checker.(All)[1].(Any)[0].(*IPList)
+	whiteIPList := checker.(All)[1].(Any)[0].(*IPList)
 
-	whiteIpList.mu.Lock()
-	whiteIpList.Resolver = resolver
-	whiteIpList.mu.Unlock()
-	whiteIpList.updateIPs()
+	whiteIPList.mu.Lock()
+	whiteIPList.Resolver = resolver
+	whiteIPList.mu.Unlock()
+	whiteIPList.updateIPs()
 
 	res, err := checker.IsDomainAllowed(ctx, "whitelist")
 	td.True(res)
@@ -194,20 +195,20 @@ func TestConfig_CreateDomainCheckerComplex(t *testing.T) {
 	checker, err := cfg.CreateDomainChecker(ctx)
 	td.CmpNoError(err)
 
-	selfIpList := checker.(All)[1].(Any)[0].(*IPList)
-	selfIpList.mu.Lock()
-	selfIpList.Resolver = resolver
-	selfIpList.Addresses = func(ctx context.Context) (ips []net.IP, e error) {
+	selfIPList := checker.(All)[1].(Any)[0].(*IPList)
+	selfIPList.mu.Lock()
+	selfIPList.Resolver = resolver
+	selfIPList.Addresses = func(ctx context.Context) (ips []net.IP, e error) {
 		return []net.IP{net.ParseIP("1.2.3.4")}, nil
 	}
-	selfIpList.mu.Unlock()
-	selfIpList.updateIPs()
+	selfIPList.mu.Unlock()
+	selfIPList.updateIPs()
 
-	whiteIpList := checker.(All)[1].(Any)[1].(*IPList)
-	whiteIpList.mu.Lock()
-	whiteIpList.Resolver = resolver
-	whiteIpList.mu.Unlock()
-	whiteIpList.updateIPs()
+	whiteIPList := checker.(All)[1].(Any)[1].(*IPList)
+	whiteIPList.mu.Lock()
+	whiteIPList.Resolver = resolver
+	whiteIPList.mu.Unlock()
+	whiteIPList.updateIPs()
 
 	res, err := checker.IsDomainAllowed(ctx, "any.com")
 	td.False(res)
