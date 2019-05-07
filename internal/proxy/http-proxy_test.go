@@ -13,51 +13,11 @@ import (
 
 	"github.com/gojuno/minimock"
 
-	zc "github.com/rekby/zapcontext"
-	"go.uber.org/zap"
-
 	"github.com/maxatome/go-testdeep"
+	zc "github.com/rekby/zapcontext"
 
 	"github.com/rekby/lets-proxy2/internal/th"
 )
-
-func TestGetDestination(t *testing.T) {
-	ctx, flush := th.TestContext()
-	defer flush()
-
-	var dest string
-	var err error
-
-	td := testdeep.NewT(t)
-
-	dest, err = getDestination(ctx, "127.0.0.1:443")
-	td.String(dest, "127.0.0.1:80")
-	td.CmpNoError(err)
-
-	dest, err = getDestination(ctx, "127.0.0.1:444")
-	td.String(dest, "127.0.0.1:80")
-	td.CmpNoError(err)
-
-	dest, err = getDestination(ctx, "127.0.0.2:443")
-	td.String(dest, "127.0.0.2:80")
-	td.CmpNoError(err)
-
-	dest, err = getDestination(ctx, "127.0.0.2")
-	td.String(dest, "")
-	td.CmpError(err)
-}
-
-func TestHttpProxy_SetTransport(t *testing.T) {
-	td := testdeep.NewT(t)
-
-	proxy := HTTPProxy{}
-	transport := NewRoundTripperMock(t)
-	proxy.SetTransport(transport)
-
-	td.CmpDeeply(proxy.httpReverseProxy.Transport, transport)
-	transport.MinimockFinish()
-
-}
 
 func TestHttpProxy_HandleHttpValidationDefault(t *testing.T) {
 	ctx, flush := th.TestContext()
@@ -91,23 +51,9 @@ func TestHttpProxy_getContextDefault(t *testing.T) {
 	td.CmpNoError(err)
 }
 
-func TestHttpProxy_Director(t *testing.T) {
-	ctx, flush := th.TestContext()
-	defer flush()
-
-	var req *http.Request
-	td := testdeep.NewT(t)
-	proxy := HTTPProxy{}
-	proxy.GetContext = func(req *http.Request) (context.Context, error) {
-		return zc.WithLogger(ctx, zap.NewNop()), nil
-	}
-	proxy.GetDestination = func(ctx context.Context, remoteAddr string) (addr string, err error) {
-		return "1.2.3.4:80", err
-	}
-
-	req = &http.Request{}
-	proxy.director(req)
-	td.CmpDeeply(req, &http.Request{URL: &url.URL{Host: "1.2.3.4:80", Scheme: "http"}})
+type HttpProxyTest interface {
+	GetContext(req *http.Request) (context.Context, error)
+	HandleHTTPValidation(w http.ResponseWriter, r *http.Request) bool
 }
 
 func TestNewHttpProxy(t *testing.T) {
@@ -146,7 +92,7 @@ func TestNewHttpProxy(t *testing.T) {
 	proxyTest.GetContextMock.Set(func(req *http.Request) (c1 context.Context, err2 error) {
 		return ctx, nil
 	})
-	proxyTest.HandleHttpValidationMock.Set(func(w http.ResponseWriter, r *http.Request) (b1 bool) {
+	proxyTest.HandleHTTPValidationMock.Set(func(w http.ResponseWriter, r *http.Request) (b1 bool) {
 		if strings.HasPrefix(r.URL.Path, "/asdf") {
 			w.WriteHeader(http.StatusAccepted)
 			_, _ = w.Write([]byte{3, 4})
@@ -155,12 +101,21 @@ func TestNewHttpProxy(t *testing.T) {
 		return false
 	})
 
+	directorMock := NewDirectorMock(mc)
+	directorMock.DirectorMock.Set(func(request *http.Request) {
+		if request.URL == nil {
+			request.URL = &url.URL{}
+		}
+		request.URL.Scheme = "http"
+		request.URL.Host = listener.Addr().String()
+	})
+
 	proxy := NewHTTPProxy(ctx, listener)
 	proxy.GetContext = proxyTest.GetContext
-	proxy.GetDestination = proxyTest.GetDestination
-	proxy.HandleHTTPValidation = proxyTest.HandleHttpValidation
-	proxy.SetTransport(transport)
-	proxyTest.GetDestinationMock.Return("1.2.3.4:80", nil)
+	proxy.Director = directorMock
+	proxy.HandleHTTPValidation = proxyTest.HandleHTTPValidation
+	proxy.HttpTransport = transport
+	go func() { _ = proxy.Start() }()
 
 	//nolint:gosec
 	resp, err = http.Get(prefix)

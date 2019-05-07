@@ -91,9 +91,12 @@ func startProgram(config *configType) {
 		return tlsListener.GetConnectionContext(req.RemoteAddr, localAddr.String())
 	}
 
-	// work in background
-	var a chan struct{}
-	<-a
+	err = p.Start()
+	var effectiveError = err
+	if effectiveError == http.ErrServerClosed {
+		effectiveError = nil
+	}
+	log.DebugErrorCtx(ctx, effectiveError, "Handle request stopped")
 }
 
 func createHTTPSListeners(ctx context.Context, bindings string) (res []net.Listener) {

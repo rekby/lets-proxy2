@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/rekby/lets-proxy2/internal/contextlabel"
+
 	"golang.org/x/crypto/acme"
 
 	"github.com/rekby/lets-proxy2/internal/log"
@@ -145,8 +147,9 @@ func (p *ListenersHandler) registerConnection(conn net.Conn) ContextConnextion {
 
 	ctx, exist := p.connectionsContext[key]
 	if !exist {
-		connectionUUID := uuid.NewV4()
-		logger := p.logger.With(zap.String("connection_id", connectionUUID.String()))
+		connectionUUID := uuid.NewV4().String()
+		logger := p.logger.With(zap.String("connection_id", connectionUUID))
+		ctx = context.WithValue(ctx, contextlabel.ConnectionID, connectionUUID)
 		ctx = zc.WithLogger(p.ctx, logger)
 		p.connectionsContext[key] = ctx
 	}
