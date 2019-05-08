@@ -5,6 +5,8 @@ import (
 	"context"
 	"io/ioutil"
 
+	"github.com/rekby/lets-proxy2/internal/proxy"
+
 	"github.com/rekby/lets-proxy2/internal/domain_checker"
 
 	"github.com/rekby/lets-proxy2/internal/log"
@@ -21,6 +23,7 @@ type configType struct {
 	StorageDir             string `default:"storage" comment:"Path to dir, which will store state and certificates"`
 	AcmeServer             string `default:"https://acme-v01.api.letsencrypt.org/directory" comment:"Directory url of acme server.\nTest server: https://acme-staging-v02.api.letsencrypt.org/directory"`
 	Log                    logConfig
+	Proxy                  proxy.Config
 	CheckDomains           domain_checker.Config
 }
 
@@ -80,7 +83,7 @@ func readConfig(ctx context.Context, file string) (configType, error) {
 	if file == "" {
 		logger.Info("Use default config.")
 		// Workaround https://github.com/pelletier/go-toml/issues/274
-		fileBytes = []byte("[Log]\n[CheckDomains]")
+		fileBytes = []byte("[Log]\n[CheckDomains]\n[Proxy]")
 	} else {
 		fileBytes, err = ioutil.ReadFile(file)
 	}

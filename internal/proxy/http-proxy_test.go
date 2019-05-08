@@ -51,7 +51,9 @@ func TestHttpProxy_getContextDefault(t *testing.T) {
 	td.CmpNoError(err)
 }
 
-type HttpProxyTest interface {
+// nolint:unused
+// need for mock generator
+type HTTPProxyTest interface {
 	GetContext(req *http.Request) (context.Context, error)
 	HandleHTTPValidation(w http.ResponseWriter, r *http.Request) bool
 }
@@ -88,7 +90,7 @@ func TestNewHttpProxy(t *testing.T) {
 		return respRecorder.Result(), nil
 	})
 
-	proxyTest := NewHttpProxyTestMock(mc)
+	proxyTest := NewHTTPProxyTestMock(mc)
 	proxyTest.GetContextMock.Set(func(req *http.Request) (c1 context.Context, err2 error) {
 		return ctx, nil
 	})
@@ -106,7 +108,7 @@ func TestNewHttpProxy(t *testing.T) {
 		if request.URL == nil {
 			request.URL = &url.URL{}
 		}
-		request.URL.Scheme = "http"
+		request.URL.Scheme = ProtocolHTTP
 		request.URL.Host = listener.Addr().String()
 	})
 
@@ -114,7 +116,7 @@ func TestNewHttpProxy(t *testing.T) {
 	proxy.GetContext = proxyTest.GetContext
 	proxy.Director = directorMock
 	proxy.HandleHTTPValidation = proxyTest.HandleHTTPValidation
-	proxy.HttpTransport = transport
+	proxy.HTTPTransport = transport
 	go func() { _ = proxy.Start() }()
 
 	//nolint:gosec

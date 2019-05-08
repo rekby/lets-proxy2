@@ -19,8 +19,7 @@ func TestDirectorChain(t *testing.T) {
 	mc := minimock.NewController(t)
 	defer mc.Finish()
 
-	var chain DirectorChain
-	chain = NewDirectorChain()
+	var chain = NewDirectorChain()
 	req := &http.Request{}
 	chain.Director(req)
 
@@ -100,6 +99,7 @@ func TestDirectorSetHeaders(t *testing.T) {
 		"TestPort":         "{{SOURCE_PORT}}",
 		"TestIPPort":       "{{SOURCE_IP}}:{{SOURCE_PORT}}",
 		"TestVal":          "ddd",
+		"TestProtocol":     "{{HTTP_PROTO}}",
 	}
 
 	d := NewDirectorSetHeaders(m)
@@ -114,4 +114,17 @@ func TestDirectorSetHeaders(t *testing.T) {
 	td.CmpDeeply(req.Header.Get("TestPort"), "881")
 	td.CmpDeeply(req.Header.Get("TestIPPort"), "1.2.3.4:881")
 	td.CmpDeeply(req.Header.Get("TestVal"), "ddd")
+	td.CmpDeeply(req.Header.Get("TestProtocol"), "error protocol detection")
+
+	req = &http.Request{RemoteAddr: "1.2.3.4:881"}
+	ctx = context.WithValue(ctx, contextlabel.TLSConnection, true)
+	req = req.WithContext(ctx)
+	d.Director(req)
+	td.CmpDeeply(req.Header.Get("TestProtocol"), "https")
+
+	req = &http.Request{RemoteAddr: "1.2.3.4:881"}
+	ctx = context.WithValue(ctx, contextlabel.TLSConnection, false)
+	req = req.WithContext(ctx)
+	d.Director(req)
+	td.CmpDeeply(req.Header.Get("TestProtocol"), "http")
 }

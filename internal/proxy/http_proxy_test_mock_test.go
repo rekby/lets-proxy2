@@ -3,7 +3,7 @@ package proxy
 // DO NOT EDIT!
 // The code below was generated with http://github.com/gojuno/minimock (dev)
 
-//go:generate minimock -i github.com/rekby/lets-proxy2/internal/proxy.HttpProxyTest -o ./http_proxy_test_mock_test.go
+//go:generate minimock -i github.com/rekby/lets-proxy2/internal/proxy.HTTPProxyTest -o ./http_proxy_test_mock_test.go
 
 import (
 	"sync/atomic"
@@ -16,69 +16,69 @@ import (
 	"github.com/gojuno/minimock"
 )
 
-// HttpProxyTestMock implements HttpProxyTest
-type HttpProxyTestMock struct {
+// HTTPProxyTestMock implements HTTPProxyTest
+type HTTPProxyTestMock struct {
 	t minimock.Tester
 
 	funcGetContext          func(req *http.Request) (c1 context.Context, err error)
 	afterGetContextCounter  uint64
 	beforeGetContextCounter uint64
-	GetContextMock          mHttpProxyTestMockGetContext
+	GetContextMock          mHTTPProxyTestMockGetContext
 
 	funcHandleHTTPValidation          func(w http.ResponseWriter, r *http.Request) (b1 bool)
 	afterHandleHTTPValidationCounter  uint64
 	beforeHandleHTTPValidationCounter uint64
-	HandleHTTPValidationMock          mHttpProxyTestMockHandleHTTPValidation
+	HandleHTTPValidationMock          mHTTPProxyTestMockHandleHTTPValidation
 }
 
-// NewHttpProxyTestMock returns a mock for HttpProxyTest
-func NewHttpProxyTestMock(t minimock.Tester) *HttpProxyTestMock {
-	m := &HttpProxyTestMock{t: t}
+// NewHTTPProxyTestMock returns a mock for HTTPProxyTest
+func NewHTTPProxyTestMock(t minimock.Tester) *HTTPProxyTestMock {
+	m := &HTTPProxyTestMock{t: t}
 	if controller, ok := t.(minimock.MockController); ok {
 		controller.RegisterMocker(m)
 	}
-	m.GetContextMock = mHttpProxyTestMockGetContext{mock: m}
-	m.HandleHTTPValidationMock = mHttpProxyTestMockHandleHTTPValidation{mock: m}
+	m.GetContextMock = mHTTPProxyTestMockGetContext{mock: m}
+	m.HandleHTTPValidationMock = mHTTPProxyTestMockHandleHTTPValidation{mock: m}
 
 	return m
 }
 
-type mHttpProxyTestMockGetContext struct {
-	mock               *HttpProxyTestMock
-	defaultExpectation *HttpProxyTestMockGetContextExpectation
-	expectations       []*HttpProxyTestMockGetContextExpectation
+type mHTTPProxyTestMockGetContext struct {
+	mock               *HTTPProxyTestMock
+	defaultExpectation *HTTPProxyTestMockGetContextExpectation
+	expectations       []*HTTPProxyTestMockGetContextExpectation
 }
 
-// HttpProxyTestMockGetContextExpectation specifies expectation struct of the HttpProxyTest.GetContext
-type HttpProxyTestMockGetContextExpectation struct {
-	mock    *HttpProxyTestMock
-	params  *HttpProxyTestMockGetContextParams
-	results *HttpProxyTestMockGetContextResults
+// HTTPProxyTestMockGetContextExpectation specifies expectation struct of the HTTPProxyTest.GetContext
+type HTTPProxyTestMockGetContextExpectation struct {
+	mock    *HTTPProxyTestMock
+	params  *HTTPProxyTestMockGetContextParams
+	results *HTTPProxyTestMockGetContextResults
 	Counter uint64
 }
 
-// HttpProxyTestMockGetContextParams contains parameters of the HttpProxyTest.GetContext
-type HttpProxyTestMockGetContextParams struct {
+// HTTPProxyTestMockGetContextParams contains parameters of the HTTPProxyTest.GetContext
+type HTTPProxyTestMockGetContextParams struct {
 	req *http.Request
 }
 
-// HttpProxyTestMockGetContextResults contains results of the HttpProxyTest.GetContext
-type HttpProxyTestMockGetContextResults struct {
+// HTTPProxyTestMockGetContextResults contains results of the HTTPProxyTest.GetContext
+type HTTPProxyTestMockGetContextResults struct {
 	c1  context.Context
 	err error
 }
 
-// Expect sets up expected params for HttpProxyTest.GetContext
-func (m *mHttpProxyTestMockGetContext) Expect(req *http.Request) *mHttpProxyTestMockGetContext {
+// Expect sets up expected params for HTTPProxyTest.GetContext
+func (m *mHTTPProxyTestMockGetContext) Expect(req *http.Request) *mHTTPProxyTestMockGetContext {
 	if m.mock.funcGetContext != nil {
-		m.mock.t.Fatalf("HttpProxyTestMock.GetContext mock is already set by Set")
+		m.mock.t.Fatalf("HTTPProxyTestMock.GetContext mock is already set by Set")
 	}
 
 	if m.defaultExpectation == nil {
-		m.defaultExpectation = &HttpProxyTestMockGetContextExpectation{}
+		m.defaultExpectation = &HTTPProxyTestMockGetContextExpectation{}
 	}
 
-	m.defaultExpectation.params = &HttpProxyTestMockGetContextParams{req}
+	m.defaultExpectation.params = &HTTPProxyTestMockGetContextParams{req}
 	for _, e := range m.expectations {
 		if minimock.Equal(e.params, m.defaultExpectation.params) {
 			m.mock.t.Fatalf("Expectation set by When has same params: %#v", *m.defaultExpectation.params)
@@ -88,61 +88,61 @@ func (m *mHttpProxyTestMockGetContext) Expect(req *http.Request) *mHttpProxyTest
 	return m
 }
 
-// Return sets up results that will be returned by HttpProxyTest.GetContext
-func (m *mHttpProxyTestMockGetContext) Return(c1 context.Context, err error) *HttpProxyTestMock {
+// Return sets up results that will be returned by HTTPProxyTest.GetContext
+func (m *mHTTPProxyTestMockGetContext) Return(c1 context.Context, err error) *HTTPProxyTestMock {
 	if m.mock.funcGetContext != nil {
-		m.mock.t.Fatalf("HttpProxyTestMock.GetContext mock is already set by Set")
+		m.mock.t.Fatalf("HTTPProxyTestMock.GetContext mock is already set by Set")
 	}
 
 	if m.defaultExpectation == nil {
-		m.defaultExpectation = &HttpProxyTestMockGetContextExpectation{mock: m.mock}
+		m.defaultExpectation = &HTTPProxyTestMockGetContextExpectation{mock: m.mock}
 	}
-	m.defaultExpectation.results = &HttpProxyTestMockGetContextResults{c1, err}
+	m.defaultExpectation.results = &HTTPProxyTestMockGetContextResults{c1, err}
 	return m.mock
 }
 
-//Set uses given function f to mock the HttpProxyTest.GetContext method
-func (m *mHttpProxyTestMockGetContext) Set(f func(req *http.Request) (c1 context.Context, err error)) *HttpProxyTestMock {
+//Set uses given function f to mock the HTTPProxyTest.GetContext method
+func (m *mHTTPProxyTestMockGetContext) Set(f func(req *http.Request) (c1 context.Context, err error)) *HTTPProxyTestMock {
 	if m.defaultExpectation != nil {
-		m.mock.t.Fatalf("Default expectation is already set for the HttpProxyTest.GetContext method")
+		m.mock.t.Fatalf("Default expectation is already set for the HTTPProxyTest.GetContext method")
 	}
 
 	if len(m.expectations) > 0 {
-		m.mock.t.Fatalf("Some expectations are already set for the HttpProxyTest.GetContext method")
+		m.mock.t.Fatalf("Some expectations are already set for the HTTPProxyTest.GetContext method")
 	}
 
 	m.mock.funcGetContext = f
 	return m.mock
 }
 
-// When sets expectation for the HttpProxyTest.GetContext which will trigger the result defined by the following
+// When sets expectation for the HTTPProxyTest.GetContext which will trigger the result defined by the following
 // Then helper
-func (m *mHttpProxyTestMockGetContext) When(req *http.Request) *HttpProxyTestMockGetContextExpectation {
+func (m *mHTTPProxyTestMockGetContext) When(req *http.Request) *HTTPProxyTestMockGetContextExpectation {
 	if m.mock.funcGetContext != nil {
-		m.mock.t.Fatalf("HttpProxyTestMock.GetContext mock is already set by Set")
+		m.mock.t.Fatalf("HTTPProxyTestMock.GetContext mock is already set by Set")
 	}
 
-	expectation := &HttpProxyTestMockGetContextExpectation{
+	expectation := &HTTPProxyTestMockGetContextExpectation{
 		mock:   m.mock,
-		params: &HttpProxyTestMockGetContextParams{req},
+		params: &HTTPProxyTestMockGetContextParams{req},
 	}
 	m.expectations = append(m.expectations, expectation)
 	return expectation
 }
 
-// Then sets up HttpProxyTest.GetContext return parameters for the expectation previously defined by the When method
-func (e *HttpProxyTestMockGetContextExpectation) Then(c1 context.Context, err error) *HttpProxyTestMock {
-	e.results = &HttpProxyTestMockGetContextResults{c1, err}
+// Then sets up HTTPProxyTest.GetContext return parameters for the expectation previously defined by the When method
+func (e *HTTPProxyTestMockGetContextExpectation) Then(c1 context.Context, err error) *HTTPProxyTestMock {
+	e.results = &HTTPProxyTestMockGetContextResults{c1, err}
 	return e.mock
 }
 
-// GetContext implements HttpProxyTest
-func (m *HttpProxyTestMock) GetContext(req *http.Request) (c1 context.Context, err error) {
+// GetContext implements HTTPProxyTest
+func (m *HTTPProxyTestMock) GetContext(req *http.Request) (c1 context.Context, err error) {
 	atomic.AddUint64(&m.beforeGetContextCounter, 1)
 	defer atomic.AddUint64(&m.afterGetContextCounter, 1)
 
 	for _, e := range m.GetContextMock.expectations {
-		if minimock.Equal(*e.params, HttpProxyTestMockGetContextParams{req}) {
+		if minimock.Equal(*e.params, HTTPProxyTestMockGetContextParams{req}) {
 			atomic.AddUint64(&e.Counter, 1)
 			return e.results.c1, e.results.err
 		}
@@ -151,37 +151,37 @@ func (m *HttpProxyTestMock) GetContext(req *http.Request) (c1 context.Context, e
 	if m.GetContextMock.defaultExpectation != nil {
 		atomic.AddUint64(&m.GetContextMock.defaultExpectation.Counter, 1)
 		want := m.GetContextMock.defaultExpectation.params
-		got := HttpProxyTestMockGetContextParams{req}
+		got := HTTPProxyTestMockGetContextParams{req}
 		if want != nil && !minimock.Equal(*want, got) {
-			m.t.Errorf("HttpProxyTestMock.GetContext got unexpected parameters, want: %#v, got: %#v%s\n", *want, got, minimock.Diff(*want, got))
+			m.t.Errorf("HTTPProxyTestMock.GetContext got unexpected parameters, want: %#v, got: %#v%s\n", *want, got, minimock.Diff(*want, got))
 		}
 
 		results := m.GetContextMock.defaultExpectation.results
 		if results == nil {
-			m.t.Fatal("No results are set for the HttpProxyTestMock.GetContext")
+			m.t.Fatal("No results are set for the HTTPProxyTestMock.GetContext")
 		}
 		return (*results).c1, (*results).err
 	}
 	if m.funcGetContext != nil {
 		return m.funcGetContext(req)
 	}
-	m.t.Fatalf("Unexpected call to HttpProxyTestMock.GetContext. %v", req)
+	m.t.Fatalf("Unexpected call to HTTPProxyTestMock.GetContext. %v", req)
 	return
 }
 
-// GetContextAfterCounter returns a count of finished HttpProxyTestMock.GetContext invocations
-func (m *HttpProxyTestMock) GetContextAfterCounter() uint64 {
+// GetContextAfterCounter returns a count of finished HTTPProxyTestMock.GetContext invocations
+func (m *HTTPProxyTestMock) GetContextAfterCounter() uint64 {
 	return atomic.LoadUint64(&m.afterGetContextCounter)
 }
 
-// GetContextBeforeCounter returns a count of HttpProxyTestMock.GetContext invocations
-func (m *HttpProxyTestMock) GetContextBeforeCounter() uint64 {
+// GetContextBeforeCounter returns a count of HTTPProxyTestMock.GetContext invocations
+func (m *HTTPProxyTestMock) GetContextBeforeCounter() uint64 {
 	return atomic.LoadUint64(&m.beforeGetContextCounter)
 }
 
 // MinimockGetContextDone returns true if the count of the GetContext invocations corresponds
 // the number of defined expectations
-func (m *HttpProxyTestMock) MinimockGetContextDone() bool {
+func (m *HTTPProxyTestMock) MinimockGetContextDone() bool {
 	for _, e := range m.GetContextMock.expectations {
 		if atomic.LoadUint64(&e.Counter) < 1 {
 			return false
@@ -200,59 +200,59 @@ func (m *HttpProxyTestMock) MinimockGetContextDone() bool {
 }
 
 // MinimockGetContextInspect logs each unmet expectation
-func (m *HttpProxyTestMock) MinimockGetContextInspect() {
+func (m *HTTPProxyTestMock) MinimockGetContextInspect() {
 	for _, e := range m.GetContextMock.expectations {
 		if atomic.LoadUint64(&e.Counter) < 1 {
-			m.t.Errorf("Expected call to HttpProxyTestMock.GetContext with params: %#v", *e.params)
+			m.t.Errorf("Expected call to HTTPProxyTestMock.GetContext with params: %#v", *e.params)
 		}
 	}
 
 	// if default expectation was set then invocations count should be greater than zero
 	if m.GetContextMock.defaultExpectation != nil && atomic.LoadUint64(&m.afterGetContextCounter) < 1 {
-		m.t.Errorf("Expected call to HttpProxyTestMock.GetContext with params: %#v", *m.GetContextMock.defaultExpectation.params)
+		m.t.Errorf("Expected call to HTTPProxyTestMock.GetContext with params: %#v", *m.GetContextMock.defaultExpectation.params)
 	}
 	// if func was set then invocations count should be greater than zero
 	if m.funcGetContext != nil && atomic.LoadUint64(&m.afterGetContextCounter) < 1 {
-		m.t.Error("Expected call to HttpProxyTestMock.GetContext")
+		m.t.Error("Expected call to HTTPProxyTestMock.GetContext")
 	}
 }
 
-type mHttpProxyTestMockHandleHTTPValidation struct {
-	mock               *HttpProxyTestMock
-	defaultExpectation *HttpProxyTestMockHandleHTTPValidationExpectation
-	expectations       []*HttpProxyTestMockHandleHTTPValidationExpectation
+type mHTTPProxyTestMockHandleHTTPValidation struct {
+	mock               *HTTPProxyTestMock
+	defaultExpectation *HTTPProxyTestMockHandleHTTPValidationExpectation
+	expectations       []*HTTPProxyTestMockHandleHTTPValidationExpectation
 }
 
-// HttpProxyTestMockHandleHTTPValidationExpectation specifies expectation struct of the HttpProxyTest.HandleHTTPValidation
-type HttpProxyTestMockHandleHTTPValidationExpectation struct {
-	mock    *HttpProxyTestMock
-	params  *HttpProxyTestMockHandleHTTPValidationParams
-	results *HttpProxyTestMockHandleHTTPValidationResults
+// HTTPProxyTestMockHandleHTTPValidationExpectation specifies expectation struct of the HTTPProxyTest.HandleHTTPValidation
+type HTTPProxyTestMockHandleHTTPValidationExpectation struct {
+	mock    *HTTPProxyTestMock
+	params  *HTTPProxyTestMockHandleHTTPValidationParams
+	results *HTTPProxyTestMockHandleHTTPValidationResults
 	Counter uint64
 }
 
-// HttpProxyTestMockHandleHTTPValidationParams contains parameters of the HttpProxyTest.HandleHTTPValidation
-type HttpProxyTestMockHandleHTTPValidationParams struct {
+// HTTPProxyTestMockHandleHTTPValidationParams contains parameters of the HTTPProxyTest.HandleHTTPValidation
+type HTTPProxyTestMockHandleHTTPValidationParams struct {
 	w http.ResponseWriter
 	r *http.Request
 }
 
-// HttpProxyTestMockHandleHTTPValidationResults contains results of the HttpProxyTest.HandleHTTPValidation
-type HttpProxyTestMockHandleHTTPValidationResults struct {
+// HTTPProxyTestMockHandleHTTPValidationResults contains results of the HTTPProxyTest.HandleHTTPValidation
+type HTTPProxyTestMockHandleHTTPValidationResults struct {
 	b1 bool
 }
 
-// Expect sets up expected params for HttpProxyTest.HandleHTTPValidation
-func (m *mHttpProxyTestMockHandleHTTPValidation) Expect(w http.ResponseWriter, r *http.Request) *mHttpProxyTestMockHandleHTTPValidation {
+// Expect sets up expected params for HTTPProxyTest.HandleHTTPValidation
+func (m *mHTTPProxyTestMockHandleHTTPValidation) Expect(w http.ResponseWriter, r *http.Request) *mHTTPProxyTestMockHandleHTTPValidation {
 	if m.mock.funcHandleHTTPValidation != nil {
-		m.mock.t.Fatalf("HttpProxyTestMock.HandleHTTPValidation mock is already set by Set")
+		m.mock.t.Fatalf("HTTPProxyTestMock.HandleHTTPValidation mock is already set by Set")
 	}
 
 	if m.defaultExpectation == nil {
-		m.defaultExpectation = &HttpProxyTestMockHandleHTTPValidationExpectation{}
+		m.defaultExpectation = &HTTPProxyTestMockHandleHTTPValidationExpectation{}
 	}
 
-	m.defaultExpectation.params = &HttpProxyTestMockHandleHTTPValidationParams{w, r}
+	m.defaultExpectation.params = &HTTPProxyTestMockHandleHTTPValidationParams{w, r}
 	for _, e := range m.expectations {
 		if minimock.Equal(e.params, m.defaultExpectation.params) {
 			m.mock.t.Fatalf("Expectation set by When has same params: %#v", *m.defaultExpectation.params)
@@ -262,61 +262,61 @@ func (m *mHttpProxyTestMockHandleHTTPValidation) Expect(w http.ResponseWriter, r
 	return m
 }
 
-// Return sets up results that will be returned by HttpProxyTest.HandleHTTPValidation
-func (m *mHttpProxyTestMockHandleHTTPValidation) Return(b1 bool) *HttpProxyTestMock {
+// Return sets up results that will be returned by HTTPProxyTest.HandleHTTPValidation
+func (m *mHTTPProxyTestMockHandleHTTPValidation) Return(b1 bool) *HTTPProxyTestMock {
 	if m.mock.funcHandleHTTPValidation != nil {
-		m.mock.t.Fatalf("HttpProxyTestMock.HandleHTTPValidation mock is already set by Set")
+		m.mock.t.Fatalf("HTTPProxyTestMock.HandleHTTPValidation mock is already set by Set")
 	}
 
 	if m.defaultExpectation == nil {
-		m.defaultExpectation = &HttpProxyTestMockHandleHTTPValidationExpectation{mock: m.mock}
+		m.defaultExpectation = &HTTPProxyTestMockHandleHTTPValidationExpectation{mock: m.mock}
 	}
-	m.defaultExpectation.results = &HttpProxyTestMockHandleHTTPValidationResults{b1}
+	m.defaultExpectation.results = &HTTPProxyTestMockHandleHTTPValidationResults{b1}
 	return m.mock
 }
 
-//Set uses given function f to mock the HttpProxyTest.HandleHTTPValidation method
-func (m *mHttpProxyTestMockHandleHTTPValidation) Set(f func(w http.ResponseWriter, r *http.Request) (b1 bool)) *HttpProxyTestMock {
+//Set uses given function f to mock the HTTPProxyTest.HandleHTTPValidation method
+func (m *mHTTPProxyTestMockHandleHTTPValidation) Set(f func(w http.ResponseWriter, r *http.Request) (b1 bool)) *HTTPProxyTestMock {
 	if m.defaultExpectation != nil {
-		m.mock.t.Fatalf("Default expectation is already set for the HttpProxyTest.HandleHTTPValidation method")
+		m.mock.t.Fatalf("Default expectation is already set for the HTTPProxyTest.HandleHTTPValidation method")
 	}
 
 	if len(m.expectations) > 0 {
-		m.mock.t.Fatalf("Some expectations are already set for the HttpProxyTest.HandleHTTPValidation method")
+		m.mock.t.Fatalf("Some expectations are already set for the HTTPProxyTest.HandleHTTPValidation method")
 	}
 
 	m.mock.funcHandleHTTPValidation = f
 	return m.mock
 }
 
-// When sets expectation for the HttpProxyTest.HandleHTTPValidation which will trigger the result defined by the following
+// When sets expectation for the HTTPProxyTest.HandleHTTPValidation which will trigger the result defined by the following
 // Then helper
-func (m *mHttpProxyTestMockHandleHTTPValidation) When(w http.ResponseWriter, r *http.Request) *HttpProxyTestMockHandleHTTPValidationExpectation {
+func (m *mHTTPProxyTestMockHandleHTTPValidation) When(w http.ResponseWriter, r *http.Request) *HTTPProxyTestMockHandleHTTPValidationExpectation {
 	if m.mock.funcHandleHTTPValidation != nil {
-		m.mock.t.Fatalf("HttpProxyTestMock.HandleHTTPValidation mock is already set by Set")
+		m.mock.t.Fatalf("HTTPProxyTestMock.HandleHTTPValidation mock is already set by Set")
 	}
 
-	expectation := &HttpProxyTestMockHandleHTTPValidationExpectation{
+	expectation := &HTTPProxyTestMockHandleHTTPValidationExpectation{
 		mock:   m.mock,
-		params: &HttpProxyTestMockHandleHTTPValidationParams{w, r},
+		params: &HTTPProxyTestMockHandleHTTPValidationParams{w, r},
 	}
 	m.expectations = append(m.expectations, expectation)
 	return expectation
 }
 
-// Then sets up HttpProxyTest.HandleHTTPValidation return parameters for the expectation previously defined by the When method
-func (e *HttpProxyTestMockHandleHTTPValidationExpectation) Then(b1 bool) *HttpProxyTestMock {
-	e.results = &HttpProxyTestMockHandleHTTPValidationResults{b1}
+// Then sets up HTTPProxyTest.HandleHTTPValidation return parameters for the expectation previously defined by the When method
+func (e *HTTPProxyTestMockHandleHTTPValidationExpectation) Then(b1 bool) *HTTPProxyTestMock {
+	e.results = &HTTPProxyTestMockHandleHTTPValidationResults{b1}
 	return e.mock
 }
 
-// HandleHTTPValidation implements HttpProxyTest
-func (m *HttpProxyTestMock) HandleHTTPValidation(w http.ResponseWriter, r *http.Request) (b1 bool) {
+// HandleHTTPValidation implements HTTPProxyTest
+func (m *HTTPProxyTestMock) HandleHTTPValidation(w http.ResponseWriter, r *http.Request) (b1 bool) {
 	atomic.AddUint64(&m.beforeHandleHTTPValidationCounter, 1)
 	defer atomic.AddUint64(&m.afterHandleHTTPValidationCounter, 1)
 
 	for _, e := range m.HandleHTTPValidationMock.expectations {
-		if minimock.Equal(*e.params, HttpProxyTestMockHandleHTTPValidationParams{w, r}) {
+		if minimock.Equal(*e.params, HTTPProxyTestMockHandleHTTPValidationParams{w, r}) {
 			atomic.AddUint64(&e.Counter, 1)
 			return e.results.b1
 		}
@@ -325,37 +325,37 @@ func (m *HttpProxyTestMock) HandleHTTPValidation(w http.ResponseWriter, r *http.
 	if m.HandleHTTPValidationMock.defaultExpectation != nil {
 		atomic.AddUint64(&m.HandleHTTPValidationMock.defaultExpectation.Counter, 1)
 		want := m.HandleHTTPValidationMock.defaultExpectation.params
-		got := HttpProxyTestMockHandleHTTPValidationParams{w, r}
+		got := HTTPProxyTestMockHandleHTTPValidationParams{w, r}
 		if want != nil && !minimock.Equal(*want, got) {
-			m.t.Errorf("HttpProxyTestMock.HandleHTTPValidation got unexpected parameters, want: %#v, got: %#v%s\n", *want, got, minimock.Diff(*want, got))
+			m.t.Errorf("HTTPProxyTestMock.HandleHTTPValidation got unexpected parameters, want: %#v, got: %#v%s\n", *want, got, minimock.Diff(*want, got))
 		}
 
 		results := m.HandleHTTPValidationMock.defaultExpectation.results
 		if results == nil {
-			m.t.Fatal("No results are set for the HttpProxyTestMock.HandleHTTPValidation")
+			m.t.Fatal("No results are set for the HTTPProxyTestMock.HandleHTTPValidation")
 		}
 		return (*results).b1
 	}
 	if m.funcHandleHTTPValidation != nil {
 		return m.funcHandleHTTPValidation(w, r)
 	}
-	m.t.Fatalf("Unexpected call to HttpProxyTestMock.HandleHTTPValidation. %v %v", w, r)
+	m.t.Fatalf("Unexpected call to HTTPProxyTestMock.HandleHTTPValidation. %v %v", w, r)
 	return
 }
 
-// HandleHTTPValidationAfterCounter returns a count of finished HttpProxyTestMock.HandleHTTPValidation invocations
-func (m *HttpProxyTestMock) HandleHTTPValidationAfterCounter() uint64 {
+// HandleHTTPValidationAfterCounter returns a count of finished HTTPProxyTestMock.HandleHTTPValidation invocations
+func (m *HTTPProxyTestMock) HandleHTTPValidationAfterCounter() uint64 {
 	return atomic.LoadUint64(&m.afterHandleHTTPValidationCounter)
 }
 
-// HandleHTTPValidationBeforeCounter returns a count of HttpProxyTestMock.HandleHTTPValidation invocations
-func (m *HttpProxyTestMock) HandleHTTPValidationBeforeCounter() uint64 {
+// HandleHTTPValidationBeforeCounter returns a count of HTTPProxyTestMock.HandleHTTPValidation invocations
+func (m *HTTPProxyTestMock) HandleHTTPValidationBeforeCounter() uint64 {
 	return atomic.LoadUint64(&m.beforeHandleHTTPValidationCounter)
 }
 
 // MinimockHandleHTTPValidationDone returns true if the count of the HandleHTTPValidation invocations corresponds
 // the number of defined expectations
-func (m *HttpProxyTestMock) MinimockHandleHTTPValidationDone() bool {
+func (m *HTTPProxyTestMock) MinimockHandleHTTPValidationDone() bool {
 	for _, e := range m.HandleHTTPValidationMock.expectations {
 		if atomic.LoadUint64(&e.Counter) < 1 {
 			return false
@@ -374,25 +374,25 @@ func (m *HttpProxyTestMock) MinimockHandleHTTPValidationDone() bool {
 }
 
 // MinimockHandleHTTPValidationInspect logs each unmet expectation
-func (m *HttpProxyTestMock) MinimockHandleHTTPValidationInspect() {
+func (m *HTTPProxyTestMock) MinimockHandleHTTPValidationInspect() {
 	for _, e := range m.HandleHTTPValidationMock.expectations {
 		if atomic.LoadUint64(&e.Counter) < 1 {
-			m.t.Errorf("Expected call to HttpProxyTestMock.HandleHTTPValidation with params: %#v", *e.params)
+			m.t.Errorf("Expected call to HTTPProxyTestMock.HandleHTTPValidation with params: %#v", *e.params)
 		}
 	}
 
 	// if default expectation was set then invocations count should be greater than zero
 	if m.HandleHTTPValidationMock.defaultExpectation != nil && atomic.LoadUint64(&m.afterHandleHTTPValidationCounter) < 1 {
-		m.t.Errorf("Expected call to HttpProxyTestMock.HandleHTTPValidation with params: %#v", *m.HandleHTTPValidationMock.defaultExpectation.params)
+		m.t.Errorf("Expected call to HTTPProxyTestMock.HandleHTTPValidation with params: %#v", *m.HandleHTTPValidationMock.defaultExpectation.params)
 	}
 	// if func was set then invocations count should be greater than zero
 	if m.funcHandleHTTPValidation != nil && atomic.LoadUint64(&m.afterHandleHTTPValidationCounter) < 1 {
-		m.t.Error("Expected call to HttpProxyTestMock.HandleHTTPValidation")
+		m.t.Error("Expected call to HTTPProxyTestMock.HandleHTTPValidation")
 	}
 }
 
 // MinimockFinish checks that all mocked methods have been called the expected number of times
-func (m *HttpProxyTestMock) MinimockFinish() {
+func (m *HTTPProxyTestMock) MinimockFinish() {
 	if !m.minimockDone() {
 		m.MinimockGetContextInspect()
 
@@ -402,7 +402,7 @@ func (m *HttpProxyTestMock) MinimockFinish() {
 }
 
 // MinimockWait waits for all mocked methods to be called the expected number of times
-func (m *HttpProxyTestMock) MinimockWait(timeout time.Duration) {
+func (m *HTTPProxyTestMock) MinimockWait(timeout time.Duration) {
 	timeoutCh := time.After(timeout)
 	for {
 		if m.minimockDone() {
@@ -417,7 +417,7 @@ func (m *HttpProxyTestMock) MinimockWait(timeout time.Duration) {
 	}
 }
 
-func (m *HttpProxyTestMock) minimockDone() bool {
+func (m *HTTPProxyTestMock) minimockDone() bool {
 	done := true
 	return done &&
 		m.MinimockGetContextDone() &&

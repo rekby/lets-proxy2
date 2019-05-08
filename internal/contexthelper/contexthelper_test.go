@@ -8,11 +8,11 @@ import (
 	"github.com/maxatome/go-testdeep"
 )
 
-var _ context.Context = &combinedContext{}
+var _ context.Context = &CombinedContext{}
 
 func TestCombinedContext_Deadline(t *testing.T) {
 	td := testdeep.NewT(t)
-	var ctx *combinedContext
+	var ctx *CombinedContext
 	var deadline time.Time
 	var ok bool
 
@@ -52,7 +52,7 @@ func TestCombinedContext_Deadline(t *testing.T) {
 
 func TestCombinedContext_Err(t *testing.T) {
 	td := testdeep.NewT(t)
-	var ctx *combinedContext
+	var ctx *CombinedContext
 
 	wait := func() { time.Sleep(time.Millisecond) }
 
@@ -96,27 +96,29 @@ func TestCombinedContext_Err(t *testing.T) {
 }
 
 func TestCombinedContext_Value(t *testing.T) {
+	type ctxKeyType int
+
+	const one ctxKeyType = 1
+
 	td := testdeep.NewT(t)
-	var ctx *combinedContext
+	var ctx = CombineContext()
+	td.CmpDeeply(ctx.Value(one), nil)
 
-	ctx = CombineContext()
-	td.CmpDeeply(ctx.Value(1), nil)
-
-	ctx1 := context.WithValue(context.Background(), 1, 2)
+	ctx1 := context.WithValue(context.Background(), one, 2)
 	ctx = CombineContext(ctx1)
-	td.CmpDeeply(ctx.Value(1), 2)
+	td.CmpDeeply(ctx.Value(one), 2)
 
-	ctx2 := context.WithValue(context.Background(), 1, 3)
+	ctx2 := context.WithValue(context.Background(), one, 3)
 	ctx = CombineContext(ctx1, ctx2)
-	td.CmpDeeply(ctx.Value(1), 2)
+	td.CmpDeeply(ctx.Value(one), 2)
 
 	ctx = CombineContext(ctx2, ctx1)
-	td.CmpDeeply(ctx.Value(1), 3)
+	td.CmpDeeply(ctx.Value(one), 3)
 }
 
 func TestCombinedContext_Done(t *testing.T) {
 	td := testdeep.NewT(t)
-	var ctx *combinedContext
+	var ctx *CombinedContext
 	var done bool
 
 	wait := func() { time.Sleep(10 * time.Millisecond) }

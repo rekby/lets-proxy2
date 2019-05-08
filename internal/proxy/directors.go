@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/rekby/lets-proxy2/internal/contextlabel"
+
 	"github.com/rekby/lets-proxy2/internal/log"
 
 	zc "github.com/rekby/zapcontext"
@@ -16,9 +17,15 @@ import (
 
 const (
 	ConnectionID = "{{CONNECTION_ID}}"
+	HTTPProto    = "{{HTTP_PROTO}}"
 	SourceIP     = "{{SOURCE_IP}}"
 	SourcePort   = "{{SOURCE_PORT}}"
 	SourceIPPort = "{{SOURCE_IP}}:{{SOURCE_PORT}}"
+)
+
+const (
+	ProtocolHTTP  = "http"
+	ProtocolHTTPS = "https"
 )
 
 type DirectorChain []Director
@@ -46,7 +53,7 @@ func (s DirectorSameIP) Director(request *http.Request) {
 	if request.URL == nil {
 		request.URL = &url.URL{}
 	}
-	request.URL.Scheme = "http"
+	request.URL.Scheme = ProtocolHTTP
 	request.URL.Host = localAddr.IP.String() + ":" + s.Port
 	zc.L(request.Context()).Debug("Set target as same ip",
 		zap.Stringer("local_addr", localAddr), zap.String("dest_host", request.Host))
@@ -102,14 +109,24 @@ func (h DirectorSetHeaders) Director(request *http.Request) {
 	for name, headerVal := range h {
 		var value string
 		switch headerVal {
+		case ConnectionID:
+			value = request.Context().Value(contextlabel.ConnectionID).(string)
+		case HTTPProto:
+			if tls, ok := ctx.Value(contextlabel.TLSConnection).(bool); ok {
+				if tls {
+					value = ProtocolHTTPS
+				} else {
+					value = ProtocolHTTP
+				}
+			} else {
+				value = "error protocol detection"
+			}
 		case SourceIP:
 			value = host
 		case SourceIPPort:
 			value = host + ":" + port
 		case SourcePort:
 			value = port
-		case ConnectionID:
-			value = request.Context().Value(contextlabel.ConnectionID).(string)
 		default:
 			value = headerVal
 		}

@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-type combinedContext struct {
+type CombinedContext struct {
 	contexts []context.Context
 
 	deadline   time.Time
@@ -19,17 +19,17 @@ type combinedContext struct {
 }
 
 // Deadline return minimum of contextx deadlines, if present
-func (cc *combinedContext) Deadline() (deadline time.Time, ok bool) {
+func (cc *CombinedContext) Deadline() (deadline time.Time, ok bool) {
 	return cc.deadline, cc.deadlineOk
 }
 
 // Done return channel, that will close when first of initial contexts will closed
-func (cc *combinedContext) Done() <-chan struct{} {
+func (cc *CombinedContext) Done() <-chan struct{} {
 	return cc.done
 }
 
 // Err return error, of context, which close handled first
-func (cc *combinedContext) Err() error {
+func (cc *CombinedContext) Err() error {
 	cc.mu.RLock()
 	res := cc.err
 	cc.mu.RUnlock()
@@ -39,7 +39,7 @@ func (cc *combinedContext) Err() error {
 
 // Value return value of key. It iterate  over initial context one by one and return first not nil value.
 // If all of contextx return nil - return nil too
-func (cc *combinedContext) Value(key interface{}) interface{} {
+func (cc *CombinedContext) Value(key interface{}) interface{} {
 	for _, ctx := range cc.contexts {
 		val := ctx.Value(key)
 		if val != nil {
@@ -52,8 +52,8 @@ func (cc *combinedContext) Value(key interface{}) interface{} {
 
 // CombineContext return combined context: common deadline, values, close.
 // Minimum one of underly contexts MUST be closed for prevent memory leak.
-func CombineContext(contexts ...context.Context) *combinedContext {
-	res := &combinedContext{
+func CombineContext(contexts ...context.Context) *CombinedContext {
+	res := &CombinedContext{
 		contexts: contexts,
 		done:     make(chan struct{}),
 	}
@@ -77,7 +77,7 @@ func CombineContext(contexts ...context.Context) *combinedContext {
 	return res
 }
 
-func (cc *combinedContext) waitCloseAny() {
+func (cc *CombinedContext) waitCloseAny() {
 	selectCases := make([]reflect.SelectCase, len(cc.contexts))
 	for i, ctx := range cc.contexts {
 		selectCases[i] = reflect.SelectCase{

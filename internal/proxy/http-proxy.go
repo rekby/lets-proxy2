@@ -25,7 +25,7 @@ type HTTPProxy struct {
 	GetContext           func(req *http.Request) (context.Context, error)
 	HandleHTTPValidation func(w http.ResponseWriter, r *http.Request) bool
 	Director             Director // modify requests to backend.
-	HttpTransport        http.RoundTripper
+	HTTPTransport        http.RoundTripper
 
 	ctx              context.Context
 	listener         net.Listener
@@ -51,8 +51,8 @@ func NewHTTPProxy(ctx context.Context, listener net.Listener) *HTTPProxy {
 // It is sync method, always return with non nil error: if handle stopped by context or if error on start handling.
 // Any public fields must not change after Start called
 func (p *HTTPProxy) Start() error {
-	if p.HttpTransport != nil {
-		p.httpReverseProxy.Transport = p.HttpTransport
+	if p.HTTPTransport != nil {
+		p.httpReverseProxy.Transport = p.HTTPTransport
 	}
 
 	mux := &http.ServeMux{}
