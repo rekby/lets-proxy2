@@ -54,7 +54,9 @@ func TestCombinedContext_Err(t *testing.T) {
 	td := testdeep.NewT(t)
 	var ctx *CombinedContext
 
-	wait := func() { time.Sleep(time.Millisecond) }
+	const waitPause = 10 * time.Millisecond
+
+	wait := func() { time.Sleep(waitPause) }
 
 	ctx = CombineContext()
 	td.CmpNoError(ctx.Err())
@@ -74,14 +76,14 @@ func TestCombinedContext_Err(t *testing.T) {
 	wait()
 	td.CmpDeeply(ctx.Err(), ctx2.Err())
 
-	ctxTimeout1, ctxTimeout1Cancel := context.WithTimeout(context.Background(), time.Millisecond*10)
+	ctxTimeout1, ctxTimeout1Cancel := context.WithTimeout(context.Background(), 10*waitPause)
 	defer ctxTimeout1Cancel()
 
 	ctx = CombineContext(ctx1, ctxTimeout1)
 	wait()
 	td.CmpDeeply(ctx.Err(), ctx1.Err())
 
-	ctxTimeout2, ctxTimeout2Cancel := context.WithTimeout(context.Background(), time.Millisecond*10)
+	ctxTimeout2, ctxTimeout2Cancel := context.WithTimeout(context.Background(), 10*waitPause)
 	defer ctxTimeout2Cancel()
 
 	ctx3, ctx3Cancel := context.WithCancel(context.Background())
