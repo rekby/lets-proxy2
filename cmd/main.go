@@ -90,6 +90,8 @@ func startProgram(config *configType) {
 		localAddr := req.Context().Value(http.LocalAddrContextKey).(net.Addr)
 		return tlsListener.GetConnectionContext(req.RemoteAddr, localAddr.String())
 	}
+	err = config.Proxy.Apply(ctx, p)
+	log.InfoFatal(logger, err, "Apply proxy config")
 
 	err = p.Start()
 	var effectiveError = err

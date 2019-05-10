@@ -36,8 +36,22 @@ func (c DirectorChain) Director(request *http.Request) {
 	}
 }
 
+// skip nil directors
 func NewDirectorChain(directors ...Director) DirectorChain {
-	return DirectorChain(directors)
+	cnt := 0
+	for _, item := range directors {
+		if item != nil {
+			cnt++
+		}
+	}
+
+	ownDirectors := make(DirectorChain, 0, cnt)
+	for _, item := range directors {
+		if item != nil {
+			ownDirectors = append(ownDirectors, item)
+		}
+	}
+	return ownDirectors
 }
 
 type DirectorSameIP struct {
@@ -89,6 +103,19 @@ func NewDirectorDestMap(m map[string]string) DirectorDestMap {
 		res[k] = v
 	}
 	return res
+}
+
+type DirectorHost string
+
+func (d DirectorHost) Director(request *http.Request) {
+	if request.URL == nil {
+		request.URL = &url.URL{}
+	}
+	request.URL.Host = string(d)
+}
+
+func NewDirectorHost(host string) DirectorHost {
+	return DirectorHost(host)
 }
 
 type DirectorSetHeaders map[string]string

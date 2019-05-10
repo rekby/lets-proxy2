@@ -73,6 +73,16 @@ func TestDirectorDestMap(t *testing.T) {
 
 }
 
+func TestDirectorHost(t *testing.T) {
+	td := testdeep.NewT(t)
+
+	d := NewDirectorHost("haha:81")
+	req := &http.Request{}
+	d.Director(req)
+	td.CmpDeeply(req.URL.Host, "haha:81")
+
+}
+
 func TestDirectorSameIP(t *testing.T) {
 	ctx, flush := th.TestContext()
 	defer flush()
