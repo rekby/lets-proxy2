@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"runtime"
-	"strings"
 
 	"github.com/rekby/lets-proxy2/internal/cert_manager"
 
@@ -57,18 +56,12 @@ func startProgram(config *configType) {
 
 	logger.Info("StartAutoRenew program version", zap.String("version", version()))
 
-	httpsListeners := createHTTPSListeners(ctx, config.HTTPSListeners)
-
-	if len(httpsListeners) == 0 {
-		logger.Fatal("Can't start any listener")
-	}
-
-	err := os.MkdirAll(config.StorageDir, defaultDirMode)
+	err := os.MkdirAll(config.General.StorageDir, defaultDirMode)
 	log.InfoFatal(logger, err, "Create storage dir")
 
-	storage := &cache.DiskCache{Dir: config.StorageDir}
+	storage := &cache.DiskCache{Dir: config.General.StorageDir}
 	clientManager := acme_client_manager.New(ctx, storage)
-	clientManager.DirectoryURL = config.AcmeServer
+	clientManager.DirectoryURL = config.General.AcmeServer
 	acmeClient, err := clientManager.GetClient(ctx)
 	log.DebugFatal(logger, err, "Get acme client")
 
@@ -78,9 +71,11 @@ func startProgram(config *configType) {
 	log.DebugFatal(logger, err, "Config domain checkers.")
 
 	tlsListener := &tlslistener.ListenersHandler{
-		ListenersForHandleTLS: httpsListeners,
-		GetCertificate:        certManager.GetCertificate,
+		GetCertificate: certManager.GetCertificate,
 	}
+
+	err = config.Listen.Apply(ctx, tlsListener)
+	log.DebugFatal(logger, err, "Config listeners")
 
 	err = tlsListener.Start(ctx)
 	log.DebugFatal(logger, err, "StartAutoRenew tls listener")
@@ -99,21 +94,4 @@ func startProgram(config *configType) {
 		effectiveError = nil
 	}
 	log.DebugErrorCtx(ctx, effectiveError, "Handle request stopped")
-}
-
-func createHTTPSListeners(ctx context.Context, bindings string) (res []net.Listener) {
-	addresses := strings.Split(bindings, ",")
-	for _, address := range addresses {
-		address = strings.TrimSpace(address)
-		if address == "" {
-			continue
-		}
-		var lc net.ListenConfig
-		listener, err := lc.Listen(ctx, "tcp", address)
-		log.InfoErrorCtx(ctx, err, "StartAutoRenew https listener", zap.String("address", address))
-		if err == nil {
-			res = append(res, listener)
-		}
-	}
-	return res
 }

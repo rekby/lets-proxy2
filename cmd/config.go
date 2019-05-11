@@ -5,6 +5,8 @@ import (
 	"context"
 	"io/ioutil"
 
+	"github.com/rekby/lets-proxy2/internal/tlslistener"
+
 	"github.com/rekby/lets-proxy2/internal/proxy"
 
 	"github.com/rekby/lets-proxy2/internal/domain_checker"
@@ -16,15 +18,19 @@ import (
 	"go.uber.org/zap"
 )
 
-type configType struct {
+type configGeneral struct {
 	IssueTimeout           int    `default:"300" comment:"Seconds for issue every certificate. Cancel issue and return error if timeout."`
 	AutoIssueForSubdomains string `default:"www" comment:"Comma separated for subdomains for try get common used subdomains in one certificate."`
-	HTTPSListeners         string `default:"[::]:443" comment:"Comma-separated bindings for listen https.\nSupported formats:\n1.2.3.4:443,0.0.0.0:443,[::]:443,[2001:db8::a123]:443"`
 	StorageDir             string `default:"storage" comment:"Path to dir, which will store state and certificates"`
 	AcmeServer             string `default:"https://acme-v01.api.letsencrypt.org/directory" comment:"Directory url of acme server.\nTest server: https://acme-staging-v02.api.letsencrypt.org/directory"`
-	Log                    logConfig
-	Proxy                  proxy.Config
-	CheckDomains           domain_checker.Config
+}
+
+type configType struct {
+	General      configGeneral
+	Log          logConfig
+	Proxy        proxy.Config
+	CheckDomains domain_checker.Config
+	Listen       tlslistener.Config
 }
 
 //nolint:maligned
@@ -64,7 +70,7 @@ func getConfig(ctx context.Context) *configType {
 func applyFlags(ctx context.Context, config *configType) {
 	if *testAcmeServerP {
 		zc.L(ctx).Info("Set test acme server by command line flag")
-		config.AcmeServer = "https://acme-staging-v02.api.letsencrypt.org/directory"
+		config.General.AcmeServer = "https://acme-staging-v02.api.letsencrypt.org/directory"
 	}
 }
 
