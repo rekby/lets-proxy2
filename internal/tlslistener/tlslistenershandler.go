@@ -8,6 +8,8 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/rekby/lets-proxy2/internal/contextlabel"
+
 	"golang.org/x/crypto/acme"
 
 	"github.com/rekby/lets-proxy2/internal/log"
@@ -35,7 +37,12 @@ type ListenersHandler struct {
 	connListenProxy listenerType
 
 	connectionsContextMu sync.RWMutex
-	connectionsContext   map[string]context.Context
+	connectionsContext   map[string]contextInfo
+}
+
+type contextInfo struct {
+	ctx        context.Context
+	cancelFunc context.CancelFunc
 }
 
 // Implement net.Listener
@@ -54,7 +61,7 @@ func (p *ListenersHandler) Addr() net.Addr {
 
 // Block until finish work (by context or start error)
 // It can stop by cancel context.
-// Now Start return immedantly after cancel context - without wait to finish background processes.
+// Now StartAutoRenew return immedantly after cancel context - without wait to finish background processes.
 // It can change in future.
 func (p *ListenersHandler) Start(ctx context.Context) error {
 	p.logger = zc.L(ctx)
@@ -65,7 +72,7 @@ func (p *ListenersHandler) Start(ctx context.Context) error {
 	listenerClosed := make(chan struct{})
 
 	logger := zc.L(ctx)
-	logger.Info("Start handleListeners")
+	logger.Info("StartAutoRenew handleListeners")
 	for _, listenerForTLS := range p.ListenersForHandleTLS {
 		go func(l net.Listener) {
 			for {
@@ -134,25 +141,28 @@ func (p *ListenersHandler) init() {
 		GetCertificate: p.GetCertificate,
 		NextProtos:     append(nextProtos, acme.ALPNProto),
 	}
-	p.connectionsContext = make(map[string]context.Context)
+	p.connectionsContext = make(map[string]contextInfo)
 }
 
-func (p *ListenersHandler) registerConnection(conn net.Conn) ContextConnextion {
+func (p *ListenersHandler) registerConnection(conn net.Conn, tls bool) ContextConnextion {
 	key := conn.RemoteAddr().String() + "-" + conn.LocalAddr().String()
 
 	p.connectionsContextMu.Lock()
 	defer p.connectionsContextMu.Unlock()
 
-	ctx, exist := p.connectionsContext[key]
+	ctxStruct, exist := p.connectionsContext[key]
 	if !exist {
-		connectionUUID := uuid.NewV4()
-		logger := p.logger.With(zap.String("connection_id", connectionUUID.String()))
-		ctx = zc.WithLogger(p.ctx, logger)
-		p.connectionsContext[key] = ctx
+		ctxStruct.ctx, ctxStruct.cancelFunc = context.WithCancel(context.Background())
+		connectionUUID := uuid.NewV4().String()
+		logger := p.logger.With(zap.String("connection_id", connectionUUID))
+		ctxStruct.ctx = context.WithValue(ctxStruct.ctx, contextlabel.TLSConnection, tls)
+		ctxStruct.ctx = context.WithValue(ctxStruct.ctx, contextlabel.ConnectionID, connectionUUID)
+		ctxStruct.ctx = zc.WithLogger(p.ctx, logger)
+		p.connectionsContext[key] = ctxStruct
 	}
 
 	res := ContextConnextion{
-		Context: ctx,
+		Context: ctxStruct.ctx,
 		Conn:    conn,
 	}
 
@@ -169,7 +179,8 @@ func (p *ListenersHandler) registerConnection(conn net.Conn) ContextConnextion {
 
 		runtime.SetFinalizer(&res, nil)
 
-		zc.L(ctx).WithOptions(zap.AddCallerSkip(2)).Debug("Connection closed.")
+		zc.L(ctxStruct.ctx).WithOptions(zap.AddCallerSkip(2)).Debug("Connection closed.")
+		ctxStruct.cancelFunc()
 
 		return conn.Close()
 	}
@@ -183,14 +194,14 @@ func (p *ListenersHandler) GetConnectionContext(remoteAddr, localAddr string) (c
 	p.connectionsContextMu.RLock()
 	defer p.connectionsContextMu.RUnlock()
 
-	if ctx, ok := p.connectionsContext[key]; ok {
-		return ctx, nil
+	if ctxStruct, ok := p.connectionsContext[key]; ok {
+		return ctxStruct.ctx, nil
 	}
 	return nil, errors.New("not found registered connection")
 }
 
 func (p *ListenersHandler) handleTCPConnection(ctx context.Context, conn net.Conn) {
-	contextConn := p.registerConnection(conn)
+	contextConn := p.registerConnection(conn, false)
 	logger := zc.L(contextConn.Context)
 
 	logger.Debug("Accept connection", zap.String("remote_addr", conn.RemoteAddr().String()),
@@ -206,7 +217,7 @@ func (p *ListenersHandler) handleTCPConnection(ctx context.Context, conn net.Con
 }
 
 func (p *ListenersHandler) handleTCPTLSConnection(ctx context.Context, conn net.Conn) {
-	contextConn := p.registerConnection(conn)
+	contextConn := p.registerConnection(conn, true)
 	logger := zc.L(contextConn.Context)
 
 	logger.Debug("Accept tls connection", zap.String("remote_addr", conn.RemoteAddr().String()),

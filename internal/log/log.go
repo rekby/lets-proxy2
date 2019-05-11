@@ -96,6 +96,10 @@ func InfoFatal(logger *zap.Logger, err error, mess string, fields ...zap.Field) 
 	infoFatal(logger, err, mess, fields...)
 }
 
+func InfoFatalCtx(ctx context.Context, err error, mess string, fields ...zap.Field) {
+	infoFatal(zc.L(ctx), err, mess, fields...)
+}
+
 func infoFatal(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
 	logger = logger.WithOptions(zap.AddCallerSkip(2))
 	if err == nil {

@@ -29,7 +29,7 @@ type certState struct {
 func (s *certState) StartIssue(ctx context.Context) (res bool) {
 	defer func() {
 		// defer for log outside of lock mutex
-		zc.L(ctx).Debug("Start issue lock", zap.Bool("result", res))
+		zc.L(ctx).Debug("StartAutoRenew issue lock", zap.Bool("result", res))
 	}()
 
 	s.mu.Lock()
@@ -68,7 +68,7 @@ func (s *certState) FinishIssue(ctx context.Context, cert *tls.Certificate, last
 
 func (s *certState) WaitFinishIssue(ctx context.Context) (cert *tls.Certificate, err error) {
 	logger := zc.L(ctx)
-	logger.Debug("Start waiting to finish certificate issue.")
+	logger.Debug("StartAutoRenew waiting to finish certificate issue.")
 
 	s.mu.RLock()
 	issueContext, cert, err := s.issueContext, s.cert, s.lastError

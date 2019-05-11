@@ -55,7 +55,7 @@ func startProgram(config *configType) {
 	logger := initLogger(config.Log)
 	ctx := zc.WithLogger(context.Background(), logger)
 
-	logger.Info("Start program version", zap.String("version", version()))
+	logger.Info("StartAutoRenew program version", zap.String("version", version()))
 
 	httpsListeners := createHTTPSListeners(ctx, config.HTTPSListeners)
 
@@ -74,23 +74,31 @@ func startProgram(config *configType) {
 
 	certManager := cert_manager.New(acmeClient, storage)
 
+	certManager.DomainChecker, err = config.CheckDomains.CreateDomainChecker(ctx)
+	log.DebugFatal(logger, err, "Config domain checkers.")
+
 	tlsListener := &tlslistener.ListenersHandler{
 		ListenersForHandleTLS: httpsListeners,
 		GetCertificate:        certManager.GetCertificate,
 	}
 
 	err = tlsListener.Start(ctx)
-	log.DebugFatal(logger, err, "Start tls listener")
+	log.DebugFatal(logger, err, "StartAutoRenew tls listener")
 
 	p := proxy.NewHTTPProxy(ctx, tlsListener)
 	p.GetContext = func(req *http.Request) (i context.Context, e error) {
 		localAddr := req.Context().Value(http.LocalAddrContextKey).(net.Addr)
 		return tlsListener.GetConnectionContext(req.RemoteAddr, localAddr.String())
 	}
+	err = config.Proxy.Apply(ctx, p)
+	log.InfoFatal(logger, err, "Apply proxy config")
 
-	// work in background
-	var a chan struct{}
-	<-a
+	err = p.Start()
+	var effectiveError = err
+	if effectiveError == http.ErrServerClosed {
+		effectiveError = nil
+	}
+	log.DebugErrorCtx(ctx, effectiveError, "Handle request stopped")
 }
 
 func createHTTPSListeners(ctx context.Context, bindings string) (res []net.Listener) {
@@ -102,7 +110,7 @@ func createHTTPSListeners(ctx context.Context, bindings string) (res []net.Liste
 		}
 		var lc net.ListenConfig
 		listener, err := lc.Listen(ctx, "tcp", address)
-		log.InfoErrorCtx(ctx, err, "Start https listener", zap.String("address", address))
+		log.InfoErrorCtx(ctx, err, "StartAutoRenew https listener", zap.String("address", address))
 		if err == nil {
 			res = append(res, listener)
 		}
