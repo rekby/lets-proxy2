@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 
 	"github.com/rekby/lets-proxy2/internal/contexthelper"
 
@@ -83,5 +84,9 @@ func (p *HTTPProxy) director(request *http.Request) {
 	ctx, err := p.GetContext(request)
 	log.DebugDPanicCtx(ctx, err, "Get connection context for request")
 	*request = *request.WithContext(contexthelper.CombineContext(ctx, request.Context()))
+	if request.URL == nil {
+		request.URL = &url.URL{}
+	}
+	request.URL.Scheme = ProtocolHTTP
 	p.Director.Director(request)
 }
