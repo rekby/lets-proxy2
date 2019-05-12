@@ -3,7 +3,7 @@ package tlslistener
 // DO NOT EDIT!
 // The code below was generated with http://github.com/gojuno/minimock (dev)
 
-//go:generate minimock -i net.Conn -o ./internal/proxy/net_conn_mock_test.go
+//go:generate minimock -i net.Conn -o ./net_conn_mock_test.go
 
 import (
 	"net"

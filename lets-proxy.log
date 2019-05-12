@@ -1,0 +1,7 @@
+2019-05-12T15:04:39.883+0300	info	cmd/log.go:72	Initialize log on level	{"level": "info"}
+2019-05-12T15:04:39.884+0300	info	cmd/main.go:57	StartAutoRenew program version	{"version": "Version: 'custom', Os: 'darwin', Arch: 'amd64'"}
+2019-05-12T15:04:39.884+0300	info	cmd/main.go:60	Create storage dir
+2019-05-12T15:04:39.886+0300	info	tlslistener/tlslistenershandler.go:75	StartAutoRenew handleListeners
+2019-05-12T15:04:39.886+0300	info	proxy/config.go:72	Create same ip director	{"port": 80}
+2019-05-12T15:04:39.886+0300	info	cmd/main.go:89	Apply proxy config
+2019-05-12T15:04:39.886+0300	info	proxy/http-proxy.go:73	Http builtin reverse proxy start
