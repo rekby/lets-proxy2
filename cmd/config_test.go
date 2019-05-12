@@ -12,13 +12,13 @@ import (
 
 func TestConfigEmbed(t *testing.T) {
 	td := testdeep.NewT(t)
-	sourceConfig, err := ioutil.ReadFile("cmd/static/default-config.toml")
+	sourceConfig, err := ioutil.ReadFile("static/default-config.toml")
 	td.CmpNoError(err)
 
 	// force remove file - for prevent box read from disk
-	err = os.Rename("cmd/static/default-config.toml", "cmd/static/default-config.toml.tmp")
+	err = os.Rename("static/default-config.toml", "static/default-config.toml.tmp")
 	td.CmpNoError(err)
-	defer os.Rename("cmd/static/default-config.toml.tmp", "cmd/static/default-config.toml")
+	defer os.Rename("static/default-config.toml.tmp", "static/default-config.toml")
 
 	box := packr.NewBox("static")
 	boxBytes, err := box.Find("default-config.toml")
