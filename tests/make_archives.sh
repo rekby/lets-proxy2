@@ -2,7 +2,7 @@
 set -ev
 
 cd output
-lets-proxy_linux_amd64 --print-default-config > output/config_default.toml_
+./lets-proxy_linux_amd64 --print-default-config > config_default.toml_
 
 
 cp ../README.md ./README.md
