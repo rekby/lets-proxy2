@@ -1,9 +1,9 @@
 #!/bin/bash
 set -ev
 
-go run cmd/*.go --print-default-config > output/config_default.toml_
-
 cd output
+lets-proxy_linux_amd64 --print-default-config > output/config_default.toml_
+
 
 cp ../README.md ./README.md
 unix2dos -n README.md README.txt
