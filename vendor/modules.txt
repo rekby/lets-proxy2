@@ -1,7 +1,19 @@
+# github.com/BurntSushi/toml v0.3.1
+github.com/BurntSushi/toml
 # github.com/davecgh/go-spew v1.1.1
 github.com/davecgh/go-spew/spew
+# github.com/gobuffalo/envy v1.7.0
+github.com/gobuffalo/envy
+# github.com/gobuffalo/packd v0.0.0-20190315124812-a385830c7fc0
+github.com/gobuffalo/packd
+# github.com/gobuffalo/packr v1.25.0
+github.com/gobuffalo/packr
+# github.com/gobuffalo/syncx v0.0.0-20190224160051-33c29581e754
+github.com/gobuffalo/syncx
 # github.com/gojuno/minimock v0.0.0-20190201083043-bbb4f602d884
 github.com/gojuno/minimock
+# github.com/joho/godotenv v1.3.0
+github.com/joho/godotenv
 # github.com/kardianos/minwinsvc v0.0.0-20151122163309-cad6b2b879b0
 github.com/kardianos/minwinsvc
 # github.com/maxatome/go-testdeep v1.0.8
@@ -12,12 +24,16 @@ github.com/maxatome/go-testdeep/internal/dark
 github.com/maxatome/go-testdeep/internal/location
 github.com/maxatome/go-testdeep/internal/types
 github.com/maxatome/go-testdeep/internal/util
-# github.com/pelletier/go-toml v1.3.0
-github.com/pelletier/go-toml
+# github.com/pkg/errors v0.8.1
+github.com/pkg/errors
 # github.com/pmezard/go-difflib v1.0.0
 github.com/pmezard/go-difflib/difflib
 # github.com/rekby/zapcontext v0.0.3
 github.com/rekby/zapcontext
+# github.com/rogpeppe/go-internal v1.3.0
+github.com/rogpeppe/go-internal/modfile
+github.com/rogpeppe/go-internal/module
+github.com/rogpeppe/go-internal/semver
 # github.com/satori/go.uuid v1.2.0
 github.com/satori/go.uuid
 # go.uber.org/atomic v1.3.2
@@ -31,14 +47,14 @@ go.uber.org/zap/internal/bufferpool
 go.uber.org/zap/buffer
 go.uber.org/zap/internal/color
 go.uber.org/zap/internal/exit
-# golang.org/x/crypto v0.0.0-20190411191339-88737f569e3a
+# golang.org/x/crypto v0.0.0-20190426145343-a29dc8fdc734
 golang.org/x/crypto/acme
-# golang.org/x/net v0.0.0-20190415214537-1da14a5a36f2
+# golang.org/x/net v0.0.0-20190424112056-4829fb13d2c6
 golang.org/x/net/idna
-# golang.org/x/sys v0.0.0-20190403152447-81d4e9dc473e
+# golang.org/x/sys v0.0.0-20190428183149-804c0c7841b5
 golang.org/x/sys/windows/svc
 golang.org/x/sys/windows
-# golang.org/x/text v0.3.0
+# golang.org/x/text v0.3.2
 golang.org/x/text/secure/bidirule
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm

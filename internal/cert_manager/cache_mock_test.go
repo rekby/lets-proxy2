@@ -3,7 +3,7 @@ package cert_manager
 // DO NOT EDIT!
 // The code below was generated with http://github.com/gojuno/minimock (dev)
 
-//go:generate minimock -i github.com/rekby/lets-proxy2/internal/manager.Cache -o ./cache_mock_test.go
+//go:generate minimock -i github.com/rekby/lets-proxy2/internal/cache.Cache -o ./cache_mock_test.go
 
 import (
 	"sync/atomic"
@@ -14,7 +14,7 @@ import (
 	"github.com/gojuno/minimock"
 )
 
-// CacheMock implements Cache
+// CacheMock implements cache.Cache
 type CacheMock struct {
 	t minimock.Tester
 
@@ -34,7 +34,7 @@ type CacheMock struct {
 	PutMock          mCacheMockPut
 }
 
-// NewCacheMock returns a mock for Cache
+// NewCacheMock returns a mock for cache.Cache
 func NewCacheMock(t minimock.Tester) *CacheMock {
 	m := &CacheMock{t: t}
 	if controller, ok := t.(minimock.MockController); ok {
@@ -140,7 +140,7 @@ func (e *CacheMockDeleteExpectation) Then(err error) *CacheMock {
 	return e.mock
 }
 
-// Delete implements Cache
+// Delete implements cache.Cache
 func (m *CacheMock) Delete(ctx context.Context, key string) (err error) {
 	atomic.AddUint64(&m.beforeDeleteCounter, 1)
 	defer atomic.AddUint64(&m.afterDeleteCounter, 1)
@@ -315,7 +315,7 @@ func (e *CacheMockGetExpectation) Then(ba1 []byte, err error) *CacheMock {
 	return e.mock
 }
 
-// Get implements Cache
+// Get implements cache.Cache
 func (m *CacheMock) Get(ctx context.Context, key string) (ba1 []byte, err error) {
 	atomic.AddUint64(&m.beforeGetCounter, 1)
 	defer atomic.AddUint64(&m.afterGetCounter, 1)
@@ -490,7 +490,7 @@ func (e *CacheMockPutExpectation) Then(err error) *CacheMock {
 	return e.mock
 }
 
-// Put implements Cache
+// Put implements cache.Cache
 func (m *CacheMock) Put(ctx context.Context, key string, data []byte) (err error) {
 	atomic.AddUint64(&m.beforePutCounter, 1)
 	defer atomic.AddUint64(&m.afterPutCounter, 1)

@@ -10,8 +10,8 @@ import (
 )
 
 type Config struct {
-	TLSAddresses []string `default:":[\"443\"]" comment:"Bind addresses for TLS listeners"`
-	TCPAddresses []string `comment:"Bind addresses without TLS secure (for HTTP reverse proxy and http-01 validation without redirect to https)"`
+	TLSAddresses []string
+	TCPAddresses []string
 }
 
 func (c *Config) Apply(ctx context.Context, l *ListenersHandler) error {
