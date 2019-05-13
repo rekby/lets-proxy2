@@ -12,6 +12,20 @@ Home page: https://github.com/rekby/lets-proxy2
 
 Now it is alpha and not ready for production use.
 
+Features:
+* http-01 and tls-alpn-01 validation
+* HTTPS (with certificate autoissue) and HTTP reverse proxy
+* Zero config for start usage
+* Time limit for issue certificate
+* Auto include subdomains in certificate (default: domain and www.domain)
+* Logging for stderr and/or file
+* Self rotate log files (can disable by config)
+* Can configure backend in dependence of incoming connection IP:Port
+* Custom headers to backend
+* Self check domain before issue cert (prevent DoS cert issue attack by requests with bad domains)
+* Blacklist/whitelist of domains
+* Lock certificates (force to use manual issued certificate without internal checks)
+
 It is next generation of https://github.com/rekby/lets-proxy, rewrited from scratch.
 
 It is improove logging and internal structure for better test coverage and simpler support.
@@ -35,12 +49,26 @@ Use --help key for details:
 
     ./lets-proxy --help or lets-proxy.exe --help
 
-
 Русский (Russian):
 ==================
 Сайт программы: https://github.com/rekby/lets-proxy2
 
 Сейчас это тестовая версия, программа в процессе разработчик и она не готова для реального использования.
+
+Возможности:
+* Авторизация доменов по протоколам http-01 and tls-alpn-01
+* Проксирование HTTPS (с автовыпуском сертификата) and HTTP
+* Начать использование можно без настроек
+* Ограничение времени на получение сертификата
+* Автоматическое получение сертификата для домена и поддоменов (default: domain and www.domain)
+* Вывод логов в файл и/или на стандартный вывод ошибок
+* Самостоятельная ротация лог-файлов (отключается в настройках)
+* Можно настроить адрес перенаправления запроса в заивисмости от адреса приема запроса.
+* Настраиваемые дополнительные заголовки для передачи на внутренний сервер
+* Самостоятельная проверка возможности выпуска сертификата перед его запросов (для исключения DoS-атак путем запросов с неправильными доменами)
+* Белый/чёрный списки доменов для выпуска сертификатов
+* Фиксированный сертификат (возможность использовать самостоятельно полученный сертификат, без внутренних проверок и автообновления)
+
 
 Эта программа - следующая итерация после https://github.com/rekby/lets-proxy, переписанная с нуля.
 
