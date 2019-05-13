@@ -2,6 +2,8 @@
 set -ev
 
 cd output
+ls
+
 ./lets-proxy_linux_amd64 --print-default-config > config_default.toml_
 
 
