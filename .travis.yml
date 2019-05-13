@@ -1,6 +1,3 @@
-env:
-  - GO111MODULE=on GOFLAGS=-mod=vendor CGO_ENABLED=0
-
 language: go
 
 addons:
@@ -22,18 +19,18 @@ script:
 
 after_script:
   # Install and upload test coverage must not failure for test build
-  - test -n "$TRAVIS_TAG" || go get -mod= golang.org/x/tools/cmd/cover
-  - test -n "$TRAVIS_TAG" || go get -mod= github.com/mattn/goveralls
+  - test -n "$TRAVIS_TAG" || go get golang.org/x/tools/cmd/cover
+  - test -n "$TRAVIS_TAG" || go get github.com/mattn/goveralls
   - test -n "$TRAVIS_TAG" || goveralls -coverprofile=coverage.out -service=travis-ci -repotoken $COVERALLS_TOKEN
 
 before_deploy:
   - git config --local user.name "$GIT_NAME"
   - git config --local user.email "$GIT_EMAIL"
   - BUILD_TIME=$(TZ=UTC date --rfc-3339=seconds)
-  - go get -mod= github.com/mitchellh/gox
+  - go get github.com/mitchellh/gox
   - mkdir -p output
   - OS_ARCH_BUILDS="darwin/amd64 linux/386 linux/amd64 linux/arm freebsd/386 freebsd/amd64 freebsd/arm windows/386 windows/amd64"
-  - gox --mod=vendor -osarch "$OS_ARCH_BUILDS" --ldflags "-X \"main.VERSION=$TRAVIS_TAG+build-$TRAVIS_BUILD_NUMBER, Build time $BUILD_TIME, commit $TRAVIS_COMMIT\"" --output="output/lets-proxy_{{.OS}}_{{.Arch}}" -verbose --rebuild ./cmd/
+  - GO111MODULE=on CGO_ENABLED=0 gox --mod=vendor -osarch "$OS_ARCH_BUILDS" --ldflags "-X \"main.VERSION=$TRAVIS_TAG+build-$TRAVIS_BUILD_NUMBER, Build time $BUILD_TIME, commit $TRAVIS_COMMIT\"" --output="output/lets-proxy_{{.OS}}_{{.Arch}}" -verbose --rebuild ./cmd/
   - bash tests/make_archives.sh
 
 deploy:
