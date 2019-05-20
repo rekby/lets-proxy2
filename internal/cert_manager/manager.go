@@ -10,6 +10,7 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -66,6 +67,7 @@ type Manager struct {
 	DomainChecker        DomainChecker
 	EnableHTTPValidation bool
 	EnableTLSValidation  bool
+	SaveJSONMeta         bool
 
 	certForDomainAuthorize cache.Value
 
@@ -441,11 +443,21 @@ func (m *Manager) issueCertificate(ctx context.Context, certName certNameType, d
 
 	cert, err := validCertDer(domains, der, key, false, time.Now())
 	log.DebugDPanic(logger, err, "Check certificate is valid")
-	if err == nil {
-		storeCertificate(ctx, m.Cache, certName, cert)
-		return cert, nil
+	if err != nil {
+		return nil, err
 	}
-	return nil, err
+	err = storeCertificate(ctx, m.Cache, certName, cert)
+	log.DebugDPanic(logger, err, "Certificate stored")
+	if err != nil {
+		return nil, err
+	}
+	if m.SaveJSONMeta {
+		err = storeCertificateMeta(ctx, m.Cache, certName, cert)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return cert, nil
 }
 
 func (m *Manager) renewCertInBackground(ctx context.Context, certName certNameType) {
@@ -585,11 +597,11 @@ func (m *Manager) deleteCertToken(ctx context.Context, key DomainName) {
 
 // It isn't atomic syncronized - caller must not save two certificates with same name same time
 func storeCertificate(ctx context.Context, cache cache.Cache, certName certNameType,
-	cert *tls.Certificate) {
+	cert *tls.Certificate) error {
 	logger := zc.L(ctx)
 	if cache == nil {
 		logger.Debug("Can't save certificate to nil cache")
-		return
+		return nil
 	}
 
 	locked, _ := isCertLocked(ctx, cache, certName)
@@ -605,7 +617,7 @@ func storeCertificate(ctx context.Context, cache cache.Cache, certName certNameT
 		err := pem.Encode(&certBuf, &pemBlock)
 		if err != nil {
 			logger.DPanic("Can't encode pem block of certificate", zap.Error(err), zap.Binary("block", block))
-			return
+			return err
 		}
 	}
 
@@ -619,11 +631,11 @@ func storeCertificate(ctx context.Context, cache cache.Cache, certName certNameT
 		err := pem.Encode(&privateKeyBuf, &pemBlock)
 		if err != nil {
 			logger.DPanic("Can't marshal rsa private key", zap.Error(err))
-			return
+			return err
 		}
 	default:
 		logger.DPanic("Unknow private key type", zap.String("type", reflect.TypeOf(cert.PrivateKey).String()))
-		return
+		return errors.New("unknow private key type")
 	}
 
 	if keyType == "" {
@@ -636,14 +648,30 @@ func storeCertificate(ctx context.Context, cache cache.Cache, certName certNameT
 	err := cache.Put(ctx, certKeyName, certBuf.Bytes())
 	if err != nil {
 		logger.Error("Can't store certificate file", zap.Error(err))
-		return
+		return err
 	}
 
 	err = cache.Put(ctx, keyKeyName, privateKeyBuf.Bytes())
 	if err != nil {
 		_ = cache.Delete(ctx, certKeyName)
 		logger.Error("Can't store certificate key file", zap.Error(err))
+		return err
 	}
+	return nil
+}
+
+func storeCertificateMeta(ctx context.Context, storage cache.Cache, key certNameType, certificate *tls.Certificate) error {
+	info := struct {
+		Domains    []string
+		ExpireDate time.Time
+	}{
+		Domains:    certificate.Leaf.DNSNames,
+		ExpireDate: certificate.Leaf.NotAfter,
+	}
+	infoBytes, _ := json.MarshalIndent(info, "", "    ")
+	err := storage.Put(ctx, key.String()+".json", infoBytes)
+	log.DebugDPanicCtx(ctx, err, "Save cert metadata")
+	return err
 }
 
 func getCertificate(ctx context.Context, cache cache.Cache, certName certNameType, keyType keyType) (cert *tls.Certificate, err error) {

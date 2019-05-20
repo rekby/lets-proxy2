@@ -3,11 +3,11 @@
 # Seconds for issue every certificate. Cancel issue and return error if timeout.
 IssueTimeout = 300
 
-# Comma separated for subdomains for try get common used subdomains in one certificate.
-AutoIssueForSubdomains = "www"
-
 # Path to dir, which will store state and certificates
 StorageDir = "storage"
+
+# Store .json info with certificate metadata near certificate.
+StoreJSONMetadata = true
 
 # Directory url of acme server.
 #Test server: https://acme-staging-v02.api.letsencrypt.org/directory
