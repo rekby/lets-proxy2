@@ -20,10 +20,10 @@ import (
 )
 
 type ConfigGeneral struct {
-	IssueTimeout           int
-	AutoIssueForSubdomains string
-	StorageDir             string
-	AcmeServer             string
+	IssueTimeout      int
+	StorageDir        string
+	AcmeServer        string
+	StoreJSONMetadata bool
 }
 
 //go:generate packr

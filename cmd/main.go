@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/rekby/lets-proxy2/internal/cert_manager"
 
@@ -57,7 +58,7 @@ func startProgram(config *configType) {
 	logger.Info("StartAutoRenew program version", zap.String("version", version()))
 
 	err := os.MkdirAll(config.General.StorageDir, defaultDirMode)
-	log.InfoFatal(logger, err, "Create storage dir")
+	log.InfoFatal(logger, err, "Create storage dir", zap.String("dir", config.General.StorageDir))
 
 	storage := &cache.DiskCache{Dir: config.General.StorageDir}
 	clientManager := acme_client_manager.New(ctx, storage)
@@ -66,6 +67,8 @@ func startProgram(config *configType) {
 	log.DebugFatal(logger, err, "Get acme client")
 
 	certManager := cert_manager.New(acmeClient, storage)
+	certManager.CertificateIssueTimeout = time.Duration(config.General.IssueTimeout) * time.Second
+	certManager.SaveJSONMeta = config.General.StoreJSONMetadata
 
 	certManager.DomainChecker, err = config.CheckDomains.CreateDomainChecker(ctx)
 	log.DebugFatal(logger, err, "Config domain checkers.")
