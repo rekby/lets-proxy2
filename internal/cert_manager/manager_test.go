@@ -3,6 +3,7 @@ package cert_manager
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -70,6 +71,30 @@ func createTestClient(t *testing.T) *acme.Client {
 		t.Fatal("Can't initialize acme client.")
 	}
 	return &client
+}
+
+func TestGetKeyType(t *testing.T) {
+	td := testdeep.NewT(t)
+	cert := &tls.Certificate{
+		PrivateKey: &rsa.PrivateKey{},
+	}
+	td.CmpDeeply(getKeyType(cert), keyRSA)
+
+	cert = &tls.Certificate{
+		PrivateKey: &ecdsa.PrivateKey{},
+	}
+	td.CmpDeeply(getKeyType(cert), keyECDSA)
+
+	cert = &tls.Certificate{
+		PrivateKey: "string - no key",
+	}
+	td.CmpDeeply(getKeyType(cert), keyUnknown)
+
+	cert = &tls.Certificate{}
+	td.CmpDeeply(getKeyType(cert), keyUnknown)
+
+	cert = nil
+	td.CmpDeeply(getKeyType(cert), keyUnknown)
 }
 
 func TestStoreCertificate(t *testing.T) {
