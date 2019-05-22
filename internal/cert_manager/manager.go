@@ -49,6 +49,8 @@ type GetContext interface {
 type keyType string
 
 const keyRSA keyType = "rsa"
+const keyECDSA keyType = "ecdsa"
+const keyUnknown keyType = "unknown"
 
 // Interface inspired to https://godoc.org/golang.org/x/crypto/acme/autocert#Manager but not compatible guarantee
 type Manager struct {
@@ -609,7 +611,7 @@ func storeCertificate(ctx context.Context, cache cache.Cache, certName certNameT
 		logger.Panic("Logical error - try to save to locked certificate")
 	}
 
-	var keyType keyType
+	var keyType = getKeyType(cert)
 
 	var certBuf bytes.Buffer
 	for _, block := range cert.Certificate {
@@ -623,9 +625,9 @@ func storeCertificate(ctx context.Context, cache cache.Cache, certName certNameT
 
 	var privateKeyBuf bytes.Buffer
 
-	switch privateKey := cert.PrivateKey.(type) {
-	case *rsa.PrivateKey:
-		keyType = keyRSA
+	switch keyType {
+	case keyRSA:
+		privateKey := cert.PrivateKey.(*rsa.PrivateKey)
 		keyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
 		pemBlock := pem.Block{Type: "RSA PRIVATE KEY", Bytes: keyBytes}
 		err := pem.Encode(&privateKeyBuf, &pemBlock)
@@ -669,9 +671,26 @@ func storeCertificateMeta(ctx context.Context, storage cache.Cache, key certName
 		ExpireDate: certificate.Leaf.NotAfter,
 	}
 	infoBytes, _ := json.MarshalIndent(info, "", "    ")
-	err := storage.Put(ctx, key.String()+".json", infoBytes)
+	keyTypeName := string(getKeyType(certificate))
+	keyName := fmt.Sprintf("%v.%v.json", key.String(), keyTypeName)
+	err := storage.Put(ctx, keyName, infoBytes)
 	log.DebugDPanicCtx(ctx, err, "Save cert metadata")
 	return err
+}
+
+func getKeyType(cert *tls.Certificate) keyType {
+	if cert == nil || cert.PrivateKey == nil {
+		return keyUnknown
+	}
+
+	switch cert.PrivateKey.(type) {
+	case *rsa.PrivateKey:
+		return keyRSA
+	case *ecdsa.PrivateKey:
+		return keyECDSA
+	default:
+		return keyUnknown
+	}
 }
 
 func getCertificate(ctx context.Context, cache cache.Cache, certName certNameType, keyType keyType) (cert *tls.Certificate, err error) {
