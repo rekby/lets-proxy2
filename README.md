@@ -10,8 +10,6 @@ English description
 ===================
 Home page: https://github.com/rekby/lets-proxy2
 
-Now it is alpha and not ready for production use.
-
 Features:
 * http-01 and tls-alpn-01 validation
 * HTTPS (with certificate autoissue) and HTTP reverse proxy
