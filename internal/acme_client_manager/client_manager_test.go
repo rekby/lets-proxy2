@@ -2,6 +2,7 @@
 package acme_client_manager
 
 import (
+	"context"
 	"crypto/rsa"
 	"encoding/json"
 	"math/big"
@@ -78,4 +79,11 @@ func TestClientManagerGetFromCache(t *testing.T) {
 	client2, err := manager.GetClient(ctx)
 	td.CmpNoError(err)
 	td.True(client == client2)
+
+	ctxCancelled, ctxCancelledCancel := context.WithCancel(ctx)
+	ctxCancelledCancel()
+
+	client3, err := manager.GetClient(ctxCancelled)
+	td.CmpError(err)
+	td.Nil(client3)
 }

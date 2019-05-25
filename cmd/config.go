@@ -90,24 +90,6 @@ func defaultConfig(ctx context.Context) []byte {
 	return configBytes
 }
 
-func readConfig(ctx context.Context, file string) *configType {
-	var res configType
-	logger := zc.LNop(ctx).With(zap.String("config_file", file))
-	var fileBytes []byte
-	var err error
-	fileBytes = defaultConfig(ctx)
-	err = toml.Unmarshal(fileBytes, &res)
-	log.DebugFatal(logger, err, "Read default config.")
-
-	if file != "" {
-		fileBytes, err = ioutil.ReadFile(file)
-		log.DebugFatal(logger, err, "Read config file", zap.String("filepath", file))
-		err = toml.Unmarshal(fileBytes, &res)
-		log.InfoFatal(logger, err, "Parse config file", zap.String("filepath", file))
-	}
-	return &res
-}
-
 func mergeConfigByTemplate(ctx context.Context, c *configType, filepathTemplate string) {
 	logger := zc.LNop(ctx).With(zap.String("config_file", filepathTemplate))
 	if !hasMeta(filepathTemplate) {

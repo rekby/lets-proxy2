@@ -1,3 +1,7 @@
+## ATTENTION
+# it is example file only. It builtin in binary and don't read from file system.
+# changes in config_default.toml have no real effect.
+
 [General]
 
 # Seconds for issue every certificate. Cancel issue and return error if timeout.

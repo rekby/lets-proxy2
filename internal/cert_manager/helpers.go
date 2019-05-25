@@ -53,7 +53,7 @@ func flatByteSlices(in [][]byte) []byte {
 }
 
 // Return valid parced certificate or error
-func validCertDer(domains []DomainName, der [][]byte, key crypto.PrivateKey, locked bool, now time.Time) (cert *tls.Certificate, err error) {
+func validCertDer(domains []DomainName, der [][]byte, key crypto.PrivateKey, useAsIs bool, now time.Time) (cert *tls.Certificate, err error) {
 	// parse public part(s)
 	x509Cert, err := x509.ParseCertificates(flatByteSlices(der))
 	if err != nil || len(x509Cert) == 0 {
@@ -68,10 +68,10 @@ func validCertDer(domains []DomainName, der [][]byte, key crypto.PrivateKey, loc
 		Leaf:        leaf,
 	}
 
-	return validCertTLS(cert, domains, locked, now)
+	return validCertTLS(cert, domains, useAsIs, now)
 }
 
-func validCertTLS(cert *tls.Certificate, domains []DomainName, locked bool, now time.Time) (validCert *tls.Certificate, err error) {
+func validCertTLS(cert *tls.Certificate, domains []DomainName, useAsIs bool, now time.Time) (validCert *tls.Certificate, err error) {
 	if cert == nil {
 		return nil, errors.New("certificate is nil")
 	}
@@ -88,7 +88,7 @@ func validCertTLS(cert *tls.Certificate, domains []DomainName, locked bool, now 
 		return nil, errors.New("certificate has no public key")
 	}
 
-	if locked {
+	if useAsIs {
 		return cert, nil
 	}
 
