@@ -50,7 +50,13 @@ var (
 		mustParseNet("fe80::/10"),
 		mustParseNet("ff00::/8"),
 	}
+
+	defaultResolver Resolver = net.DefaultResolver
 )
+
+func SetDefaultResolver(resolver Resolver) {
+	defaultResolver = resolver
+}
 
 type IPList struct {
 	Addresses          AllowedIPAddresses
@@ -75,7 +81,7 @@ func NewIPList(ctx context.Context, addresses AllowedIPAddresses) *IPList {
 	res := &IPList{
 		ctx:                ctx,
 		Addresses:          addresses,
-		Resolver:           net.DefaultResolver,
+		Resolver:           defaultResolver,
 		AutoUpdateInterval: time.Hour,
 	}
 	res.updateIPs()
@@ -92,6 +98,11 @@ func (s *IPList) IsDomainAllowed(ctx context.Context, domain string) (bool, erro
 	log.DebugInfo(logger, err, "Resolve domain ip addresses", zap.Any("ips", ips))
 	if err != nil {
 		return false, err
+	}
+
+	if len(ips) == 0 {
+		logger.Info("Doesn't allow domain without ip address")
+		return false, errors.New("domain has no ip address")
 	}
 
 	s.mu.RLock()

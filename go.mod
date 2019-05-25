@@ -9,8 +9,10 @@ require (
 	github.com/golangci/golangci-lint v1.16.0 // indirect
 	github.com/kardianos/minwinsvc v0.0.0-20151122163309-cad6b2b879b0
 	github.com/maxatome/go-testdeep v1.0.8
+	github.com/miekg/dns v1.1.12
 	github.com/mitchellh/gox v1.0.1 // indirect
 	github.com/pelletier/go-toml v1.3.0 // indirect
+	github.com/pkg/errors v0.8.1
 	github.com/rekby/zapcontext v0.0.3
 	github.com/satori/go.uuid v1.2.0
 	go.uber.org/zap v1.9.1

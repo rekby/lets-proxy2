@@ -185,6 +185,17 @@ func TestIPList_UpdateByTimer(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 }
 
+func TestSetDefaultResolver(t *testing.T) {
+	oldResolver := defaultResolver
+	defer func() {
+		defaultResolver = oldResolver
+	}()
+
+	resolver := NewResolverMock(t)
+	SetDefaultResolver(resolver)
+	testdeep.CmpDeeply(t, defaultResolver, resolver)
+}
+
 func TestSelfPublicIP_IsDomainAllowed(t *testing.T) {
 	var _ DomainChecker = &IPList{}
 
