@@ -13,6 +13,17 @@ StoreJSONMetadata = true
 #Test server: https://acme-staging-v02.api.letsencrypt.org/directory
 AcmeServer = "https://acme-v01.api.letsencrypt.org/directory"
 
+# Include other config files
+# It support glob syntax
+# If it has path without template - the file must exist.
+# For allow optional include file - it can contain some glob symbol
+# Included configs merge with current readed state.
+# example=[ "config.tom[l]" ]
+IncludeConfigs = []
+
+# For prevent infinite loop and consume all memory if cycle in includes
+MaxConfigFilesRead = 10000
+
 [Log]
 EnableLogToFile = true
 EnableLogToStdErr = true
