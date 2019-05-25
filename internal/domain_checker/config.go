@@ -5,6 +5,11 @@ import (
 	"context"
 	"net"
 	"regexp"
+	"strings"
+
+	"github.com/pkg/errors"
+
+	"github.com/rekby/lets-proxy2/internal/dns"
 
 	zc "github.com/rekby/zapcontext"
 
@@ -13,10 +18,11 @@ import (
 )
 
 type Config struct {
-	IPSelf      bool   `default:"true" comment:"Allow domain if it resolver for one of public IPs of this server."`
-	IPWhiteList string `default:"" comment:"Allow domain if it resolver for one of the ips."`
-	BlackList   string `default:"" comment:"Regexp in golang syntax of blacklisted domain for issue certificate.\nThis list overrided by whitelist."`
-	WhiteList   string `default:"" comment:"Regexp in golang syntax of whitelist domains for issue certificate.\nWhitelist need for allow part of domains, which excluded by blacklist.\n"`
+	IPSelf      bool
+	IPWhiteList string
+	BlackList   string
+	WhiteList   string
+	Resolver    string
 }
 
 func (c *Config) CreateDomainChecker(ctx context.Context) (DomainChecker, error) {
@@ -41,6 +47,36 @@ func (c *Config) CreateDomainChecker(ctx context.Context) (DomainChecker, error)
 		}
 		listCheckers = NewAny(listCheckers, NewRegexp(r))
 	}
+
+	var resolver Resolver
+	if strings.TrimSpace(c.Resolver) == "" {
+		resolver = net.DefaultResolver
+	} else {
+		stringAddresses := strings.Split(c.Resolver, ",")
+		var resolvers = make([]dns.ResolverInterface, 0, len(stringAddresses))
+		for _, addr := range stringAddresses {
+			addr = strings.TrimSpace(addr)
+			if addr == "" {
+				continue
+			}
+			tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
+			if err != nil {
+				logger.Error("Can't resolve dns server address string", zap.String("addr", addr), zap.Error(err))
+				return nil, err
+			}
+			if len(tcpAddr.IP) == 0 {
+				logger.Error("Can't resolve dns server address ip - it is empty.", zap.String("addr", addr))
+				return nil, errors.New("empty ip address")
+			}
+			if tcpAddr.Port == 0 {
+				tcpAddr.Port = 53 // default dns port
+			}
+			tcpAddrString := tcpAddr.String()
+			resolvers = append(resolvers, dns.NewResolver(tcpAddrString))
+		}
+		resolver = dns.NewParallel(resolvers...)
+	}
+	SetDefaultResolver(resolver)
 
 	var ipCheckers Any
 

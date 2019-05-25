@@ -86,6 +86,17 @@ BlackList = ""
 #
 WhiteList = ""
 
+# Comma separated dns server, used for resolve ip:port address of domains while check it.
+# if empty - use system dns resolver (usually include hosts file, cache, etc)
+# if set - use direct dns queries for servers, without self cache.
+# if set more, than one dns server - send queries in parallel to all servers.
+# error results from part of servers - ignore. Need minimum one answer.
+# if different dns servers return different ip addresses - all of them use for check
+# Example: "8.8.8.8:53,1.1.1.1:53,77.88.8.8:53,[2a02:6b8::feed:0ff]:53,[2001:4860:4860::8888]:53"
+Resolver = ""
+
+
+
 [Listen]
 
 # Bind addresses for TLS listeners
