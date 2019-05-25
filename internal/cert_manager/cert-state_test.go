@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	td "github.com/maxatome/go-testdeep"
+	"github.com/maxatome/go-testdeep"
 	"github.com/rekby/lets-proxy2/internal/th"
 )
 
@@ -21,24 +21,24 @@ func TestCertState(t *testing.T) {
 	defer flush()
 
 	s := &certState{}
-	td.CmpTrue(t, s.StartIssue(ctx))
-	td.CmpFalse(t, s.StartIssue(ctx))
+	testdeep.CmpTrue(t, s.StartIssue(ctx))
+	testdeep.CmpFalse(t, s.StartIssue(ctx))
 
 	cert := &tls.Certificate{Leaf: &x509.Certificate{Subject: pkix.Name{CommonName: "asd"}}}
 
 	s.FinishIssue(ctx, cert, nil)
 
 	rCert, rErr := s.Cert()
-	td.CmpDeeply(t, rCert, cert)
-	td.CmpNil(t, rErr)
+	testdeep.CmpDeeply(t, rCert, cert)
+	testdeep.CmpNil(t, rErr)
 
 	s = &certState{}
 	err1 := errors.New("1")
-	td.CmpTrue(t, s.StartIssue(ctx))
+	testdeep.CmpTrue(t, s.StartIssue(ctx))
 	s.FinishIssue(ctx, nil, err1)
 	rCert, rErr = s.Cert()
-	td.CmpNil(t, rCert)
-	td.CmpDeeply(t, rErr, err1)
+	testdeep.CmpNil(t, rCert)
+	testdeep.CmpDeeply(t, rErr, err1)
 
 }
 
@@ -150,15 +150,15 @@ func TestCertState_WaitFinishIssue(t *testing.T) {
 	//nolint:govet
 	ctxTimeout, _ := context.WithTimeout(ctx, timeout)
 	rCert, rErr := s.WaitFinishIssue(ctxTimeout)
-	td.CmpNil(t, rCert)
-	td.CmpNil(t, rErr)
+	testdeep.CmpNil(t, rCert)
+	testdeep.CmpNil(t, rErr)
 
 	s.StartIssue(ctx)
 	//nolint:govet
 	ctxTimeout, _ = context.WithTimeout(ctx, timeout)
 	rCert, rErr = s.WaitFinishIssue(ctxTimeout)
-	td.CmpNil(t, rCert)
-	td.CmpError(t, rErr)
+	testdeep.CmpNil(t, rCert)
+	testdeep.CmpError(t, rErr)
 
 	cert1 := &tls.Certificate{Leaf: &x509.Certificate{Subject: pkix.Name{CommonName: "asdasd"}}}
 	go func() {
@@ -168,8 +168,8 @@ func TestCertState_WaitFinishIssue(t *testing.T) {
 	//nolint:govet
 	ctxTimeout, _ = context.WithTimeout(ctx, timeout)
 	rCert, rErr = s.WaitFinishIssue(ctxTimeout)
-	td.CmpNoError(t, rErr)
-	td.CmpDeeply(t, rCert, cert1)
+	testdeep.CmpNoError(t, rErr)
+	testdeep.CmpDeeply(t, rCert, cert1)
 
 	s.StartIssue(ctx)
 	err2 := errors.New("2")
@@ -180,8 +180,8 @@ func TestCertState_WaitFinishIssue(t *testing.T) {
 	//nolint:govet
 	ctxTimeout, _ = context.WithTimeout(ctx, timeout)
 	rCert, rErr = s.WaitFinishIssue(ctxTimeout)
-	td.CmpNil(t, rCert)
-	td.CmpDeeply(t, rErr, err2)
+	testdeep.CmpNil(t, rCert)
+	testdeep.CmpDeeply(t, rErr, err2)
 }
 
 func TestCertState_FinishIssuePanic(t *testing.T) {
@@ -194,24 +194,52 @@ func TestCertState_FinishIssuePanic(t *testing.T) {
 	cert1 := &tls.Certificate{Leaf: &x509.Certificate{Subject: pkix.Name{CommonName: "asdf"}}}
 	err1 := errors.New("2")
 
-	td.CmpPanic(t, func() {
+	testdeep.CmpPanic(t, func() {
 		s.FinishIssue(th.NoLog(ctx), cert1, nil)
-	}, td.NotEmpty())
+	}, testdeep.NotEmpty())
 
 	rCert, rErr := s.Cert()
-	td.CmpDeeply(t, rCert, cert1)
-	td.CmpNil(t, rErr)
+	testdeep.CmpDeeply(t, rCert, cert1)
+	testdeep.CmpNil(t, rErr)
 
 	s = certState{}
 	s.StartIssue(ctx)
-	td.CmpPanic(t, func() {
+	testdeep.CmpPanic(t, func() {
 		s.FinishIssue(th.NoLog(ctx), nil, nil)
-	}, td.NotEmpty())
+	}, testdeep.NotEmpty())
 
 	s = certState{}
 	s.StartIssue(ctx)
-	td.CmpPanic(t, func() {
+	testdeep.CmpPanic(t, func() {
 		s.FinishIssue(th.NoLog(ctx), cert1, err1)
-	}, td.NotEmpty())
+	}, testdeep.NotEmpty())
 
+}
+
+func TestCertState_CertSet(t *testing.T) {
+	ctx, flush := th.TestContext()
+	defer flush()
+
+	td := testdeep.NewT(t)
+	s := certState{}
+	cert := &tls.Certificate{
+		OCSPStaple: []byte{1, 2, 3},
+	}
+	s.CertSet(ctx, true, cert)
+	td.CmpDeeply(s.cert, cert)
+	td.True(s.useAsIs)
+
+	s.CertSet(ctx, false, nil)
+	td.Nil(s.cert)
+	td.False(s.useAsIs)
+}
+
+func TestCertState_GetLocked(t *testing.T) {
+	td := testdeep.NewT(t)
+
+	s := certState{}
+	td.False(s.GetUseAsIs())
+
+	s.useAsIs = true
+	td.True(s.GetUseAsIs())
 }

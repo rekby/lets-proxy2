@@ -19,7 +19,7 @@ type certState struct {
 	issueContext       context.Context // nil if no issue process now
 	issueContextCancel func()
 	cert               *tls.Certificate
-	locked             bool
+	useAsIs            bool // certificate locked by flag. It deny renew and some internal checks.
 	lastError          error
 }
 
@@ -108,20 +108,14 @@ func (s *certState) CertSet(ctx context.Context, locked bool, cert *tls.Certific
 
 	s.mu.Lock()
 	s.cert = cert
-	s.locked = locked
+	s.useAsIs = locked
 	s.lastError = nil
 	s.mu.Unlock()
 }
 
-func (s *certState) SetLocked() {
-	s.mu.Lock()
-	s.locked = true
-	s.mu.Unlock()
-}
-
-func (s *certState) GetLocked() bool {
+func (s *certState) GetUseAsIs() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return s.locked
+	return s.useAsIs
 }
