@@ -5,7 +5,7 @@ import (
 	"errors"
 )
 
-var ErrCacheMiss = errors.New("lets proxy: certificate cache miss")
+var ErrCacheMiss = errors.New("lets proxy: cache miss")
 
 type Cache interface {
 	// Get returns a certificate data for the specified key.
