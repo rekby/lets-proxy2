@@ -14,7 +14,7 @@ StorageDir = "storage"
 StoreJSONMetadata = true
 
 # Directory url of acme server.
-#Test server: https://acme-staging-v02.api.letsencrypt.org/directory
+#Test server: https://acme-staging.api.letsencrypt.org/directory
 AcmeServer = "https://acme-v01.api.letsencrypt.org/directory"
 
 # Include other config files
