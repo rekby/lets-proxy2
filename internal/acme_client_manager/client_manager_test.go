@@ -30,6 +30,7 @@ func TestClientManagerCreateNew(t *testing.T) {
 	defer mc.Finish()
 
 	c := NewCacheMock(mc)
+	c.DeleteMock.When()
 
 	var err error
 
