@@ -37,7 +37,7 @@ const (
 
 const domainKeyRSALength = 2048
 
-var errHaveNoCert = errors.New("have no certificate for domain")
+var errHaveNoCert = errors.New("have no certificate for domain") // may return for any internal error
 
 //nolint:varcheck,deadcode,unused
 var errNotImplementedError = errors.New("not implemented yet")
@@ -55,7 +55,7 @@ const keyUnknown keyType = "unknown"
 // Interface inspired to https://godoc.org/golang.org/x/crypto/acme/autocert#Manager but not compatible guarantee
 type Manager struct {
 	CertificateIssueTimeout time.Duration
-	Cache                   cache.Cache
+	Cache                   cache.Bytes
 
 	// Client is used to perform low-level operations, such as account registration
 	// and requesting new certificates.
@@ -76,10 +76,10 @@ type Manager struct {
 	certStateMu sync.Mutex
 	certState   cache.Value
 
-	httpTokens cache.Cache
+	httpTokens cache.Bytes
 }
 
-func New(client AcmeClient, c cache.Cache) *Manager {
+func New(client AcmeClient, c cache.Bytes) *Manager {
 	res := Manager{}
 	res.Client = client
 	res.certForDomainAuthorize = cache.NewMemoryValueLRU("authcert")
@@ -598,7 +598,7 @@ func (m *Manager) deleteCertToken(ctx context.Context, key DomainName) {
 }
 
 // It isn't atomic syncronized - caller must not save two certificates with same name same time
-func storeCertificate(ctx context.Context, cache cache.Cache, certName certNameType,
+func storeCertificate(ctx context.Context, cache cache.Bytes, certName certNameType,
 	cert *tls.Certificate) error {
 	logger := zc.L(ctx)
 	if cache == nil {
@@ -662,7 +662,7 @@ func storeCertificate(ctx context.Context, cache cache.Cache, certName certNameT
 	return nil
 }
 
-func storeCertificateMeta(ctx context.Context, storage cache.Cache, key certNameType, certificate *tls.Certificate) error {
+func storeCertificateMeta(ctx context.Context, storage cache.Bytes, key certNameType, certificate *tls.Certificate) error {
 	info := struct {
 		Domains    []string
 		ExpireDate time.Time
@@ -693,7 +693,7 @@ func getKeyType(cert *tls.Certificate) keyType {
 	}
 }
 
-func getCertificate(ctx context.Context, cache cache.Cache, certName certNameType, keyType keyType) (cert *tls.Certificate, err error) {
+func getCertificate(ctx context.Context, c cache.Bytes, certName certNameType, keyType keyType) (cert *tls.Certificate, err error) {
 	logger := zc.L(ctx)
 	logger.Debug("Check certificate in cache")
 	defer func() {
@@ -702,38 +702,49 @@ func getCertificate(ctx context.Context, cache cache.Cache, certName certNameTyp
 
 	certKeyName := string(certName) + "." + string(keyType) + ".cer"
 
-	certBytes, err := cache.Get(ctx, certKeyName)
+	certBytes, err := c.Get(ctx, certKeyName)
+	log.DebugError(logger, err, "Get certificate from cache")
 	if err != nil {
+		if err != cache.ErrCacheMiss {
+			return nil, errHaveNoCert
+		}
 		return nil, err
 	}
-	keyBytes, err := getCertificateKeyBytes(ctx, cache, certName, keyType)
+	keyBytes, err := getCertificateKeyBytes(ctx, c, certName, keyType)
+	log.DebugError(logger, err, "Get certificate key from cache")
 	if err != nil {
-		return nil, err
+		// cert without key is logical error, may be system failure.
+		return nil, errHaveNoCert
 	}
 
 	cert2, err := tls.X509KeyPair(certBytes, keyBytes)
+	log.DebugError(logger, err, "Combine cert and key into pair")
 	if err != nil {
-		return nil, err
+		// logical error, may be system failure
+		return nil, errHaveNoCert
 	}
 	if len(cert2.Certificate) > 0 {
 		cert2.Leaf, err = x509.ParseCertificate(cert2.Certificate[0])
 		if err != nil {
-			return nil, err
+			// logical error, may be system failure
+			return nil, errHaveNoCert
 		}
 	}
-	locked, err := isCertLocked(ctx, cache, certName)
+	locked, err := isCertLocked(ctx, c, certName)
+	log.DebugError(logger, err, "Check if certificate locked")
 	if err != nil {
-		return nil, err
+		// logical error, may be system failure
+		return nil, errHaveNoCert
 	}
 	return validCertTLS(&cert2, nil, locked, time.Now())
 }
 
-func getCertificateKeyBytes(ctx context.Context, cache cache.Cache, certName certNameType, keyType keyType) ([]byte, error) {
+func getCertificateKeyBytes(ctx context.Context, cache cache.Bytes, certName certNameType, keyType keyType) ([]byte, error) {
 	keyKeyName := string(certName) + "." + string(keyType) + ".key"
 	return cache.Get(ctx, keyKeyName)
 }
 
-func getCertificateKey(ctx context.Context, cache cache.Cache, certName certNameType, keyType keyType) (crypto.Signer, error) {
+func getCertificateKey(ctx context.Context, cache cache.Bytes, certName certNameType, keyType keyType) (crypto.Signer, error) {
 	certBytes, err := getCertificateKeyBytes(ctx, cache, certName, keyType)
 	if err != nil {
 		return nil, err
@@ -799,7 +810,7 @@ func isNeedRenew(cert *tls.Certificate, now time.Time) bool {
 	return cert.Leaf.NotAfter.Add(-time.Hour * 24 * 30).Before(now)
 }
 
-func isCertLocked(ctx context.Context, storage cache.Cache, certName certNameType) (bool, error) {
+func isCertLocked(ctx context.Context, storage cache.Bytes, certName certNameType) (bool, error) {
 	lockName := certName.String() + ".lock"
 	_, err := storage.Get(ctx, lockName)
 	switch err {

@@ -29,14 +29,14 @@ type AcmeManager struct {
 	RenewAccountInterval time.Duration
 
 	ctx   context.Context
-	cache cache.Cache
+	cache cache.Bytes
 
 	mu      sync.Mutex
 	client  *acme.Client
 	account *acme.Account
 }
 
-func New(ctx context.Context, cache cache.Cache) *AcmeManager {
+func New(ctx context.Context, cache cache.Bytes) *AcmeManager {
 	return &AcmeManager{
 		ctx:                  ctx,
 		cache:                cache,
@@ -65,7 +65,7 @@ func (m *AcmeManager) GetClient(ctx context.Context) (*acme.Client, error) {
 	if m.cache != nil && !m.IgnoreCacheLoad {
 		err := m.loadFromCache(ctx)
 		if err != cache.ErrCacheMiss {
-			return m.client, err
+			return nil, err
 		}
 	}
 

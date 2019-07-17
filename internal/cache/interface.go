@@ -7,7 +7,7 @@ import (
 
 var ErrCacheMiss = errors.New("lets proxy: cache miss")
 
-type Cache interface {
+type Bytes interface {
 	// Get returns a certificate data for the specified key.
 	// If there's no such key, Get returns ErrCacheMiss.
 	Get(ctx context.Context, key string) ([]byte, error)
