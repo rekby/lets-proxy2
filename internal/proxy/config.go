@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/rekby/lets-proxy2/internal/log"
 
@@ -18,9 +19,10 @@ const defaultHTTPPort = 80
 
 //nolint:lll
 type Config struct {
-	DefaultTarget string
-	TargetMap     []string
-	Headers       []string
+	DefaultTarget           string
+	TargetMap               []string
+	Headers                 []string
+	KeepAliveTimeoutSeconds int
 }
 
 func (c *Config) Apply(ctx context.Context, p *HTTPProxy) error {
@@ -46,6 +48,7 @@ func (c *Config) Apply(ctx context.Context, p *HTTPProxy) error {
 
 	chainDirector := NewDirectorChain(chain...)
 	p.Director = chainDirector
+	p.IdleTimeout = time.Duration(c.KeepAliveTimeoutSeconds) * time.Second
 	return nil
 }
 
