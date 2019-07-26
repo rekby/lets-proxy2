@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	zc "github.com/rekby/zapcontext"
+	"go.uber.org/zap/zapcore"
 
 	"go.uber.org/zap"
 )
@@ -167,5 +168,11 @@ func infoPanic(logger *zap.Logger, err error, mess string, fields ...zap.Field) 
 		logger.Info(mess, fields...)
 	} else {
 		logger.Panic(mess, append(fields, zap.Error(err))...)
+	}
+}
+
+func LogLevel(logger *zap.Logger, level zapcore.Level, mess string, fields ...zap.Field) {
+	if ce := logger.Check(level, mess); ce != nil {
+		ce.Write(fields...)
 	}
 }

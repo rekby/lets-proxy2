@@ -65,7 +65,7 @@ func (m *AcmeManager) GetClient(ctx context.Context) (*acme.Client, error) {
 	if m.cache != nil && !m.IgnoreCacheLoad {
 		err := m.loadFromCache(ctx)
 		if err != cache.ErrCacheMiss {
-			return nil, err
+			return m.client, err
 		}
 	}
 

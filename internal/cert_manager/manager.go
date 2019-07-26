@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/rekby/lets-proxy2/internal/cache"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/rekby/lets-proxy2/internal/log"
 
@@ -158,16 +159,23 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 	locked, err := isCertLocked(ctx, m.Cache, certName)
 	log.DebugDPanic(logger, err, "Check if certificate locked")
 
-	cert, err = getCertificate(ctx, m.Cache, certName, keyRSA)
-	if err == nil {
-		logger.Debug("Certificate loaded from cache")
+	cert, err = loadCertificateFromCache(ctx, m.Cache, certName, keyRSA)
+	logLevel := zapcore.DebugLevel
+	if err != nil && err != cache.ErrCacheMiss {
+		logLevel = zapcore.ErrorLevel
+	}
+	log.LogLevel(logger, logLevel, "Load certificate from cache", zap.Error(err))
 
+	if err == nil {
 		cert, err = validCertDer([]DomainName{needDomain}, cert.Certificate, cert.PrivateKey, locked, now)
 		logger.Debug("Check if certificate ok", zap.Error(err))
 		if err == nil {
 			certState.CertSet(ctx, locked, cert)
 			return cert, nil
 		}
+	}
+	if err != cache.ErrCacheMiss {
+		return nil, errHaveNoCert
 	}
 
 	if locked {
@@ -693,7 +701,7 @@ func getKeyType(cert *tls.Certificate) keyType {
 	}
 }
 
-func getCertificate(ctx context.Context, c cache.Bytes, certName certNameType, keyType keyType) (cert *tls.Certificate, err error) {
+func loadCertificateFromCache(ctx context.Context, c cache.Bytes, certName certNameType, keyType keyType) (cert *tls.Certificate, err error) {
 	logger := zc.L(ctx)
 	logger.Debug("Check certificate in cache")
 	defer func() {
@@ -705,36 +713,32 @@ func getCertificate(ctx context.Context, c cache.Bytes, certName certNameType, k
 	certBytes, err := c.Get(ctx, certKeyName)
 	log.DebugError(logger, err, "Get certificate from cache")
 	if err != nil {
-		if err != cache.ErrCacheMiss {
-			return nil, errHaveNoCert
-		}
 		return nil, err
 	}
 	keyBytes, err := getCertificateKeyBytes(ctx, c, certName, keyType)
 	log.DebugError(logger, err, "Get certificate key from cache")
 	if err != nil {
-		// cert without key is logical error, may be system failure.
-		return nil, errHaveNoCert
+		return nil, err
 	}
 
 	cert2, err := tls.X509KeyPair(certBytes, keyBytes)
 	log.DebugError(logger, err, "Combine cert and key into pair")
 	if err != nil {
 		// logical error, may be system failure
-		return nil, errHaveNoCert
+		return nil, err
 	}
 	if len(cert2.Certificate) > 0 {
 		cert2.Leaf, err = x509.ParseCertificate(cert2.Certificate[0])
 		if err != nil {
 			// logical error, may be system failure
-			return nil, errHaveNoCert
+			return nil, err
 		}
 	}
 	locked, err := isCertLocked(ctx, c, certName)
 	log.DebugError(logger, err, "Check if certificate locked")
 	if err != nil {
 		// logical error, may be system failure
-		return nil, errHaveNoCert
+		return nil, err
 	}
 	return validCertTLS(&cert2, nil, locked, time.Now())
 }
