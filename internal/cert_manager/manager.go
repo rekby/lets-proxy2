@@ -174,7 +174,7 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 			return cert, nil
 		}
 	}
-	if err != cache.ErrCacheMiss {
+	if err != cache.ErrCacheMiss && err != errCertExpired {
 		return nil, errHaveNoCert
 	}
 

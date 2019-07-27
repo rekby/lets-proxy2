@@ -14,6 +14,8 @@ import (
 	"golang.org/x/crypto/acme"
 )
 
+var errCertExpired = errors.New("expired certificate")
+
 func isTLSALPN01Hello(hello *tls.ClientHelloInfo) bool {
 	return len(hello.SupportedProtos) == 1 && hello.SupportedProtos[0] == acme.ALPNProto
 }
@@ -111,7 +113,7 @@ func validCertTLS(cert *tls.Certificate, domains []DomainName, useAsIs bool, now
 		return nil, errors.New("certificate is not valid yet")
 	}
 	if now.After(cert.Leaf.NotAfter) {
-		return nil, errors.New("expired certificate")
+		return nil, errCertExpired
 	}
 
 	for _, domain := range domains {
