@@ -171,7 +171,7 @@ func infoPanic(logger *zap.Logger, err error, mess string, fields ...zap.Field) 
 	}
 }
 
-func LogLevel(logger *zap.Logger, level zapcore.Level, mess string, fields ...zap.Field) {
+func LevelParam(logger *zap.Logger, level zapcore.Level, mess string, fields ...zap.Field) {
 	if ce := logger.Check(level, mess); ce != nil {
 		ce.Write(fields...)
 	}

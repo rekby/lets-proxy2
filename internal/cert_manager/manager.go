@@ -164,7 +164,7 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 	if err != nil && err != cache.ErrCacheMiss {
 		logLevel = zapcore.ErrorLevel
 	}
-	log.LogLevel(logger, logLevel, "Load certificate from cache", zap.Error(err))
+	log.LevelParam(logger, logLevel, "Load certificate from cache", zap.Error(err))
 
 	if err == nil {
 		cert, err = validCertDer([]DomainName{needDomain}, cert.Certificate, cert.PrivateKey, locked, now)
