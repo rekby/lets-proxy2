@@ -62,6 +62,9 @@ MaxCount = 10
 #It can be: IP (with default port 80), :Port (default - same IP as receive connection), IPv4:Port or [IPv6]:Port
 DefaultTarget = ":80"
 
+# After KeepAliveTimeoutSeconds of inactive incoming connection will close.
+KeepAliveTimeoutSeconds = 900
+
 # Array of '-' separated pairs or IP:Port. For example:
 # [
 #   "1.2.3.4:443-2.2.2.2:1234",

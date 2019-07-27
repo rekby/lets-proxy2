@@ -29,14 +29,14 @@ type AcmeManager struct {
 	RenewAccountInterval time.Duration
 
 	ctx   context.Context
-	cache cache.Cache
+	cache cache.Bytes
 
 	mu      sync.Mutex
 	client  *acme.Client
 	account *acme.Account
 }
 
-func New(ctx context.Context, cache cache.Cache) *AcmeManager {
+func New(ctx context.Context, cache cache.Bytes) *AcmeManager {
 	return &AcmeManager{
 		ctx:                  ctx,
 		cache:                cache,

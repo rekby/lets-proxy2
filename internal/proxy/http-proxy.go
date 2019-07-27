@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"time"
 
 	"github.com/rekby/lets-proxy2/internal/contexthelper"
 
@@ -31,6 +32,7 @@ type HTTPProxy struct {
 	ctx              context.Context
 	listener         net.Listener
 	httpReverseProxy httputil.ReverseProxy
+	IdleTimeout      time.Duration
 }
 
 func NewHTTPProxy(ctx context.Context, listener net.Listener) *HTTPProxy {
@@ -64,6 +66,7 @@ func (p *HTTPProxy) Start() error {
 	})
 	httpServer := http.Server{}
 	httpServer.Handler = mux
+	httpServer.IdleTimeout = p.IdleTimeout
 
 	go func() {
 		<-p.ctx.Done()
