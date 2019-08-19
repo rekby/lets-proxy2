@@ -6,12 +6,12 @@ addons:
       - dos2unix
 
 go:
-  - "1.12.4"
+  - "1.10.x"
 
 services:
   - docker
 
-install:
+install:s
   - test -n "$TRAVIS_TAG" || bash tests/prepare.sh
 
 script:
