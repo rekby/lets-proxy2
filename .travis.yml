@@ -6,7 +6,7 @@ addons:
       - dos2unix
 
 go:
-  - "1.12.4"
+  - "1.10"
 
 services:
   - docker
@@ -42,4 +42,3 @@ deploy:
   api_key: $GITHUB_TOKEN
   file_glob: true
   file: output/*
-
