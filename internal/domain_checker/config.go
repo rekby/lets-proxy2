@@ -48,6 +48,45 @@ func (c *Config) CreateDomainChecker(ctx context.Context) (DomainChecker, error)
 		listCheckers = NewAny(listCheckers, NewRegexp(r))
 	}
 
+	resolver, err := c.createResolver(logger)
+	if err != nil {
+		log.DebugError(logger, err, "Create resolver")
+		return nil, err
+	}
+	SetDefaultResolver(resolver)
+
+	var ipCheckers Any
+
+	if c.IPSelf {
+		selfPublicIPList := NewIPList(ctx, CreateGetSelfPublicBinded(net.InterfaceAddrs))
+		selfPublicIPList.StartAutoRenew()
+		ipCheckers = append(ipCheckers, selfPublicIPList)
+	}
+
+	if c.IPWhiteList != "" {
+		ips, err := ParseIPs(ctx, c.IPWhiteList)
+		log.DebugError(logger, err, "Parse ip whitelist")
+		if err != nil {
+			return nil, err
+		}
+		whiteIpList := NewIPList(ctx, func(ctx context.Context) ([]net.IP, error) {
+			return ips, nil
+		})
+		// ipList.StartAutoRenew() - doesn't need renew, because list static
+		ipCheckers = append(ipCheckers, whiteIpList)
+	}
+
+	// If no ip checks - allow domain without ip check
+	// If have one or more ip checks - allow
+	if len(ipCheckers) == 0 {
+		ipCheckers = NewAny(True{})
+	}
+
+	res := NewAll(listCheckers, ipCheckers)
+	return res, nil
+}
+
+func (c *Config) createResolver(logger *zap.Logger) (Resolver, error) {
 	var resolver Resolver
 	if strings.TrimSpace(c.Resolver) == "" {
 		resolver = net.DefaultResolver
@@ -76,35 +115,5 @@ func (c *Config) CreateDomainChecker(ctx context.Context) (DomainChecker, error)
 		}
 		resolver = dns.NewParallel(resolvers...)
 	}
-	SetDefaultResolver(resolver)
-
-	var ipCheckers Any
-
-	if c.IPSelf {
-		selfPublicIpList := NewIPList(ctx, CreateGetSelfPublicBinded(net.InterfaceAddrs))
-		selfPublicIpList.StartAutoRenew()
-		ipCheckers = append(ipCheckers, selfPublicIpList)
-	}
-
-	if c.IPWhiteList != "" {
-		ips, err := ParseIPs(ctx, c.IPWhiteList)
-		log.DebugError(logger, err, "Parse ip whitelist")
-		if err != nil {
-			return nil, err
-		}
-		whiteIpList := NewIPList(ctx, func(ctx context.Context) ([]net.IP, error) {
-			return ips, nil
-		})
-		// ipList.StartAutoRenew() - doesn't need renew, because list static
-		ipCheckers = append(ipCheckers, whiteIpList)
-	}
-
-	// If no ip checks - allow domain without ip check
-	// If have one or more ip checks - allow
-	if len(ipCheckers) == 0 {
-		ipCheckers = NewAny(True{})
-	}
-
-	res := NewAll(listCheckers, ipCheckers)
-	return res, nil
+	return resolver, nil
 }

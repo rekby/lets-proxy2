@@ -71,7 +71,7 @@ func (p *HTTPProxy) Start() error {
 	go func() {
 		<-p.ctx.Done()
 		err := httpServer.Close()
-		log.DebugErrorCtx(p.ctx, err, "Http builtin reverse proxy stop because context cancelled")
+		log.DebugErrorCtx(p.ctx, err, "Http builtin reverse proxy stop because context canceled")
 	}()
 
 	zc.L(p.ctx).Info("Http builtin reverse proxy start")

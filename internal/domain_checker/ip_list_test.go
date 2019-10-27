@@ -30,22 +30,22 @@ func TestMastParseNet(t *testing.T) {
 
 func TestIsPublicIp(t *testing.T) {
 	td := testdeep.NewT(t)
-	td.True(isPublicIp(net.ParseIP("8.8.8.8")))
-	td.True(isPublicIp(net.ParseIP("2a02:6b8:0:1::feed:0ff")))
-	td.False(isPublicIp(net.ParseIP("")))
-	td.False(isPublicIp(net.ParseIP("127.0.0.1")))
-	td.False(isPublicIp(net.ParseIP("169.254.2.3")))
-	td.False(isPublicIp(net.ParseIP("192.168.1.1")))
-	td.False(isPublicIp(net.ParseIP("10.4.5.6")))
-	td.False(isPublicIp(net.ParseIP("172.16.33.2")))
-	td.False(isPublicIp(net.ParseIP("::")))
-	td.False(isPublicIp(net.ParseIP("::1")))
-	td.False(isPublicIp(net.ParseIP("::ffff:​192.168.0.1")))
-	td.False(isPublicIp(net.ParseIP("2001:db8::123")))
-	td.False(isPublicIp(net.ParseIP("fe80::33")))
-	td.False(isPublicIp(net.ParseIP("FC00::4")))
-	td.False(isPublicIp(net.ParseIP("ff00::a")))
-	td.False(isPublicIp(net.ParseIP("FF02:0:0:0:0:1:FF00::441")))
+	td.True(isPublicIP(net.ParseIP("8.8.8.8")))
+	td.True(isPublicIP(net.ParseIP("2a02:6b8:0:1::feed:0ff")))
+	td.False(isPublicIP(net.ParseIP("")))
+	td.False(isPublicIP(net.ParseIP("127.0.0.1")))
+	td.False(isPublicIP(net.ParseIP("169.254.2.3")))
+	td.False(isPublicIP(net.ParseIP("192.168.1.1")))
+	td.False(isPublicIP(net.ParseIP("10.4.5.6")))
+	td.False(isPublicIP(net.ParseIP("172.16.33.2")))
+	td.False(isPublicIP(net.ParseIP("::")))
+	td.False(isPublicIP(net.ParseIP("::1")))
+	td.False(isPublicIP(net.ParseIP("::ffff:192.168.0.1")))
+	td.False(isPublicIP(net.ParseIP("2001:db8::123")))
+	td.False(isPublicIP(net.ParseIP("fe80::33")))
+	td.False(isPublicIP(net.ParseIP("FC00::4")))
+	td.False(isPublicIP(net.ParseIP("ff00::a")))
+	td.False(isPublicIP(net.ParseIP("FF02:0:0:0:0:1:FF00::441")))
 }
 
 func TestGetBindedIpAddress(t *testing.T) {
@@ -65,7 +65,7 @@ func TestGetBindedIpAddress(t *testing.T) {
 		}, nil
 	}
 
-	res := getBindedIpAddress(ctx, f)
+	res := getBindedIPAddress(ctx, f)
 	td.CmpDeeply(res, []net.IP{net.ParseIP("127.0.0.1"), net.ParseIP("161.32.6.19"), net.ParseIP("::1"),
 		net.ParseIP("1.2.3.4"),
 		net.ParseIP("2a02:6b8::feed:0ff")})

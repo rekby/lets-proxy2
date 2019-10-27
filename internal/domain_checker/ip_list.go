@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	nonPublicIpNetworks = []net.IPNet{
+	nonPublicIPNetworks = []net.IPNet{
 		// list networks from https://en.wikipedia.org/wiki/Reserved_IP_addresses
 		mustParseNet("0.0.0.0/8"),
 		mustParseNet("10.0.0.0/8"),
@@ -110,8 +110,8 @@ func (s *IPList) IsDomainAllowed(ctx context.Context, domain string) (bool, erro
 
 hostIP:
 	for _, ip := range ips {
-		for _, bindedIp := range s.ips {
-			if ip.IP.Equal(bindedIp) {
+		for _, bindedIP := range s.ips {
+			if ip.IP.Equal(bindedIP) {
 				continue hostIP
 			}
 		}
@@ -167,7 +167,7 @@ func (s *IPList) updateIPsByTimer() {
 
 type InterfacesAddrFunc func() ([]net.Addr, error)
 
-func getBindedIpAddress(ctx context.Context, interfacesAddr InterfacesAddrFunc) []net.IP {
+func getBindedIPAddress(ctx context.Context, interfacesAddr InterfacesAddrFunc) []net.IP {
 	logger := zc.L(ctx)
 	binded, err := interfacesAddr()
 	log.DebugDPanic(logger, err, "Get system addresses", zap.Any("addresses", binded))
@@ -190,7 +190,7 @@ func getBindedIpAddress(ctx context.Context, interfacesAddr InterfacesAddrFunc) 
 func filterPublicOnlyIPs(ips []net.IP) []net.IP {
 	var public = make([]net.IP, 0, len(ips))
 	for _, ip := range ips {
-		if isPublicIp(ip) {
+		if isPublicIP(ip) {
 			public = append(public, ip)
 		}
 	}
@@ -199,7 +199,7 @@ func filterPublicOnlyIPs(ips []net.IP) []net.IP {
 
 func CreateGetSelfPublicBinded(binded InterfacesAddrFunc) AllowedIPAddresses {
 	var f AllowedIPAddresses = func(ctx context.Context) ([]net.IP, error) {
-		ips := getBindedIpAddress(ctx, binded)
+		ips := getBindedIPAddress(ctx, binded)
 		ips = filterPublicOnlyIPs(ips)
 		ips = truncatedCopyIPs(ips)
 		return ips, nil
@@ -237,12 +237,12 @@ func mustParseNet(s string) net.IPNet {
 	return *ipnet
 }
 
-func isPublicIp(ip net.IP) bool {
+func isPublicIP(ip net.IP) bool {
 	if len(ip) == 0 {
 		return false
 	}
 
-	for _, ipNet := range nonPublicIpNetworks {
+	for _, ipNet := range nonPublicIPNetworks {
 		if ipNet.Contains(ip) {
 			return false
 		}
