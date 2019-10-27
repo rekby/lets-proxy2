@@ -6,7 +6,7 @@ addons:
       - dos2unix
 
 go:
-  - "1.12"
+  - "1.13"
 
 services:
   - docker
