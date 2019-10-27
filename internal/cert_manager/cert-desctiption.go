@@ -21,6 +21,6 @@ func domainNamesFromCertificateName(name certNameType) []DomainName {
 	return []DomainName{DomainName(name), DomainName("www." + name)}
 }
 
-func logCetName(certName certNameType) zap.Field {
+func logCertName(certName certNameType) zap.Field {
 	return zap.String("cert_name", string(certName))
 }

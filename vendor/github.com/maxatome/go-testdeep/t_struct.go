@@ -16,6 +16,8 @@ type T struct {
 	Config ContextConfig // defaults to DefaultContextConfig
 }
 
+var _ TestingFT = T{}
+
 // NewT returns a new T instance. Typically used as:
 //
 //   import (
@@ -58,11 +60,11 @@ type T struct {
 //   }
 //
 // "config" is an optional argument and, if passed, must be unique. It
-// allows to configure how failures will be rendered during the life
-// time of the returned instance.
+// allows to configure how failures will be rendered during the
+// lifetime of the returned instance.
 //
 //   t := NewT(tt)
-//   t.CmpDeeply(
+//   t.Cmp(
 //     Record{Age: 12, Name: "Bob", Id: 12},  // got
 //     Record{Age: 21, Name: "John", Id: 28}) // expected
 //
@@ -88,7 +90,7 @@ type T struct {
 //       RootName:  "RECORD", // got data named "RECORD" instead of "DATA"
 //       MaxErrors: 2,        // stops after 2 errors instead of default 10
 //     })
-//   t.CmpDeeply(
+//   t.Cmp(
 //     Record{Age: 12, Name: "Bob", Id: 12},  // got
 //     Record{Age: 21, Name: "John", Id: 28}) // expected
 //
@@ -115,24 +117,36 @@ type T struct {
 // DefaultContextConfig.MaxErrors which is potentially dependent from
 // the TESTDEEP_MAX_ERRORS environment variable (else defaults to 10.)
 // See ContextConfig documentation for details.
+//
+// Of course "t" can already be a *T, in this special case if "config"
+// is omitted, the Config of the new instance is a copy of the "t"
+// Config.
 func NewT(t TestingFT, config ...ContextConfig) *T {
-	switch len(config) {
-	case 0:
-		return &T{
-			TestingFT: t,
-			Config:    DefaultContextConfig,
-		}
+	var newT T
 
-	case 1:
-		config[0].sanitize()
-		return &T{
-			TestingFT: t,
-			Config:    config[0],
-		}
-
-	default:
-		panic("usage: NewT(*testing.T[, ContextConfig]")
+	if len(config) > 1 {
+		panic("usage: NewT(TestingFT[, ContextConfig]")
 	}
+
+	// Already a *T, so steal its TestingFT and its Config if needed
+	if tdT, ok := t.(*T); ok {
+		newT.TestingFT = tdT.TestingFT
+		if len(config) == 0 {
+			newT.Config = tdT.Config
+		} else {
+			newT.Config = config[0]
+		}
+	} else {
+		newT.TestingFT = t
+		if len(config) == 0 {
+			newT.Config = DefaultContextConfig
+		} else {
+			newT.Config = config[0]
+		}
+	}
+	newT.Config.sanitize()
+
+	return &newT
 }
 
 // RootName changes the name of the got data. By default it is
@@ -160,8 +174,13 @@ func NewT(t TestingFT, config ...ContextConfig) *T {
 // Which is more readable than the generic:
 //
 //   DATA.Age: values differ
+//
+// If "" is passed the name is set to "DATA", the default value.
 func (t *T) RootName(rootName string) *T {
 	new := *t
+	if rootName == "" {
+		rootName = contextDefaultRootName
+	}
 	new.Config.RootName = rootName
 	return &new
 }
@@ -176,30 +195,44 @@ func (t *T) RootName(rootName string) *T {
 // It returns a new instance of *T so does not alter the original t
 // and used as follows:
 //
-//   // Following t.CmpDeeply() will call Fatal() if failure
+//   // Following t.Cmp() will call Fatal() if failure
 //   t = t.FailureIsFatal()
-//   t.CmpDeeply(...)
-//   t.CmpDeeply(...)
-//   // Following t.CmpDeeply() won't call Fatal() if failure
+//   t.Cmp(...)
+//   t.Cmp(...)
+//   // Following t.Cmp() won't call Fatal() if failure
 //   t = t.FailureIsFatal(false)
-//   t.CmpDeeply(...)
+//   t.Cmp(...)
 //
 // or, if only one call is critic:
 //
-//   // This CmpDeeply() call will call Fatal() if failure
-//   t.FailureIsFatal().CmpDeeply(...)
-//   // Following t.CmpDeeply() won't call Fatal() if failure
-//   t.CmpDeeply(...)
-//   t.CmpDeeply(...)
+//   // This Cmp() call will call Fatal() if failure
+//   t.FailureIsFatal().Cmp(...)
+//   // Following t.Cmp() won't call Fatal() if failure
+//   t.Cmp(...)
+//   t.Cmp(...)
 func (t *T) FailureIsFatal(enable ...bool) *T {
 	new := *t
 	new.Config.FailureIsFatal = len(enable) == 0 || enable[0]
 	return &new
 }
 
-// CmpDeeply is mostly a shortcut for:
+// UseEqual allows to use the Equal method on got (if it exists) or
+// on any of its component to compare got and expected values.
 //
-//   CmpDeeply(t.TestingFT, got, expected, args...)
+// The signature should be:
+//   (A) Equal(B) bool
+// with B assignable to A.
+//
+// See time.Time as an example of accepted Equal() method.
+func (t *T) UseEqual(enable ...bool) *T {
+	new := *t
+	new.Config.UseEqual = len(enable) == 0 || enable[0]
+	return &new
+}
+
+// Cmp is mostly a shortcut for:
+//
+//   Cmp(t.TestingFT, got, expected, args...)
 //
 // with the exception that t.Config is used to configure the test
 // Context.
@@ -208,57 +241,44 @@ func (t *T) FailureIsFatal(enable ...bool) *T {
 // logged as is in case of failure. If len(args) > 1 and the first
 // item of args is a string and contains a '%' rune then fmt.Fprintf
 // is used to compose the name, else args are passed to fmt.Fprint.
-func (t *T) CmpDeeply(got, expected interface{}, args ...interface{}) bool {
-	// Work around https://github.com/golang/go/issues/26995 issue
-	// when corrected, this block should be replaced by t.Helper()
-	if tt, ok := t.TestingFT.(*testing.T); ok {
-		tt.Helper()
-	} else {
-		t.Helper()
-	}
+func (t *T) Cmp(got, expected interface{}, args ...interface{}) bool {
+	t.Helper()
+	return cmpDeeply(newContextWithConfig(t.Config),
+		t.TestingFT, got, expected, args...)
+}
 
+// CmpDeeply works the same as Cmp and is still available for
+// compatibility purpose. Use shorter Cmp in new code.
+func (t *T) CmpDeeply(got, expected interface{}, args ...interface{}) bool {
+	t.Helper()
 	return cmpDeeply(newContextWithConfig(t.Config),
 		t.TestingFT, got, expected, args...)
 }
 
 // True is shortcut for:
 //
-//   t.CmpDeeply(got, true, args...)
+//   t.Cmp(got, true, args...)
 //
 // "args..." are optional and allow to name the test. This name is
 // logged as is in case of failure. If len(args) > 1 and the first
 // item of args is a string and contains a '%' rune then fmt.Fprintf
 // is used to compose the name, else args are passed to fmt.Fprint.
 func (t *T) True(got interface{}, args ...interface{}) bool {
-	// Work around https://github.com/golang/go/issues/26995 issue
-	// when corrected, this block should be replaced by t.Helper()
-	if tt, ok := t.TestingFT.(*testing.T); ok {
-		tt.Helper()
-	} else {
-		t.Helper()
-	}
-
-	return t.CmpDeeply(got, true, args...)
+	t.Helper()
+	return t.Cmp(got, true, args...)
 }
 
 // False is shortcut for:
 //
-//   t.CmpDeeply(got, false, args...)
+//   t.Cmp(got, false, args...)
 //
 // "args..." are optional and allow to name the test. This name is
 // logged as is in case of failure. If len(args) > 1 and the first
 // item of args is a string and contains a '%' rune then fmt.Fprintf
 // is used to compose the name, else args are passed to fmt.Fprint.
 func (t *T) False(got interface{}, args ...interface{}) bool {
-	// Work around https://github.com/golang/go/issues/26995 issue
-	// when corrected, this block should be replaced by t.Helper()
-	if tt, ok := t.TestingFT.(*testing.T); ok {
-		tt.Helper()
-	} else {
-		t.Helper()
-	}
-
-	return t.CmpDeeply(got, false, args...)
+	t.Helper()
+	return t.Cmp(got, false, args...)
 }
 
 // CmpError checks that "got" is non-nil error.
@@ -273,14 +293,7 @@ func (t *T) False(got interface{}, args ...interface{}) bool {
 // item of args is a string and contains a '%' rune then fmt.Fprintf
 // is used to compose the name, else args are passed to fmt.Fprint.
 func (t *T) CmpError(got error, args ...interface{}) bool {
-	// Work around https://github.com/golang/go/issues/26995 issue
-	// when corrected, this block should be replaced by t.Helper()
-	if tt, ok := t.TestingFT.(*testing.T); ok {
-		tt.Helper()
-	} else {
-		t.Helper()
-	}
-
+	t.Helper()
 	return cmpError(newContextWithConfig(t.Config), t.TestingFT, got, args...)
 }
 
@@ -298,14 +311,7 @@ func (t *T) CmpError(got error, args ...interface{}) bool {
 // item of args is a string and contains a '%' rune then fmt.Fprintf
 // is used to compose the name, else args are passed to fmt.Fprint.
 func (t *T) CmpNoError(got error, args ...interface{}) bool {
-	// Work around https://github.com/golang/go/issues/26995 issue
-	// when corrected, this block should be replaced by t.Helper()
-	if tt, ok := t.TestingFT.(*testing.T); ok {
-		tt.Helper()
-	} else {
-		t.Helper()
-	}
-
+	t.Helper()
 	return cmpNoError(newContextWithConfig(t.Config), t.TestingFT, got, args...)
 }
 
@@ -321,14 +327,7 @@ func (t *T) CmpNoError(got error, args ...interface{}) bool {
 // item of args is a string and contains a '%' rune then fmt.Fprintf
 // is used to compose the name, else args are passed to fmt.Fprint.
 func (t *T) CmpPanic(fn func(), expected interface{}, args ...interface{}) bool {
-	// Work around https://github.com/golang/go/issues/26995 issue
-	// when corrected, this block should be replaced by t.Helper()
-	if tt, ok := t.TestingFT.(*testing.T); ok {
-		tt.Helper()
-	} else {
-		t.Helper()
-	}
-
+	t.Helper()
 	return cmpPanic(newContextWithConfig(t.Config), t, fn, expected, args...)
 }
 
@@ -343,36 +342,27 @@ func (t *T) CmpPanic(fn func(), expected interface{}, args ...interface{}) bool 
 // item of args is a string and contains a '%' rune then fmt.Fprintf
 // is used to compose the name, else args are passed to fmt.Fprint.
 func (t *T) CmpNotPanic(fn func(), args ...interface{}) bool {
-	// Work around https://github.com/golang/go/issues/26995 issue
-	// when corrected, this block should be replaced by t.Helper()
-	if tt, ok := t.TestingFT.(*testing.T); ok {
-		tt.Helper()
-	} else {
-		t.Helper()
-	}
-
+	t.Helper()
 	return cmpNotPanic(newContextWithConfig(t.Config), t, fn, args...)
 }
 
-// Run runs "f" as a subtest of t called "name". It runs "f" in a separate
-// goroutine and blocks until "f" returns or calls t.Parallel to become
-// a parallel test. Run reports whether "f" succeeded (or at least did
-// not fail before calling t.Parallel).
+// RunT runs "f" as a subtest of t called "name". It runs "f" in a
+// separate goroutine and blocks until "f" returns or calls t.Parallel
+// to become a parallel test. RunT reports whether "f" succeeded (or at
+// least did not fail before calling t.Parallel).
 //
-// Run may be called simultaneously from multiple goroutines, but all
+// RunT may be called simultaneously from multiple goroutines, but all
 // such calls must return before the outer test function for t
 // returns.
 //
-// Under the hood, Run delegates all this stuff to testing.Run. That
+// Under the hood, RunT delegates all this stuff to testing.Run. That
 // is why this documentation is a copy/paste of testing.Run one.
-func (t *T) Run(name string, f func(t *T)) bool {
-	// Work around https://github.com/golang/go/issues/26995 issue
-	// when corrected, this block should be replaced by t.Helper()
-	if tt, ok := t.TestingFT.(*testing.T); ok {
-		tt.Helper()
-	} else {
-		t.Helper()
-	}
-
-	return t.TestingFT.Run(name, func(tt *testing.T) { f(NewT(tt)) })
+//
+// In versions up to v1.0.8, the name of this function was Run. As *T
+// now implements TestingFT interface, the original
+// (*testing.T).Run(string, func(t *testing.T)) is callable directly
+// on *T.
+func (t *T) RunT(name string, f func(t *T)) bool {
+	t.Helper()
+	return t.TestingFT.Run(name, func(tt *testing.T) { f(NewT(tt, t.Config)) })
 }

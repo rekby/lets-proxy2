@@ -1,6 +1,8 @@
 //nolint:golint
 package cert_manager
 
+//go:generate minimock -i github.com/rekby/lets-proxy2/internal/cache.Bytes -o ./cache_bytes_mock_test.go
+
 import (
 	"context"
 	"crypto/ecdsa"
@@ -20,15 +22,16 @@ import (
 
 	zc "github.com/rekby/zapcontext"
 
-	"github.com/gojuno/minimock"
+	"github.com/gojuno/minimock/v3"
 
 	"github.com/maxatome/go-testdeep"
+
 	"github.com/rekby/lets-proxy2/internal/th"
 
 	"golang.org/x/crypto/acme"
 )
 
-const testACMEServer = "http://localhost:4000/directory"
+const testACMEServer = "http://localhost:4001/directory"
 const rsaKeyLength = 2048
 
 type contextConnection struct {
@@ -112,7 +115,7 @@ func TestStoreCertificate(t *testing.T) {
 	}
 
 	mc := minimock.NewController(t)
-	cacheMock := NewCacheMock(mc).PutMock.Set(func(ctx context.Context, key string, data []byte) (err error) {
+	cacheMock := NewBytesMock(mc).PutMock.Set(func(ctx context.Context, key string, data []byte) (err error) {
 		fmt.Println(key)
 		fmt.Println(string(data))
 		return nil
@@ -138,12 +141,12 @@ type testManagerContext struct {
 	manager                *Manager
 	connContext            contextConnection
 	conn                   *ConnMock
-	cache                  *CacheMock
+	cache                  *BytesMock
 	certForDomainAuthorize *ValueMock
 	certState              *ValueMock
 	client                 *AcmeClientMock
 	domainChecker          *DomainCheckerMock
-	httpTokens             *CacheMock
+	httpTokens             *BytesMock
 }
 
 func TestManager_CertForLockedDomain(t *testing.T) {
@@ -188,12 +191,12 @@ func createManager(t *testing.T) (res testManagerContext, cancel func()) {
 		Conn:    res.conn,
 		Context: zc.WithLogger(context.Background(), zap.NewNop()),
 	}
-	res.cache = NewCacheMock(mc)
+	res.cache = NewBytesMock(mc)
 	res.client = NewAcmeClientMock(mc)
 	res.certForDomainAuthorize = NewValueMock(mc)
 	res.certState = NewValueMock(mc)
 	res.domainChecker = NewDomainCheckerMock(mc)
-	res.httpTokens = NewCacheMock(mc)
+	res.httpTokens = NewBytesMock(mc)
 
 	res.manager = &Manager{
 		CertificateIssueTimeout: time.Second,

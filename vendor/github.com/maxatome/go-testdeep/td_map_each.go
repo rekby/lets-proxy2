@@ -10,13 +10,14 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/maxatome/go-testdeep/helpers/tdutil"
 	"github.com/maxatome/go-testdeep/internal/ctxerr"
 	"github.com/maxatome/go-testdeep/internal/types"
 	"github.com/maxatome/go-testdeep/internal/util"
 )
 
 type tdMapEach struct {
-	BaseOKNil
+	baseOKNil
 	expected reflect.Value
 }
 
@@ -27,7 +28,7 @@ var _ TestDeep = &tdMapEach{}
 // to match to succeed.
 func MapEach(expectedValue interface{}) TestDeep {
 	return &tdMapEach{
-		BaseOKNil: NewBaseOKNil(3),
+		baseOKNil: newBaseOKNil(3),
 		expected:  reflect.ValueOf(expectedValue),
 	}
 }
@@ -66,13 +67,11 @@ func (m *tdMapEach) Match(ctx ctxerr.Context, got reflect.Value) *ctxerr.Error {
 
 	case reflect.Map:
 		var err *ctxerr.Error
-		for _, key := range got.MapKeys() {
-			err = deepValueEqual(ctx.AddMapKey(key), got.MapIndex(key), m.expected)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
+		tdutil.MapEach(got, func(k, v reflect.Value) bool {
+			err = deepValueEqual(ctx.AddMapKey(k), v, m.expected)
+			return err == nil
+		})
+		return err
 	}
 
 	if ctx.BooleanError {

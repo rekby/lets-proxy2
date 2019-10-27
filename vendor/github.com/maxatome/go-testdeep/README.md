@@ -6,14 +6,15 @@ go-testdeep
 [![Go Report Card](https://goreportcard.com/badge/github.com/maxatome/go-testdeep)](https://goreportcard.com/report/github.com/maxatome/go-testdeep)
 [![GoDoc](https://godoc.org/github.com/maxatome/go-testdeep?status.svg)](https://godoc.org/github.com/maxatome/go-testdeep)
 [![Version](https://img.shields.io/github/tag/maxatome/go-testdeep.svg)](https://github.com/maxatome/go-testdeep/releases)
-[![Awesome](https://cdn.rawgit.com/sindresorhus/awesome/d7305f38d29fed78fa85652e3a63e154dd8e8829/media/badge.svg)](https://github.com/avelino/awesome-go/#testing)
+[![Mentioned in Awesome Go](https://awesome.re/mentioned-badge.svg)](https://github.com/avelino/awesome-go/#testing)
 
 ![testdeep](doc/image.png)
 
 **Extremely flexible golang deep comparison, extends the go testing package.**
 
-- [Latest new](#latest-news)
+- [Latest news](#latest-news)
 - [Synopsis](#synopsis)
+- [Godoc table of contents](doc/toc.md#godoc-table-of-contents)
 - [Installation](#installation)
 - [Presentation](#presentation)
 - [Available operators](#available-operators)
@@ -28,27 +29,35 @@ go-testdeep
 
 ## Latest news
 
+- 2019/07/07: multiple changes occurred:
+  - `*T` type now implements `TestingFT`,
+  - add [`UseEqual` feature](https://godoc.org/github.com/maxatome/go-testdeep#T.UseEqual)
+    aka. delegates comparison to `Equal()` method of object,
+  - [`tdhttp.NewRequest()`](https://godoc.org/github.com/maxatome/go-testdeep/helpers/tdhttp#NewRequest),
+    [`tdhttp.NewJSONRequest()`](https://godoc.org/github.com/maxatome/go-testdeep/helpers/tdhttp#NewJSONRequest)
+    and
+    [`tdhttp.NewXMLRequest()`](https://godoc.org/github.com/maxatome/go-testdeep/helpers/tdhttp#NewXMLRequest)
+    now accept headers definition,
+- 2019/05/01: new [`Keys`] & [`Values`] operators (and their friends
+  [`CmpKeys`](https://godoc.org/github.com/maxatome/go-testdeep#CmpKeys),
+  [`CmpValues`](https://godoc.org/github.com/maxatome/go-testdeep#CmpValues),
+  [`T.Keys`](https://godoc.org/github.com/maxatome/go-testdeep#T.Keys)
+  &
+  [`T.Values`](https://godoc.org/github.com/maxatome/go-testdeep#T.Values));
+- 2019/04/27: new [`Cmp`] function and
+  [`T.Cmp`](https://godoc.org/github.com/maxatome/go-testdeep#T.Cmp)
+  method, shorter versions of
+  [`CmpDeeply`](https://godoc.org/github.com/maxatome/go-testdeep#CmpDeeply)
+  and [`T.CmpDeeply`](https://godoc.org/github.com/maxatome/go-testdeep#T.CmpDeeply);
 - 2019/01/13: test failures output is now colored by default. See
   [Environment variables](#environment-variables) to configure it;
-- 2019/01/07: introducing TestDeep helpers. First one is
-  [`tdhttp` or HTTP API testing helper](#tdhttp-or-http-api-testing-helper);
-- 2018/12/16: [`Between`], [`Gt`], [`Gte`], [`Lt`] & [`Lte`] operators
-  now handle strings as well;
-- 2018/12/07: [`Smuggle`] operator and its friends
-  [`CmpSmuggle`](https://godoc.org/github.com/maxatome/go-testdeep#CmpSmuggle)
-  &
-  [`T.Smuggle`](https://godoc.org/github.com/maxatome/go-testdeep#T.Smuggle)
-  are now more lax and gain the ability to work on struct
-  fields-paths.  [`Shallow`] operator and its friends
-  [`CmpShallow`](https://godoc.org/github.com/maxatome/go-testdeep#CmpShallow)
-  &
-  [`T.Shallow`](https://godoc.org/github.com/maxatome/go-testdeep#T.Shallow)
-  can now work on strings;
 - see [commits history](https://github.com/maxatome/go-testdeep/commits/master)
   for other/older changes.
 
 
 ## Synopsis
+
+![error output](doc/colored-output.svg)
 
 ```go
 import (
@@ -75,7 +84,7 @@ func TestCreateRecord(t *testing.T) {
 
   if td.CmpNoError(t, err) {
     // If you know the exact value of all fields of newly created record
-    td.CmpDeeply(t, record,
+    td.Cmp(t, record,
       &Record{
         Id:        245,
         Name:      "Bob",
@@ -86,7 +95,7 @@ func TestCreateRecord(t *testing.T) {
 
     // But as often you cannot guess the values of DB generated fields,
     // you can choose to ignore them and only test the non-zero ones
-    td.CmpDeeply(t, record,
+    td.Cmp(t, record,
       td.Struct(
         &Record{
           Name: "Bob",
@@ -96,7 +105,7 @@ func TestCreateRecord(t *testing.T) {
       "Name & Age fields of newly created record")
 
     // Anyway, it is better to be able to test all fields!
-    td.CmpDeeply(t, record,
+    td.Cmp(t, record,
       td.Struct(
         &Record{
           Name: "Bob",
@@ -116,45 +125,19 @@ Imagine `CreateRecord` does not set correctly `CreatedAt` field, then:
 go test -run=TestCreateRecord
 ```
 
-outputs for last `td.CmpDeeply` call:
-```
---- FAIL: TestCreateRecord (0.00s)
-  test_test.go:46: Failed test 'Newly created record'
-    DATA.CreatedAt: values differ
-           got: 2018-05-27 10:55:50.788166932 +0200 CEST m=-2.998149554
-      expected: 2018-05-27 10:55:53.788163509 +0200 CEST m=+0.001848002 ≤ got ≤ 2018-05-27 10:55:53.788464176 +0200 CEST m=+0.002148179
-    [under TestDeep operator Between at test_test.go:54]
-FAIL
-exit status 1
-FAIL  github.com/maxatome/go-testdeep  0.006s
-```
+outputs for last `td.Cmp` call:
+
+![error output](doc/colored-newly1.svg)
 
 If `CreateRecord` had not set correctly `Id` field, output would have
 been:
-```
---- FAIL: TestCreateRecord (0.00s)
-  test_test.go:46: Failed test 'Newly created record'
-    DATA.Id: zero value
-           got: (uint64) 0
-      expected: NotZero()
-    [under TestDeep operator Not at test_test.go:53]
-FAIL
-exit status 1
-FAIL  github.com/maxatome/go-testdeep  0.006s
-```
 
-If `CreateRecord` had not set `Name` field to "Alice" value instead of
+![error output](doc/colored-newly2.svg)
+
+If `CreateRecord` had set `Name` field to "Alice" value instead of
 expected "Bob", output would have been:
-```
---- FAIL: TestCreateRecord (0.00s)
-  test_test.go:46: Failed test 'Newly created record'
-    DATA.Name: values differ
-           got: "Alice"
-      expected: "Bob"
-FAIL
-exit status 1
-FAIL  github.com/maxatome/go-testdeep  0.006s
-```
+
+![error output](doc/colored-newly3.svg)
 
 Using [`testdeep.T`][`T`]
 type, `TestCreateRecord` can also be written as:
@@ -188,7 +171,7 @@ func TestCreateRecord(tt *testing.T) {
     t := t.RootName("RECORD") // Use RECORD instead of DATA in failure reports
 
     // If you know the exact value of all fields of newly created record
-    t.CmpDeeply(record,
+    t.Cmp(record,
       &Record{
         Id:        245,
         Name:      "Bob",
@@ -210,8 +193,8 @@ func TestCreateRecord(tt *testing.T) {
       },
       "Newly created record")
 
-    // Or using CmpDeeply method, it's a matter of taste
-    t.CmpDeeply(record,
+    // Or using Cmp method, it's a matter of taste
+    t.Cmp(record,
       td.Struct(
         Record{
           Name: "Bob",
@@ -225,6 +208,8 @@ func TestCreateRecord(tt *testing.T) {
   }
 }
 ```
+
+See [godoc table of contents](doc/toc.md#godoc-table-of-contents) for details.
 
 
 ## Installation
@@ -293,7 +278,7 @@ func TestCreateRecord(t *testing.T) {
 }
 ```
 
-With `testdeep`, it is a way simple, thanks to [`CmpDeeply`] function:
+With `testdeep`, it is a way simple, thanks to [`Cmp`] function:
 
 ```go
 import (
@@ -307,8 +292,8 @@ func TestCreateRecord(t *testing.T) {
   before := time.Now()
   record, err := CreateRecord("Bob", 23)
 
-  if td.CmpDeeply(t, err, nil) {
-    td.CmpDeeply(t, record,
+  if td.Cmp(t, err, nil) {
+    td.Cmp(t, record,
       td.Struct(
         Record{
           Name: "Bob",
@@ -327,7 +312,7 @@ Of course not only structs can be compared. A lot of
 [operators](#available-operators) can be found below to cover most
 (all?) needed tests.
 
-The [`CmpDeeply`] function is the keystone of this package,
+The [`Cmp`] function is the keystone of this package,
 but to make the writing of tests even easier, the family of `Cmp*`
 functions are provided and act as shortcuts. Using
 [`CmpNoError`](https://godoc.org/github.com/maxatome/go-testdeep#CmpNoError)
@@ -394,6 +379,8 @@ func TestCreateRecord(tt *testing.T) {
 }
 ```
 
+See [godoc table of contents](doc/toc.md#godoc-table-of-contents) for details.
+
 
 ## Available operators
 
@@ -427,6 +414,7 @@ See functions returning [`TestDeep` interface][`TestDeep`]:
 - [`Ignore`] allows to ignore a comparison;
 - [`Isa`] checks the data type or whether data implements an interface
   or not;
+- [`Keys`] checks keys of a map;
 - [`Len`] checks an array, slice, map, string or channel length;
 - [`Lt`] checks that a number, string or [`time.Time`] is lesser than a value;
 - [`Lte`] checks that a number, string or [`time.Time`] is lesser or equal
@@ -482,6 +470,7 @@ See functions returning [`TestDeep` interface][`TestDeep`]:
   potentially some extra items;
 - [`TruncTime`] compares time.Time (or assignable) values after
   truncating them;
+- [`Values`] checks values of a map;
 - [`Zero`] checks data against its zero'ed conterpart.
 
 
@@ -504,10 +493,12 @@ example of use.
 ## Environment variables
 
 - `TESTDEEP_MAX_ERRORS` maximum number of errors to report before
-  stopping during one comparison (one [`CmpDeeply`] execution for
+  stopping during one comparison (one [`Cmp`] execution for
   example). It defaults to 10;
 - `TESTDEEP_COLOR` enable (`on`) or disable (`off`) the color
   output. It defaults to `on`;
+- `TESTDEEP_COLOR_TEST_NAME` color of the test name. See below
+  for color format, it defaults to `yellow`;
 - `TESTDEEP_COLOR_TITLE` color of the test failure title. See below
   for color format, it defaults to `cyan`;
 - `TESTDEEP_COLOR_OK` color of the test expected value. See below
@@ -571,6 +562,7 @@ TESTDEEP_COLOR_OK=black:green \
 | [`HasSuffix`]       | ✗ | ✗ | ✓ | ✗ | ✗ | ✗    | ✗ | ✗ | ✗ | ✗             | ✗                             | ✓ + [`fmt.Stringer`], [`error`] | ✗ | ✗ | [`HasSuffix`] |
 | [`Ignore`]          | ✓ | ✓ | ✓ | ✓ | ✓ | ✓    | ✓ | ✓ | ✓ | ✓             | ✓                             | ✓ | ✓ | ✓ | [`Ignore`] |
 | [`Isa`]             | ✗ | ✓ | ✓ | ✓ | ✓ | ✓    | ✓ | ✓ | ✓ | ✓             | ✓                             | ✓ | ✓ | ✓ | [`Isa`] |
+| [`Keys`]            | ✗ | ✗ | ✗ | ✗ | ✗ | ✗    | ✗ | ✗ | ✓ | ✗             | ✗                             | ✓ | ✗ | ✗ | [`Keys`] |
 | [`Len`]             | ✗ | ✗ | ✓ | ✗ | ✗ | ✗    | ✓ | ✓ | ✓ | ✗             | ✗                             | ✓ | ✓ | ✗ | [`Len`] |
 | [`Lt`]              | ✗ | ✗ | ✓ | ✓ | ✓ | todo | ✗ | ✗ | ✗ | [`time.Time`] | ✗                             | ✓ | ✗ | ✗ | [`Lt`] |
 | [`Lte`]             | ✗ | ✗ | ✓ | ✓ | ✓ | todo | ✗ | ✗ | ✗ | [`time.Time`] | ✗                             | ✓ | ✗ | ✗ | [`Lte`] |
@@ -604,19 +596,20 @@ TESTDEEP_COLOR_OK=black:green \
 | Operator vs go type | nil | bool | string | {u,}int* | float* | complex* | array | slice | map | struct | pointer | interface¹ | chan | func | operator |
 | ------------------- | --- | ---- | ------ | -------- | ------ | -------- | ----- | ----- | --- | ------ | ------- | ---------- | ---- | ---- | -------- |
 | [`String`]          | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗             | ✗                  | ✓ + [`fmt.Stringer`], [`error`] | ✗ | ✗ | [`String`] |
-| [`Struct`]          | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✓             | ptr on struct      | ✓ | ✗ | ✗ | [`Struct`] |
+| [`Struct`]          | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓             | ptr on struct      | ✓ | ✗ | ✗ | [`Struct`] |
 | [`SubBagOf`]        | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗             | ptr on array/slice | ✓ | ✗ | ✗ | [`SubBagOf`] |
 | [`SubMapOf`]        | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗             | ptr on map         | ✓ | ✗ | ✗ | [`SubMapOf`] |
 | [`SubSetOf`]        | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗             | ptr on array/slice | ✓ | ✗ | ✗ | [`SubSetOf`] |
 | [`SuperBagOf`]      | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗             | ptr on array/slice | ✓ | ✗ | ✗ | [`SuperBagOf`] |
 | [`SuperMapOf`]      | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗             | ptr on map         | ✓ | ✗ | ✗ | [`SuperMapOf`] |
 | [`SuperSetOf`]      | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗             | ptr on array/slice | ✓ | ✗ | ✗ | [`SuperSetOf`] |
-| [`TruncTime`]       | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | [`time.Time`] | todo               | ✓ | ✗ | ✗ | [`TruncTime`] |
+| [`TruncTime`]       | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | [`time.Time`] | todo               | ✓ | ✗ | ✗ | [`TruncTime`] |
+| [`Values`]          | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗             | ✗                  | ✓ | ✗ | ✗ | [`Values`] |
 | [`Zero`]            | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓             | ✓                  | ✓ | ✓ | ✓ | [`Zero`] |
 
 Legend:
-- ✗ means using this operator with this go type will always fail
-- ✓ means using this operator with this go type can succeed
+- ✗ means using this operator with a value type of this kind will always fail
+- ✓ means using this operator with a value type of this kind can succeed
 - `[]byte`, [`time.Time`], ptr on X, [`fmt.Stringer`], [`error`] means using
   this operator with this go type can succeed
 - todo means should be implemented in future (PRs welcome :) )
@@ -668,6 +661,7 @@ See [FAQ](doc/FAQ.md).
 [`HasSuffix`]: https://godoc.org/github.com/maxatome/go-testdeep#HasSuffix
 [`Ignore`]: https://godoc.org/github.com/maxatome/go-testdeep#Isa
 [`Isa`]: https://godoc.org/github.com/maxatome/go-testdeep#Isa
+[`Keys`]: https://godoc.org/github.com/maxatome/go-testdeep#Keys
 [`Len`]: https://godoc.org/github.com/maxatome/go-testdeep#Len
 [`Lt`]: https://godoc.org/github.com/maxatome/go-testdeep#Lt
 [`Lte`]: https://godoc.org/github.com/maxatome/go-testdeep#Lte
@@ -700,11 +694,12 @@ See [FAQ](doc/FAQ.md).
 [`SuperMapOf`]: https://godoc.org/github.com/maxatome/go-testdeep#SuperMapOf
 [`SuperSetOf`]: https://godoc.org/github.com/maxatome/go-testdeep#SuperSetOf
 [`TruncTime`]: https://godoc.org/github.com/maxatome/go-testdeep#TruncTime
+[`Values`]: https://godoc.org/github.com/maxatome/go-testdeep#Values
 [`Zero`]: https://godoc.org/github.com/maxatome/go-testdeep#Zero
 
 [`T`]: https://godoc.org/github.com/maxatome/go-testdeep#T
 [`TestDeep`]: https://godoc.org/github.com/maxatome/go-testdeep#TestDeep
-[`CmpDeeply`]: https://godoc.org/github.com/maxatome/go-testdeep#CmpDeeply
+[`Cmp`]: https://godoc.org/github.com/maxatome/go-testdeep#Cmp
 
 [`error`]: https://golang.org/ref/spec#Errors
 [`fmt.Stringer`]: https://golang.org/pkg/fmt/#Stringer

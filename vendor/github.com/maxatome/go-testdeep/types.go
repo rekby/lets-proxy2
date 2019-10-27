@@ -24,12 +24,13 @@ var (
 	errorInterface     = reflect.TypeOf((*error)(nil)).Elem()
 	timeType           = reflect.TypeOf(time.Time{})
 	intType            = reflect.TypeOf(int(0))
+	boolType           = reflect.TypeOf(false)
 	smuggledGotType    = reflect.TypeOf(SmuggledGot{})
 	smuggledGotPtrType = reflect.TypeOf((*SmuggledGot)(nil))
 )
 
-// TestingT is the minimal interface used by CmpDeeply to report
-// errors. It is commonly implemented by *testing.T and testing.TB.
+// TestingT is the minimal interface used by Cmp to report errors. It
+// is commonly implemented by *testing.T and testing.TB.
 type TestingT interface {
 	Error(args ...interface{})
 	Fatal(args ...interface{})
@@ -67,14 +68,27 @@ type TestDeep interface {
 	TypeBehind() reflect.Type
 }
 
-// Base is a base type providing some methods needed by the TestDeep
+// base is a base type providing some methods needed by the TestDeep
 // interface.
-type Base struct {
+type base struct {
 	types.TestDeepStamp
 	location location.Location
 }
 
-func (t *Base) setLocation(callDepth int) {
+func pkgFunc(full string) (string, string) {
+	// the/package.Foo      → "the/package", "Foo"
+	dotPos := strings.LastIndex(full, ".")
+	pkg, fn := full[:dotPos], full[dotPos+1:]
+
+	// the/package.(*T).Foo → "the/package", "(*T).Foo"
+	if dotPos > 0 && pkg[len(pkg)-1] == ')' {
+		dotPos = strings.LastIndex(pkg, ".")
+		pkg, fn = full[:dotPos], full[dotPos+1:]
+	}
+	return pkg, fn
+}
+
+func (t *base) setLocation(callDepth int) {
 	var ok bool
 	t.location, ok = location.New(callDepth)
 	if !ok {
@@ -83,66 +97,64 @@ func (t *Base) setLocation(callDepth int) {
 		return
 	}
 
-	opDotPos := strings.LastIndex(t.location.Func, ".")
+	// Here package is github.com/maxatome/go-testdeep, or its vendored
+	// counterpart
+	var pkg string
+	pkg, t.location.Func = pkgFunc(t.location.Func)
 
-	// Try to go one level upper, to check if it is a CmpXxx function
+	// Try to go one level upper, if we are still in go-testdeep package
 	cmpLoc, ok := location.New(callDepth + 1)
 	if ok {
-		cmpDotPos := strings.LastIndex(cmpLoc.Func, ".")
-
-		// Must be in same package as found operator
-		if t.location.Func[:opDotPos] == cmpLoc.Func[:cmpDotPos] &&
-			strings.HasPrefix(cmpLoc.Func[cmpDotPos+1:], "Cmp") &&
-			cmpLoc.Func != "CmpDeeply" {
-			t.location = cmpLoc
-			opDotPos = cmpDotPos
+		cmpPkg, _ := pkgFunc(cmpLoc.Func)
+		if cmpPkg == pkg {
+			t.location.File = cmpLoc.File
+			t.location.Line = cmpLoc.Line
+			t.location.BehindCmp = true
 		}
 	}
-
-	t.location.Func = t.location.Func[opDotPos+1:]
 }
 
 // GetLocation returns a copy of the location.Location where the TestDeep
 // operator has been created.
-func (t *Base) GetLocation() location.Location {
+func (t *base) GetLocation() location.Location {
 	return t.location
 }
 
 // HandleInvalid tells testdeep internals that this operator does not
 // handle nil values directly.
-func (t Base) HandleInvalid() bool {
+func (t base) HandleInvalid() bool {
 	return false
 }
 
 // TypeBehind returns the type handled by the operator. Only few operators
 // knows the type they are handling. If they do not know, nil is
 // returned.
-func (t Base) TypeBehind() reflect.Type {
+func (t base) TypeBehind() reflect.Type {
 	return nil
 }
 
-// NewBase returns a new Base struct with location.Location set to the
+// newBase returns a new base struct with location.Location set to the
 // "callDepth" depth.
-func NewBase(callDepth int) (b Base) {
+func newBase(callDepth int) (b base) {
 	b.setLocation(callDepth)
 	return
 }
 
-// BaseOKNil is a base type providing some methods needed by the TestDeep
+// baseOKNil is a base type providing some methods needed by the TestDeep
 // interface, for operators handling nil values.
-type BaseOKNil struct {
-	Base
+type baseOKNil struct {
+	base
 }
 
 // HandleInvalid tells testdeep internals that this operator handles
 // nil values directly.
-func (t BaseOKNil) HandleInvalid() bool {
+func (t baseOKNil) HandleInvalid() bool {
 	return true
 }
 
-// NewBaseOKNil returns a new BaseOKNil struct with location.Location set to
+// newBaseOKNil returns a new baseOKNil struct with location.Location set to
 // the "callDepth" depth.
-func NewBaseOKNil(callDepth int) (b BaseOKNil) {
+func newBaseOKNil(callDepth int) (b baseOKNil) {
 	b.setLocation(callDepth)
 	return
 }

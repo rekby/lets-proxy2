@@ -42,6 +42,19 @@ func DebugInfoCtx(ctx context.Context, err error, mess string, fields ...zap.Fie
 	debugInfo(zc.L(ctx), err, mess, fields...)
 }
 
+func DebugWarning(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
+	debugWarning(logger, err, mess, fields...)
+}
+
+func debugWarning(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
+	logger = logger.WithOptions(zap.AddCallerSkip(2))
+	if err == nil {
+		logger.Debug(mess, fields...)
+	} else {
+		logger.Warn(mess, append(fields, zap.Error(err))...)
+	}
+}
+
 func DebugError(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
 	debugError(logger, err, mess, fields...)
 }

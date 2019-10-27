@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gojuno/minimock"
+	"github.com/gojuno/minimock/v3"
 	"github.com/maxatome/go-testdeep"
 	td "github.com/maxatome/go-testdeep"
 	"github.com/rekby/lets-proxy2/internal/cache"
@@ -29,7 +29,7 @@ func TestManager_GetCertificateHttp01(t *testing.T) {
 	mc := minimock.NewController(t)
 	defer mc.Finish()
 
-	cacheMock := NewCacheMock(mc)
+	cacheMock := NewBytesMock(mc)
 	cacheMock.GetMock.Set(func(ctx context.Context, key string) (ba1 []byte, err error) {
 		zc.L(ctx).Debug("Cache mock get", zap.String("key", key))
 
@@ -195,7 +195,7 @@ func TestManager_GetCertificateTls(t *testing.T) {
 	mc := minimock.NewController(t)
 	defer mc.Finish()
 
-	cacheMock := NewCacheMock(mc)
+	cacheMock := NewBytesMock(mc)
 	cacheMock.GetMock.Set(func(ctx context.Context, key string) (ba1 []byte, err error) {
 		zc.L(ctx).Debug("Cache mock get", zap.String("key", key))
 

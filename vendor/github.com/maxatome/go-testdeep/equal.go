@@ -13,8 +13,8 @@ package testdeep
 import (
 	"fmt"
 	"reflect"
-	"unsafe"
 
+	"github.com/maxatome/go-testdeep/helpers/tdutil"
 	"github.com/maxatome/go-testdeep/internal/ctxerr"
 	"github.com/maxatome/go-testdeep/internal/dark"
 	"github.com/maxatome/go-testdeep/internal/types"
@@ -81,6 +81,24 @@ func nilHandler(ctx ctxerr.Context, got, expected reflect.Value) *ctxerr.Error {
 	return ctx.CollectError(&err)
 }
 
+func isCustomEqual(a, b reflect.Value) (bool, bool) {
+	aType, bType := a.Type(), b.Type()
+
+	equal, ok := aType.MethodByName("Equal")
+	if ok {
+		ft := equal.Type
+		if !ft.IsVariadic() &&
+			ft.NumIn() == 2 &&
+			ft.NumOut() == 1 &&
+			ft.In(0).AssignableTo(ft.In(1)) &&
+			ft.Out(0) == boolType &&
+			bType.AssignableTo(ft.In(1)) {
+			return true, equal.Func.Call([]reflect.Value{a, b})[0].Bool()
+		}
+	}
+	return false, false
+}
+
 func deepValueEqual(ctx ctxerr.Context, got, expected reflect.Value) (err *ctxerr.Error) {
 	if !got.IsValid() || !expected.IsValid() {
 		if got.IsValid() == expected.IsValid() {
@@ -89,10 +107,27 @@ func deepValueEqual(ctx ctxerr.Context, got, expected reflect.Value) (err *ctxer
 		return nilHandler(ctx, got, expected)
 	}
 
-	// Special case, "got" implements testDeeper: only if allowed
+	// "got" must not implement testDeeper
 	if got.Type().Implements(testDeeper) {
 		panic("Found a TestDeep operator in got param, " +
 			"can only use it in expected one!")
+	}
+
+	if ctx.UseEqual {
+		hasEqual, isEqual := isCustomEqual(got, expected)
+		if hasEqual {
+			if isEqual {
+				return
+			}
+			if ctx.BooleanError {
+				return ctxerr.BooleanError
+			}
+			return ctx.CollectError(&ctxerr.Error{
+				Message:  "got.Equal(expected) failed",
+				Got:      got,
+				Expected: expected,
+			})
+		}
 	}
 
 	if got.Type() != expected.Type() {
@@ -134,43 +169,14 @@ func deepValueEqual(ctx ctxerr.Context, got, expected reflect.Value) (err *ctxer
 
 	// if ctx.Depth > 10 { panic("deepValueEqual") }	// for debugging
 
-	// We want to avoid putting more in the Visited map than we need to.
-	// For any possible reference cycle that might be encountered,
-	// hard(t) needs to return true for at least one of the types in the cycle.
-	hard := func(k reflect.Kind) bool {
-		switch k {
-		case reflect.Map, reflect.Slice, reflect.Ptr, reflect.Interface:
-			return true
-		}
-		return false
-	}
-
-	if got.CanAddr() && expected.CanAddr() && hard(got.Kind()) {
-		addr1 := unsafe.Pointer(got.UnsafeAddr())
-		addr2 := unsafe.Pointer(expected.UnsafeAddr())
-		if uintptr(addr1) > uintptr(addr2) {
-			// Canonicalize order to reduce number of entries in Visited.
-			// Assumes non-moving garbage collector.
-			addr1, addr2 = addr2, addr1
-		}
-
-		// Short circuit if references are already seen.
-		v := ctxerr.Visit{
-			A1:  addr1,
-			A2:  addr2,
-			Typ: got.Type(),
-		}
-		if ctx.Visited[v] {
-			return
-		}
-
-		// Remember for later.
-		ctx.Visited[v] = true
+	// Avoid looping forever on cyclic references
+	if ctx.Visited.Record(got, expected) {
+		return
 	}
 
 	switch got.Kind() {
 	case reflect.Array:
-		for i := 0; i < got.Len(); i++ {
+		for i, l := 0, got.Len(); i < l; i++ {
 			err = deepValueEqual(ctx.AddArrayIndex(i),
 				got.Index(i), expected.Index(i))
 			if err != nil {
@@ -196,13 +202,15 @@ func deepValueEqual(ctx ctxerr.Context, got, expected reflect.Value) (err *ctxer
 			expectedLen = expected.Len()
 		)
 
-		// Shortcut in boolean context
-		if ctx.BooleanError && gotLen != expectedLen {
-			return ctxerr.BooleanError
-		}
-
-		if got.Pointer() == expected.Pointer() {
-			return
+		if gotLen != expectedLen {
+			// Shortcut in boolean context
+			if ctx.BooleanError {
+				return ctxerr.BooleanError
+			}
+		} else {
+			if got.Pointer() == expected.Pointer() {
+				return
+			}
 		}
 
 		var maxLen int
@@ -223,6 +231,7 @@ func deepValueEqual(ctx ctxerr.Context, got, expected reflect.Value) (err *ctxer
 		if gotLen != expectedLen {
 			res := tdSetResult{
 				Kind: itemsSetResult,
+				// do not sort Extra/Mising here
 			}
 
 			if gotLen > expectedLen {
@@ -239,7 +248,7 @@ func deepValueEqual(ctx ctxerr.Context, got, expected reflect.Value) (err *ctxer
 
 			return ctx.CollectError(&ctxerr.Error{
 				Message: fmt.Sprintf("comparing slices, from index #%d", maxLen),
-				Summary: res,
+				Summary: res.Summary(),
 			})
 		}
 		return
@@ -269,7 +278,7 @@ func deepValueEqual(ctx ctxerr.Context, got, expected reflect.Value) (err *ctxer
 	case reflect.Struct:
 		sType := got.Type()
 		for i, n := 0, got.NumField(); i < n; i++ {
-			err = deepValueEqual(ctx.AddDepth("."+sType.Field(i).Name),
+			err = deepValueEqual(ctx.AddField(sType.Field(i).Name),
 				got.Field(i), expected.Field(i))
 			if err != nil {
 				return
@@ -301,7 +310,7 @@ func deepValueEqual(ctx ctxerr.Context, got, expected reflect.Value) (err *ctxer
 		var notFoundKeys []reflect.Value
 		foundKeys := map[interface{}]bool{}
 
-		for _, vkey := range expected.MapKeys() {
+		for _, vkey := range tdutil.MapSortedKeys(expected) {
 			gotValue := got.MapIndex(vkey)
 			if !gotValue.IsValid() {
 				notFoundKeys = append(notFoundKeys, vkey)
@@ -322,10 +331,11 @@ func deepValueEqual(ctx ctxerr.Context, got, expected reflect.Value) (err *ctxer
 			}
 			return ctx.CollectError(&ctxerr.Error{
 				Message: "comparing map",
-				Summary: tdSetResult{
+				Summary: (tdSetResult{
 					Kind:    keysSetResult,
 					Missing: notFoundKeys,
-				},
+					Sort:    true,
+				}).Summary(),
 			})
 		}
 
@@ -338,17 +348,18 @@ func deepValueEqual(ctx ctxerr.Context, got, expected reflect.Value) (err *ctxer
 			Kind:    keysSetResult,
 			Missing: notFoundKeys,
 			Extra:   make([]reflect.Value, 0, got.Len()-len(foundKeys)),
+			Sort:    true,
 		}
 
-		for _, vkey := range got.MapKeys() {
-			if !foundKeys[vkey.Interface()] {
-				res.Extra = append(res.Extra, vkey)
+		for _, k := range tdutil.MapSortedKeys(got) {
+			if !foundKeys[k.Interface()] {
+				res.Extra = append(res.Extra, k)
 			}
 		}
 
 		return ctx.CollectError(&ctxerr.Error{
 			Message: "comparing map",
-			Summary: res,
+			Summary: res.Summary(),
 		})
 
 	case reflect.Func:
@@ -361,7 +372,7 @@ func deepValueEqual(ctx ctxerr.Context, got, expected reflect.Value) (err *ctxer
 		// Can't do better than this:
 		return ctx.CollectError(&ctxerr.Error{
 			Message: "functions mismatch",
-			Summary: types.RawString("<can not be compared>"),
+			Summary: ctxerr.NewSummary("<can not be compared>"),
 		})
 
 	default:

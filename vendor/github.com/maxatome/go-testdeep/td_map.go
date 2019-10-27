@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/maxatome/go-testdeep/helpers/tdutil"
 	"github.com/maxatome/go-testdeep/internal/ctxerr"
 	"github.com/maxatome/go-testdeep/internal/util"
 )
@@ -47,7 +48,7 @@ func newMap(model interface{}, entries MapEntries, kind mapKind) *tdMap {
 
 	m := tdMap{
 		tdExpectedType: tdExpectedType{
-			Base: NewBase(4),
+			base: newBase(4),
 		},
 		kind: kind,
 	}
@@ -80,12 +81,12 @@ func newMap(model interface{}, entries MapEntries, kind mapKind) *tdMap {
 }
 
 func (m *tdMap) populateExpectedEntries(entries MapEntries, expectedModel reflect.Value) {
-	var expectedKeys []reflect.Value
+	var keysInModel int
 	if expectedModel.IsValid() {
-		expectedKeys = expectedModel.MapKeys()
+		keysInModel = expectedModel.Len()
 	}
 
-	m.expectedEntries = make([]mapEntryInfo, 0, len(expectedKeys)+len(entries))
+	m.expectedEntries = make([]mapEntryInfo, 0, keysInModel+len(entries))
 	checkedEntries := make(map[interface{}]bool, len(entries))
 
 	keyType := m.expectedType.Key()
@@ -134,20 +135,23 @@ func (m *tdMap) populateExpectedEntries(entries MapEntries, expectedModel reflec
 	}
 
 	// Check entries in model
-	for _, vkey := range expectedKeys {
-		entryInfo.expected = expectedModel.MapIndex(vkey)
+	if keysInModel == 0 {
+		return
+	}
 
-		if checkedEntries[vkey.Interface()] {
+	tdutil.MapEach(expectedModel, func(k, v reflect.Value) bool {
+		entryInfo.expected = v
+
+		if checkedEntries[k.Interface()] {
 			panic(fmt.Sprintf(
-				"%s entry exists in both model & expectedEntries", util.ToString(vkey)))
+				"%s entry exists in both model & expectedEntries", util.ToString(k)))
 		}
 
-		entryInfo.key = vkey
+		entryInfo.key = k
 		m.expectedEntries = append(m.expectedEntries, entryInfo)
-	}
+		return true
+	})
 }
-
-//go:noinline
 
 // Map operator compares the contents of a map against the non-zero
 // values of "model" (if any) and the values of "expectedEntries".
@@ -165,8 +169,6 @@ func Map(model interface{}, expectedEntries MapEntries) TestDeep {
 	return newMap(model, expectedEntries, allMap)
 }
 
-//go:noinline
-
 // SubMapOf operator compares the contents of a map against the non-zero
 // values of "model" (if any) and the values of "expectedEntries".
 //
@@ -179,18 +181,16 @@ func Map(model interface{}, expectedEntries MapEntries) TestDeep {
 // entry to succeed. But some expected entries can be missing from the
 // compared map.
 //
-//   CmpDeeply(t, map[string]int{"a": 1},
+//   Cmp(t, map[string]int{"a": 1},
 //     SubMapOf(map[string]int{"a": 1, "b": 2}, nil) // succeeds
 //
-//   CmpDeeply(t, map[string]int{"a": 1, "c": 3},
+//   Cmp(t, map[string]int{"a": 1, "c": 3},
 //     SubMapOf(map[string]int{"a": 1, "b": 2}, nil) // fails, extra {"c": 3}
 //
 // TypeBehind method returns the reflect.Type of "model".
 func SubMapOf(model interface{}, expectedEntries MapEntries) TestDeep {
 	return newMap(model, expectedEntries, subMap)
 }
-
-//go:noinline
 
 // SuperMapOf operator compares the contents of a map against the non-zero
 // values of "model" (if any) and the values of "expectedEntries".
@@ -203,10 +203,10 @@ func SubMapOf(model interface{}, expectedEntries MapEntries) TestDeep {
 // During a match, each expected entry should match in the compared
 // map. But some entries in the compared map may not be expected.
 //
-//   CmpDeeply(t, map[string]int{"a": 1, "b": 2},
+//   Cmp(t, map[string]int{"a": 1, "b": 2},
 //     SuperMapOf(map[string]int{"a": 1}, nil) // succeeds
 //
-//   CmpDeeply(t, map[string]int{"a": 1, "c": 3},
+//   Cmp(t, map[string]int{"a": 1, "c": 3},
 //     SuperMapOf(map[string]int{"a": 1, "b": 2}, nil) // fails, missing {"b": 2}
 //
 // TypeBehind method returns the reflect.Type of "model".
@@ -256,10 +256,11 @@ func (m *tdMap) Match(ctx ctxerr.Context, got reflect.Value) (err *ctxerr.Error)
 		}
 		return ctx.CollectError(&ctxerr.Error{
 			Message: errorMessage,
-			Summary: tdSetResult{
+			Summary: (tdSetResult{
 				Kind:    keysSetResult,
 				Missing: notFoundKeys,
-			},
+				Sort:    true,
+			}).Summary(),
 		})
 	}
 
@@ -279,10 +280,11 @@ func (m *tdMap) Match(ctx ctxerr.Context, got reflect.Value) (err *ctxerr.Error)
 		}
 		return ctx.CollectError(&ctxerr.Error{
 			Message: errorMessage,
-			Summary: tdSetResult{
+			Summary: (tdSetResult{
 				Kind:    keysSetResult,
 				Missing: notFoundKeys,
-			},
+				Sort:    true,
+			}).Summary(),
 		})
 	}
 
@@ -295,17 +297,18 @@ func (m *tdMap) Match(ctx ctxerr.Context, got reflect.Value) (err *ctxerr.Error)
 		Kind:    keysSetResult,
 		Missing: notFoundKeys,
 		Extra:   make([]reflect.Value, 0, got.Len()-len(foundKeys)),
+		Sort:    true,
 	}
 
-	for _, vkey := range got.MapKeys() {
-		if !foundKeys[vkey.Interface()] {
-			res.Extra = append(res.Extra, vkey)
+	for _, k := range tdutil.MapSortedKeys(got) {
+		if !foundKeys[k.Interface()] {
+			res.Extra = append(res.Extra, k)
 		}
 	}
 
 	return ctx.CollectError(&ctxerr.Error{
 		Message: errorMessage,
-		Summary: res,
+		Summary: res.Summary(),
 	})
 }
 

@@ -37,6 +37,7 @@ const (
 )
 
 const domainKeyRSALength = 2048
+const ONLY_ONE_CERT_TMP = true
 
 var errHaveNoCert = errors.New("have no certificate for domain") // may return for any internal error
 
@@ -131,8 +132,8 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 
 	certName := certNameFromDomain(needDomain)
 
-	logger = logger.With(logCetName(certName))
-	ctx = zc.WithLogger(ctx, zc.L(ctx).With(logCetName(certName)))
+	logger = logger.With(logCertName(certName))
+	ctx = zc.WithLogger(ctx, zc.L(ctx).With(logCertName(certName)))
 
 	now := time.Now()
 	defer func() {
@@ -157,7 +158,7 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 	}
 
 	locked, err := isCertLocked(ctx, m.Cache, certName)
-	log.DebugDPanic(logger, err, "Check if certificate locked")
+	log.DebugDPanic(logger, err, "Check if certificate locked", zap.Bool("locked", locked))
 
 	cert, err = loadCertificateFromCache(ctx, m.Cache, certName, keyRSA)
 	logLevel := zapcore.DebugLevel
@@ -184,8 +185,12 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 
 	allowed, err := m.DomainChecker.IsDomainAllowed(ctx, needDomain.ASCII())
 	log.DebugError(logger, err, "Check if domain allowed for certificate", zap.Bool("allowed", allowed))
-
 	if err != nil {
+		return nil, errHaveNoCert
+	}
+
+	if !allowed {
+		logger.Info("Deny certificate issue by filter")
 		return nil, errHaveNoCert
 	}
 
@@ -196,7 +201,7 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 	domains := domainNamesFromCertificateName(certName)
 	domains, err = filterDomains(ctx, m.DomainChecker, domains, needDomain)
 
-	res, err := m.createCertificateForDomains(certIssueContext, certName, domains, needDomain)
+	res, err := m.createCertificateForDomains(certIssueContext, certName, domains)
 	if err == nil {
 		logger.Info("Certificate issued.", log.Cert(res),
 			zap.Time("expire", res.Leaf.NotAfter))
@@ -266,11 +271,10 @@ func (m *Manager) certStateGet(ctx context.Context, certName certNameType) *cert
 	return resInterface.(*certState)
 }
 
-func (m *Manager) createCertificateForDomains(ctx context.Context, certName certNameType, domainNames []DomainName,
-	needDomain DomainName) (res *tls.Certificate, err error) {
-
-	logger := zc.L(ctx)
+func (m *Manager) createCertificateForDomains(ctx context.Context, certName certNameType, domainNames []DomainName) (res *tls.Certificate, err error) {
+	logger := zc.L(ctx).With(logDomains(domainNames))
 	certState := m.certStateGet(ctx, certName)
+
 	if certState.StartIssue(ctx) {
 		// outer func need for get argument values in defer time
 		defer func() {
@@ -283,44 +287,13 @@ func (m *Manager) createCertificateForDomains(ctx context.Context, certName cert
 		return certState.WaitFinishIssue(waitTimeout)
 	}
 
-	var authorizeDomainsWg sync.WaitGroup
-	var authorizedDomainsMu sync.Mutex
-	var authorizedDomains []DomainName
-	var needDomainAuthorized = false
-
-	authorizeDomainsWg.Add(len(domainNames))
-	for _, authorizeDomain := range domainNames {
-		go func(domain DomainName) {
-			localLogger := logger.With(logDomain(domain))
-			localCtx := zc.WithLogger(ctx, localLogger)
-
-			err = m.authorizeDomain(localCtx, domain)
-			if err == nil {
-				localLogger.Debug("Domain authorized.")
-
-				authorizedDomainsMu.Lock()
-				authorizedDomains = append(authorizedDomains, domain)
-				if domain == needDomain {
-					needDomainAuthorized = true
-				}
-				authorizedDomainsMu.Unlock()
-
-			} else {
-				localLogger.Warn("Domain doesn't authorized.", zap.Error(err))
-			}
-			authorizeDomainsWg.Done()
-		}(authorizeDomain)
-	}
-	logger.Debug("Wait for domains authorization.", logDomains(domainNames))
-	authorizeDomainsWg.Wait()
-
-	if !needDomainAuthorized {
-		logger.Warn("Need domain doesn't authorized.", logDomain(needDomain),
-			logDomainsNamed("authorized_domains", authorizedDomains))
-		return nil, errors.New("need domain doesn't authorized")
+	order, err := m.createOrderForDomains(ctx, domainNames...)
+	log.DebugWarning(logger, err, "Domains authorized")
+	if err != nil {
+		return nil, errors.New("order authorization error")
 	}
 
-	res, err = m.issueCertificate(ctx, certName, authorizedDomains)
+	res, err = m.issueCertificate(ctx, certName, order)
 	if err == nil {
 		logger.Debug("Certificate created.")
 	} else {
@@ -329,28 +302,7 @@ func (m *Manager) createCertificateForDomains(ctx context.Context, certName cert
 	return res, err
 }
 
-func (m *Manager) authorizeDomain(ctx context.Context, domain DomainName) error {
-	logger := zc.L(ctx).With(logDomain(domain))
-	pendingAuthorizations := make(map[string]struct{})
-	defer func() {
-		if len(pendingAuthorizations) == 0 {
-			logger.Debug("No pending authorizations to clean")
-			return
-		}
-
-		var authUries []string
-		for k := range pendingAuthorizations {
-			authUries = append(authUries, k)
-		}
-
-		logger.Info("StartAutoRenew detached process for revoke pending authorizations",
-			zap.Strings("uries", authUries))
-
-		revokeContext := context.Background()
-		revokeContext = zc.WithLogger(revokeContext, logger.With(zap.Bool("detached", true)))
-		go m.revokePendingAuthorizations(revokeContext, authUries)
-	}()
-
+func (m *Manager) supportedChallenges() []string {
 	var allowedChallenges []string
 	if m.EnableTLSValidation {
 		allowedChallenges = append(allowedChallenges, tlsAlpn01)
@@ -358,79 +310,127 @@ func (m *Manager) authorizeDomain(ctx context.Context, domain DomainName) error 
 	if m.EnableHTTPValidation {
 		allowedChallenges = append(allowedChallenges, http01)
 	}
-
-	var nextChallengeTypeIndex int
-	for {
-		// StartAutoRenew domain authorization and get the challenge.
-		authz, err := m.Client.Authorize(ctx, domain.String())
-		if err == nil {
-			logger.Debug("Got authorization description.", zap.Reflect("auth_object", authz))
-		} else {
-			logger.Error("Can't get domain authorization description", zap.Error(err))
-			return err
-		}
-
-		// No point in accepting challenges if the authorization status
-		// is in a final state.
-		switch authz.Status {
-		case acme.StatusValid:
-			logger.Debug("Domain already authorized")
-			return nil // already authorized
-		case acme.StatusInvalid:
-			logger.Warn("Domain has invalid authorization", zap.String("auth_uri", authz.URI))
-			return errors.New("invalid authorization status")
-		}
-
-		pendingAuthorizations[authz.URI] = struct{}{}
-
-		// Pick the next preferred challenge.
-		var chal *acme.Challenge
-		for chal == nil && nextChallengeTypeIndex < len(allowedChallenges) {
-			logger.Debug("Check if accept challenge",
-				zap.String("challenge", allowedChallenges[nextChallengeTypeIndex]))
-			chal = pickChallenge(allowedChallenges[nextChallengeTypeIndex], authz.Challenges)
-			nextChallengeTypeIndex++
-		}
-		if chal == nil {
-			logger.Warn("Unable to authorize domain. No compatible challenges.")
-			return errors.New("unable authorize domain")
-		}
-		logger.Debug("Select challenge for authorize", zap.Reflect("challenge", chal))
-
-		cleanup, err := m.fulfill(ctx, chal, domain)
-		if cleanup != nil {
-			//noinspection GoDeferInLoop
-			defer cleanup(ctx)
-		}
-
-		if err != nil {
-			logger.Error("Can't set domain token", zap.Reflect("chal", chal), zap.Error(err))
-			continue
-		}
-
-		receivedChallenge, err := m.Client.Accept(ctx, chal)
-		if err == nil {
-			logger.Debug("Receive authorize answer", zap.Reflect("challenge", receivedChallenge))
-		} else {
-			logger.Error("Can't authorize domain", zap.Reflect("challenge", receivedChallenge), zap.Error(err))
-			continue
-		}
-
-		receivedAuth, err := m.Client.WaitAuthorization(ctx, authz.URI)
-		log.DebugError(logger, err, "Receive domain authorization", zap.Reflect("authorization", receivedAuth))
-		if err != nil {
-			continue
-		}
-
-		logger.Info("Domain authorized")
-		delete(pendingAuthorizations, authz.URI)
-		return nil
-	}
+	return allowedChallenges
 }
 
-func (m *Manager) issueCertificate(ctx context.Context, certName certNameType, domains []DomainName) (*tls.Certificate, error) {
-	if len(domains) == 0 {
+func (m *Manager) createOrderForDomains(ctx context.Context, domains ...DomainName) (*acme.Order, error) {
+	// similar to func (m *Manager) verifyRFC(ctx context.Context, client *acme.Client, domain string) (*acme.Order, error)
+	// from acme/autocert
+
+	client := m.Client
+	logger := zc.L(ctx)
+	challengeTypes := m.supportedChallenges()
+	logger.Debug("Start order authorization.")
+	var order *acme.Order
+
+authorizeOrderLoop:
+	for {
+		authIDs := make([]acme.AuthzID, len(domains))
+		for i := range domains {
+			authIDs[i] = acme.AuthzID{Type: "dns", Value: domains[i].ASCII()}
+		}
+		var err error
+		order, err = m.Client.AuthorizeOrder(ctx, authIDs)
+		log.DebugError(logger, err, "Create authorization order.")
+		if err != nil {
+			return nil, err
+		}
+
+		//noinspection GoDeferInLoop
+		defer func() {
+			go func() {
+				revokeLogger := logger.Named("background_auth_revoker")
+
+				revokeCtx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+				defer cancel()
+
+				revokeCtx = zc.WithLogger(revokeCtx, revokeLogger)
+				m.deactivatePendingAuthz(revokeCtx, order.AuthzURLs)
+			}()
+		}()
+
+		switch order.Status {
+		case acme.StatusReady:
+			logger.Debug("Authorization completed")
+			break authorizeOrderLoop
+
+		case acme.StatusPending:
+		// pass
+		default:
+			logger.Error("Invalid new order status", zap.String("status", order.Status), zap.String("uri", order.URI))
+			return nil, errors.New("invalid new order status")
+		}
+
+		logger.Debug("Start authorization step")
+
+		// Satisfy all pending authorizations.
+	authDomainLoop:
+		for _, zurl := range order.AuthzURLs {
+			z, err := client.GetAuthorization(ctx, zurl)
+			log.DebugError(logger, err, "Get authorization object.", zap.String("domain", z.Identifier.Value))
+			if err != nil {
+				return nil, err
+			}
+			// force hide outer logger - for log specific domain on each iteration
+			var logger = logger.With(logDomain(DomainName(z.Identifier.Value)))
+
+			hasCompatibleChallenge := false
+		challengeTypeLoop:
+			for _, challengeType := range challengeTypes {
+				if z.Status != acme.StatusPending {
+					// We are interested only in pending authorizations.
+					logger.Debug("Skip authorize process", zap.String("status", z.Status))
+					continue authDomainLoop
+				}
+
+				// Pick the next preferred challenge.
+				var chal = pickChallenge(challengeType, z.Challenges)
+				logger.Debug("Selected challenge", zap.Any("challenge", chal))
+				if chal == nil {
+					continue challengeTypeLoop
+				}
+				hasCompatibleChallenge = true
+
+				// Respond to the challenge and wait for validation result.
+				cleanup, err := m.fulfill(ctx, chal, DomainName(z.Identifier.Value))
+				if err != nil {
+					continue authorizeOrderLoop
+				}
+				//noinspection GoDeferInLoop
+				defer cleanup(ctx)
+
+				if _, err := client.Accept(ctx, chal); err != nil {
+					continue authorizeOrderLoop
+				}
+				if _, err := client.WaitAuthorization(ctx, z.URI); err != nil {
+					continue authorizeOrderLoop
+				}
+			}
+			if !hasCompatibleChallenge {
+				logger.Error("No compatible challenges")
+				return nil, fmt.Errorf("unable to satisfy %q for domain %q: no viable challenge type found", z.URI, z.Identifier.Value)
+			}
+		}
+
+		// All authorizations are satisfied.
+		// Wait for the CA to update the order status.
+		order, err = client.WaitOrder(ctx, order.URI)
+		log.DebugWarning(logger, err, "Wait order authorization.")
+		if err == nil {
+			break authorizeOrderLoop
+		}
+	}
+	return order, nil
+}
+
+func (m *Manager) issueCertificate(ctx context.Context, certName certNameType, order *acme.Order) (*tls.Certificate, error) {
+	if len(order.Identifiers) == 0 {
 		return nil, errors.New("no domains for issue certificate")
+	}
+
+	domains := make([]DomainName, len(order.Identifiers))
+	for i := range order.Identifiers {
+		domains[i] = DomainName(order.Identifiers[i].Value)
 	}
 	logger := zc.L(ctx).With(logDomains(domains))
 
@@ -445,7 +445,7 @@ func (m *Manager) issueCertificate(ctx context.Context, certName certNameType, d
 		return nil, err
 	}
 
-	der, _, err := m.Client.CreateCert(ctx, csr, 0, true)
+	der, _, err := m.Client.CreateOrderCert(ctx, order.FinalizeURL, csr, true)
 	log.InfoError(logger, err, "Receive certificate from acme server")
 	if err != nil {
 		return nil, err
@@ -485,19 +485,26 @@ func (m *Manager) renewCertInBackground(ctx context.Context, certName certNameTy
 	}
 	domains := domainNamesFromCertificateName(certName)
 	logger.Info("StartAutoRenew background certificate issue")
-	cert, err := m.createCertificateForDomains(ctx, certName, domains, "")
+	cert, err := m.createCertificateForDomains(ctx, certName, domains)
 	certState.FinishIssue(ctx, cert, err)
 	log.InfoError(logger, err, "Renew certificate in background finished", log.Cert(cert))
 }
 
-func (m *Manager) revokePendingAuthorizations(ctx context.Context, uries []string) {
+func (m *Manager) deactivatePendingAuthz(ctx context.Context, uries []string) {
 	logger := zc.L(ctx)
+
 	for _, uri := range uries {
-		err := m.Client.RevokeAuthorization(ctx, uri)
-		if err == nil {
-			logger.Debug("Revoke authorization ok", zap.String("uri", uri))
+		localLogger := logger.With(zap.String("uri", uri))
+		authorization, err := m.Client.GetAuthorization(ctx, uri)
+		log.DebugError(localLogger, err, "Get authorization", zap.Any("authorization", authorization))
+		if err != nil {
+			continue
+		}
+		if authorization.Status == acme.StatusPending {
+			err := m.Client.RevokeAuthorization(ctx, uri)
+			log.DebugInfo(localLogger, err, "Revoke authorization", zap.String("uri", uri))
 		} else {
-			logger.Error("Can't revoke authorization", zap.String("uri", uri), zap.Error(err))
+			localLogger.Debug("Authorization not in pending state. Skip revoke.", zap.String("status", authorization.Status))
 		}
 	}
 }

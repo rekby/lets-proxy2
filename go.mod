@@ -4,22 +4,16 @@ go 1.12
 
 require (
 	github.com/BurntSushi/toml v0.3.1
-	github.com/gobuffalo/packr v1.25.0
-	github.com/gojuno/minimock v0.0.0-20190201083043-bbb4f602d884
-	github.com/golangci/golangci-lint v1.16.0 // indirect
+	github.com/gobuffalo/packr v1.30.1
+	github.com/gojuno/minimock/v3 v3.0.5
 	github.com/kardianos/minwinsvc v0.0.0-20151122163309-cad6b2b879b0
-	github.com/maxatome/go-testdeep v1.0.8
-	github.com/miekg/dns v1.1.12
-	github.com/mitchellh/gox v1.0.1 // indirect
-	github.com/pelletier/go-toml v1.3.0 // indirect
+	github.com/maxatome/go-testdeep v1.1.0
+	github.com/miekg/dns v1.1.22
 	github.com/pkg/errors v0.8.1
-	github.com/rekby/zapcontext v0.0.3
+	github.com/rekby/zapcontext v0.0.4
 	github.com/satori/go.uuid v1.2.0
-	go.uber.org/zap v1.9.1
-	golang.org/x/crypto v0.0.0-20190426145343-a29dc8fdc734
-	golang.org/x/net v0.0.0-20190424112056-4829fb13d2c6
-	golang.org/x/sys v0.0.0-20190428183149-804c0c7841b5 // indirect
-	golang.org/x/text v0.3.2 // indirect
-	golang.org/x/tools v0.0.0-20190428024724-550556f78a90 // indirect
+	go.uber.org/zap v1.11.0
+	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
+	golang.org/x/net v0.0.0-20191027093000-83d349e8ac1a
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )

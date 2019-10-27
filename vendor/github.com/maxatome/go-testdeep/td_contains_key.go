@@ -7,9 +7,9 @@
 package testdeep
 
 import (
-	"bytes"
 	"reflect"
 
+	"github.com/maxatome/go-testdeep/helpers/tdutil"
 	"github.com/maxatome/go-testdeep/internal/ctxerr"
 	"github.com/maxatome/go-testdeep/internal/types"
 	"github.com/maxatome/go-testdeep/internal/util"
@@ -25,26 +25,26 @@ var _ TestDeep = &tdContainsKey{}
 // compares each key of map against "expectedValue".
 //
 //   hash := map[string]int{"foo": 12, "bar": 34, "zip": 28}
-//   CmpDeeply(t, hash, ContainsKey("foo"))          // succeeds
-//   CmpDeeply(t, hash, ContainsKey(HasPrefix("z"))) // succeeds
-//   CmpDeeply(t, hash, ContainsKey(HasPrefix("x"))  // fails
+//   Cmp(t, hash, ContainsKey("foo"))          // succeeds
+//   Cmp(t, hash, ContainsKey(HasPrefix("z"))) // succeeds
+//   Cmp(t, hash, ContainsKey(HasPrefix("x"))  // fails
 //
 //   hnum := map[int]string{1: "foo", 42: "bar"}
-//   CmpDeeply(t, hash, ContainsKey(42))             // succeeds
-//   CmpDeeply(t, hash, ContainsKey(Between(40, 45)) // succeeds
+//   Cmp(t, hash, ContainsKey(42))             // succeeds
+//   Cmp(t, hash, ContainsKey(Between(40, 45)) // succeeds
 //
 // When ContainsKey(nil) is used, nil is automatically converted to a
 // typed nil on the fly to avoid confusion (if the map key type allows
-// it of course.) So all following CmpDeeply calls are equivalent
+// it of course.) So all following Cmp calls are equivalent
 // (except the (*byte)(nil) one):
 //
 //   num := 123
 //   hnum := map[*int]bool{&num: true, nil: true}
-//   CmpDeeply(t, hnum, ContainsKey(nil))          // succeeds → (*int)(nil)
-//   CmpDeeply(t, hnum, ContainsKey((*int)(nil)))  // succeeds
-//   CmpDeeply(t, hnum, ContainsKey(Nil()))        // succeeds
+//   Cmp(t, hnum, ContainsKey(nil))          // succeeds → (*int)(nil)
+//   Cmp(t, hnum, ContainsKey((*int)(nil)))  // succeeds
+//   Cmp(t, hnum, ContainsKey(Nil()))        // succeeds
 //   // But...
-//   CmpDeeply(t, hnum, ContainsKey((*byte)(nil))) // fails: (*byte)(nil) ≠ (*int)(nil)
+//   Cmp(t, hnum, ContainsKey((*byte)(nil))) // fails: (*byte)(nil) ≠ (*int)(nil)
 func ContainsKey(expectedValue interface{}) TestDeep {
 	c := tdContainsKey{
 		tdSmugglerBase: newSmugglerBase(expectedValue),
@@ -60,17 +60,18 @@ func (c *tdContainsKey) doesNotContainKey(ctx ctxerr.Context, got reflect.Value)
 	if ctx.BooleanError {
 		return ctxerr.BooleanError
 	}
-
-	keys := append(make([]reflect.Value, 0, got.Len()), got.MapKeys()...)
-
-	buf := bytes.NewBufferString("expected key: ")
-	buf.WriteString(util.ToString(c.expectedValue))
-	buf.WriteString("\n not in keys: ")
-	util.SliceToBuffer(buf, keys)
-
 	return ctx.CollectError(&ctxerr.Error{
 		Message: "does not contain key",
-		Summary: types.RawString(buf.String()),
+		Summary: ctxerr.ErrorSummaryItems{
+			{
+				Label: "expected key",
+				Value: util.ToString(c.expectedValue),
+			},
+			{
+				Label: "not in keys",
+				Value: util.ToString(tdutil.MapSortedKeys(got)),
+			},
+		},
 	})
 }
 
@@ -96,10 +97,17 @@ func (c *tdContainsKey) Match(ctx ctxerr.Context, got reflect.Value) *ctxerr.Err
 	if got.Kind() == reflect.Map {
 		expectedValue := c.getExpectedValue(got)
 
-		for _, vkey := range got.MapKeys() {
-			if deepValueEqualOK(vkey, expectedValue) {
-				return nil
+		// If expected value is a TestDeep operator, check each key
+		if c.isTestDeeper {
+			for _, k := range got.MapKeys() {
+				if deepValueEqualOK(k, expectedValue) {
+					return nil
+				}
 			}
+		} else if expectedValue.IsValid() &&
+			got.Type().Key() == expectedValue.Type() &&
+			got.MapIndex(expectedValue).IsValid() {
+			return nil
 		}
 		return c.doesNotContainKey(ctx, got)
 	}

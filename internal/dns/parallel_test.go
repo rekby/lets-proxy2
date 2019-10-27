@@ -6,7 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/gojuno/minimock"
+	"github.com/gojuno/minimock/v3"
 
 	"github.com/maxatome/go-testdeep"
 	"github.com/rekby/lets-proxy2/internal/th"
