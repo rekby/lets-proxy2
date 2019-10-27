@@ -11,7 +11,7 @@ import (
 
 	"context"
 
-	"github.com/gojuno/minimock"
+	"github.com/gojuno/minimock/v3"
 )
 
 // BytesMock implements cache.Bytes

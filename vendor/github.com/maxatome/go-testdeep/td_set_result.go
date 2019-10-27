@@ -7,9 +7,12 @@
 package testdeep
 
 import (
-	"bytes"
+	"fmt"
 	"reflect"
+	"sort"
 
+	"github.com/maxatome/go-testdeep/helpers/tdutil"
+	"github.com/maxatome/go-testdeep/internal/ctxerr"
 	"github.com/maxatome/go-testdeep/internal/types"
 	"github.com/maxatome/go-testdeep/internal/util"
 )
@@ -25,9 +28,9 @@ const (
 func (k tdSetResultKind) String() string {
 	switch k {
 	case itemsSetResult:
-		return "items"
+		return "item"
 	case keysSetResult:
-		return "keys"
+		return "key"
 	default:
 		return "?"
 	}
@@ -38,33 +41,51 @@ type tdSetResult struct {
 	Missing []reflect.Value
 	Extra   []reflect.Value
 	Kind    tdSetResultKind
+	Sort    bool
 }
-
-var _ types.TestDeepStringer = tdSetResult{}
 
 func (r tdSetResult) IsEmpty() bool {
 	return len(r.Missing) == 0 && len(r.Extra) == 0
 }
 
-func (r tdSetResult) String() string {
-	buf := &bytes.Buffer{}
+func (r tdSetResult) Summary() ctxerr.ErrorSummary {
+	var summary ctxerr.ErrorSummaryItems
 
 	if len(r.Missing) > 0 {
-		buf.WriteString("Missing ")
-		buf.WriteString(r.Kind.String())
-		buf.WriteString(": ")
-		util.SliceToBuffer(buf, r.Missing)
+		var missing string
+
+		if len(r.Missing) > 1 {
+			if r.Sort {
+				sort.Stable(tdutil.SortableValues(r.Missing))
+			}
+			missing = fmt.Sprintf("Missing %d %ss", len(r.Missing), r.Kind)
+		} else {
+			missing = fmt.Sprintf("Missing %s", r.Kind)
+		}
+
+		summary = append(summary, ctxerr.ErrorSummaryItem{
+			Label: missing,
+			Value: util.ToString(r.Missing),
+		})
 	}
 
 	if len(r.Extra) > 0 {
-		if buf.Len() > 0 {
-			buf.WriteString("\n  ")
+		var extra string
+
+		if len(r.Extra) > 1 {
+			if r.Sort {
+				sort.Stable(tdutil.SortableValues(r.Extra))
+			}
+			extra = fmt.Sprintf("Extra %d %ss", len(r.Extra), r.Kind)
+		} else {
+			extra = fmt.Sprintf("Extra %s", r.Kind)
 		}
-		buf.WriteString("Extra ")
-		buf.WriteString(r.Kind.String())
-		buf.WriteString(": ")
-		util.SliceToBuffer(buf, r.Extra)
+
+		summary = append(summary, ctxerr.ErrorSummaryItem{
+			Label: extra,
+			Value: util.ToString(r.Extra),
+		})
 	}
 
-	return buf.String()
+	return summary
 }

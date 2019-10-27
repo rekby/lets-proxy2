@@ -19,8 +19,6 @@ type tdAll struct {
 
 var _ TestDeep = &tdAll{}
 
-//go:noinline
-
 // All operator compares data against several expected values. During
 // a match, all of them have to match to succeed.
 //
@@ -41,7 +39,7 @@ func (a *tdAll) Match(ctx ctxerr.Context, got reflect.Value) (err *ctxerr.Error)
 		// to accumulate it silently
 		origErr = deepValueEqualFinal(
 			ctx.ResetErrors().
-				AddDepth(fmt.Sprintf("<All#%d/%d>", idx+1, len(a.items))),
+				AddCustomLevel(fmt.Sprintf("<All#%d/%d>", idx+1, len(a.items))),
 			got, item)
 		if origErr != nil {
 			if ctx.BooleanError {

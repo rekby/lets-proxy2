@@ -48,7 +48,7 @@ func newStruct(model interface{}) (*tdStruct, reflect.Value) {
 
 	st := tdStruct{
 		tdExpectedType: tdExpectedType{
-			Base: NewBase(4),
+			base: newBase(4),
 		},
 	}
 
@@ -198,7 +198,7 @@ func (s *tdStruct) Match(ctx ctxerr.Context, got reflect.Value) (err *ctxerr.Err
 	}
 
 	for _, fieldInfo := range s.expectedFields {
-		err = deepValueEqual(ctx.AddDepth("."+fieldInfo.name),
+		err = deepValueEqual(ctx.AddField(fieldInfo.name),
 			got.FieldByIndex(fieldInfo.index), fieldInfo.expected)
 		if err != nil {
 			return

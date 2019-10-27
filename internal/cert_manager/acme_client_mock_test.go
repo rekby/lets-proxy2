@@ -15,7 +15,7 @@ import (
 
 	"golang.org/x/crypto/acme"
 
-	"github.com/gojuno/minimock"
+	"github.com/gojuno/minimock/v3"
 )
 
 // AcmeClientMock implements AcmeClient

@@ -11,7 +11,7 @@ import (
 
 	mdns "github.com/miekg/dns"
 
-	"github.com/gojuno/minimock"
+	"github.com/gojuno/minimock/v3"
 )
 
 // MDNSClientMock implements mDNSClient

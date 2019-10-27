@@ -9,7 +9,7 @@ PKG_FILES ?= *.go zapcore benchmarks buffer zapgrpc zaptest zaptest/observer int
 # stable release.
 GO_VERSION := $(shell go version | cut -d " " -f 3)
 GO_MINOR_VERSION := $(word 2,$(subst ., ,$(GO_VERSION)))
-LINTABLE_MINOR_VERSIONS := 10
+LINTABLE_MINOR_VERSIONS := 12
 ifneq ($(filter $(LINTABLE_MINOR_VERSIONS),$(GO_MINOR_VERSION)),)
 SHOULD_LINT := true
 endif
@@ -28,7 +28,7 @@ dependencies:
 	go install ./vendor/github.com/mattn/goveralls
 ifdef SHOULD_LINT
 	@echo "Installing golint..."
-	go install ./vendor/github.com/golang/lint/golint
+	go install ./vendor/golang.org/x/lint/golint
 else
 	@echo "Not installing golint, since we don't expect to lint on" $(GO_VERSION)
 endif
@@ -45,13 +45,13 @@ ifdef SHOULD_LINT
 	@echo "Installing test dependencies for vet..."
 	@go test -i $(PKGS)
 	@echo "Checking vet..."
-	@$(foreach dir,$(PKG_FILES),go tool vet $(VET_RULES) $(dir) 2>&1 | tee -a lint.log;)
+	@go vet $(VET_RULES) $(PKGS) 2>&1 | tee -a lint.log
 	@echo "Checking lint..."
 	@$(foreach dir,$(PKGS),golint $(dir) 2>&1 | tee -a lint.log;)
 	@echo "Checking for unresolved FIXMEs..."
 	@git grep -i fixme | grep -v -e vendor -e Makefile | tee -a lint.log
 	@echo "Checking for license headers..."
-	@./check_license.sh | tee -a lint.log
+	@./checklicense.sh | tee -a lint.log
 	@[ ! -s lint.log ]
 else
 	@echo "Skipping linters on" $(GO_VERSION)

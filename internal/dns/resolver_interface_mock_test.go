@@ -13,7 +13,7 @@ import (
 
 	"net"
 
-	"github.com/gojuno/minimock"
+	"github.com/gojuno/minimock/v3"
 )
 
 // ResolverInterfaceMock implements ResolverInterface

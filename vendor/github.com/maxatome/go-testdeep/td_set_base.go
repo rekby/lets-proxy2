@@ -25,7 +25,7 @@ const (
 )
 
 type tdSetBase struct {
-	BaseOKNil
+	baseOKNil
 	kind       setKind
 	ignoreDups bool
 
@@ -34,7 +34,7 @@ type tdSetBase struct {
 
 func newSetBase(kind setKind, ignoreDups bool) tdSetBase {
 	return tdSetBase{
-		BaseOKNil:  NewBaseOKNil(4),
+		baseOKNil:  newBaseOKNil(4),
 		kind:       kind,
 		ignoreDups: ignoreDups,
 	}
@@ -103,6 +103,7 @@ func (s *tdSetBase) Match(ctx ctxerr.Context, got reflect.Value) *ctxerr.Error {
 
 		res := tdSetResult{
 			Kind: itemsSetResult,
+			Sort: true,
 		}
 
 		if s.kind != noneSet {
@@ -159,7 +160,7 @@ func (s *tdSetBase) Match(ctx ctxerr.Context, got reflect.Value) *ctxerr.Error {
 		}
 		return ctx.CollectError(&ctxerr.Error{
 			Message: "comparing %% as a " + s.GetLocation().Func,
-			Summary: res,
+			Summary: res.Summary(),
 		})
 	}
 

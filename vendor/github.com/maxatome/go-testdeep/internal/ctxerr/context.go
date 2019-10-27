@@ -7,27 +7,15 @@
 package ctxerr
 
 import (
-	"fmt"
-	"reflect"
-	"strings"
-	"unsafe"
-
 	"github.com/maxatome/go-testdeep/internal/location"
-	"github.com/maxatome/go-testdeep/internal/util"
+	"github.com/maxatome/go-testdeep/internal/visited"
 )
-
-// Visit is used by Context and its Visited map to handle cyclic references.
-type Visit struct {
-	A1  unsafe.Pointer
-	A2  unsafe.Pointer
-	Typ reflect.Type
-}
 
 // Context is used internally to keep track of the CmpDeeply in-Depth
 // traversal.
 type Context struct {
-	Path        string
-	Visited     map[Visit]bool
+	Path        Path
+	Visited     visited.Visited
 	CurOperator location.GetLocationer
 	Depth       int
 	// 0 ≤ MaxErrors ≤ 1 stops when first error encoutered (without the
@@ -41,8 +29,10 @@ type Context struct {
 	// checked. Can be used to avoid filling Error{} with expensive
 	// computations.
 	BooleanError bool
-	// See ContexConfig.FailureIsFatal for details
+	// See ContexConfig.FailureIsFatal for details.
 	FailureIsFatal bool
+	// See ContexConfig.UseEqual for details.
+	UseEqual bool
 }
 
 // InitErrors initializes Context *Errors slice, if MaxErrors < 0 or
@@ -106,34 +96,44 @@ func (c Context) MergeErrors() *Error {
 	return (*c.Errors)[0]
 }
 
-// AddDepth creates a new Context from current one plus pathAdd.
-func (c Context) AddDepth(pathAdd string) (new Context) {
+// AddCustomLevel creates a new Context from current one plus pathAdd.
+func (c Context) AddCustomLevel(pathAdd string) (new Context) {
 	new = c
-	if strings.HasPrefix(new.Path, "*") {
-		new.Path = "(" + new.Path + ")" + pathAdd
-	} else {
-		new.Path += pathAdd
-	}
+	new.Path = new.Path.AddCustomLevel(pathAdd)
+	new.Depth++
+	return
+}
+
+// AddField creates a new Context from current one plus "." + field.
+func (c Context) AddField(field string) (new Context) {
+	new = c
+	new.Path = new.Path.AddField(field)
 	new.Depth++
 	return
 }
 
 // AddArrayIndex creates a new Context from current one plus an array
 // dereference for index-th item.
-func (c Context) AddArrayIndex(index int) Context {
-	return c.AddDepth(fmt.Sprintf("[%d]", index))
+func (c Context) AddArrayIndex(index int) (new Context) {
+	new = c
+	new.Path = new.Path.AddArrayIndex(index)
+	new.Depth++
+	return
 }
 
 // AddMapKey creates a new Context from current one plus a map
 // dereference for key key.
-func (c Context) AddMapKey(key interface{}) Context {
-	return c.AddDepth("[" + util.ToString(key) + "]")
+func (c Context) AddMapKey(key interface{}) (new Context) {
+	new = c
+	new.Path = new.Path.AddMapKey(key)
+	new.Depth++
+	return
 }
 
 // AddPtr creates a new Context from current one plus a pointer dereference.
 func (c Context) AddPtr(num int) (new Context) {
 	new = c
-	new.Path = strings.Repeat("*", num) + new.Path
+	new.Path = new.Path.AddPtr(num)
 	new.Depth++
 	return
 }
@@ -142,15 +142,15 @@ func (c Context) AddPtr(num int) (new Context) {
 // function call.
 func (c Context) AddFunctionCall(fn string) (new Context) {
 	new = c
-	new.Path = fn + "(" + new.Path + ")"
+	new.Path = new.Path.AddFunctionCall(fn)
 	new.Depth++
 	return
 }
 
 // ResetPath creates a new Context from current one but reinitializing Path.
-func (c Context) ResetPath(newPath string) (new Context) {
+func (c Context) ResetPath(newRoot string) (new Context) {
 	new = c
-	new.Path = newPath
+	new.Path = NewPath(newRoot)
 	new.Depth++
 	return
 }

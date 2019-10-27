@@ -22,7 +22,7 @@ import (
 
 	zc "github.com/rekby/zapcontext"
 
-	"github.com/gojuno/minimock"
+	"github.com/gojuno/minimock/v3"
 
 	"github.com/maxatome/go-testdeep"
 
