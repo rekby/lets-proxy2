@@ -124,6 +124,7 @@ func TestNewHttpProxy(t *testing.T) {
 	td.CmpNoError(err)
 	td.CmpDeeply(http.StatusOK, resp.StatusCode)
 	res, err = ioutil.ReadAll(resp.Body)
+	_ = resp.Body.Close()
 	td.CmpNoError(err)
 	td.CmpDeeply(res, []byte{1, 2, 3})
 
@@ -131,6 +132,7 @@ func TestNewHttpProxy(t *testing.T) {
 	td.CmpNoError(err)
 	td.CmpDeeply(http.StatusAccepted, resp.StatusCode)
 	res, err = ioutil.ReadAll(resp.Body)
+	_ = resp.Body.Close()
 	td.CmpNoError(err)
 	td.CmpDeeply(res, []byte{3, 4})
 }

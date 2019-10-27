@@ -80,7 +80,7 @@ func (s *certState) WaitFinishIssue(ctx context.Context) (cert *tls.Certificate,
 	select {
 	case <-ctx.Done():
 		err = ctx.Err()
-		logger.Warn("Certificate issue waiting context cancelled.", zap.Error(err))
+		logger.Warn("Certificate issue waiting context canceled.", zap.Error(err))
 		return nil, err
 	case <-issueContext.Done():
 		cert, err = s.Cert()

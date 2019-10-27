@@ -37,7 +37,6 @@ const (
 )
 
 const domainKeyRSALength = 2048
-const ONLY_ONE_CERT_TMP = true
 
 var errHaveNoCert = errors.New("have no certificate for domain") // may return for any internal error
 
@@ -575,7 +574,7 @@ func (m *Manager) isHTTPValidationRequest(r *http.Request) bool {
 	return strings.HasPrefix(r.URL.Path, httpWellKnown)
 }
 
-func (m *Manager) HandleHttpValidation(w http.ResponseWriter, r *http.Request) bool {
+func (m *Manager) HandleHTTPValidation(w http.ResponseWriter, r *http.Request) bool {
 	if !m.isHTTPValidationRequest(r) {
 		return false
 	}

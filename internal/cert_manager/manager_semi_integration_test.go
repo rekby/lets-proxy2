@@ -63,7 +63,7 @@ func TestManager_GetCertificateHttp01(t *testing.T) {
 			request = request.WithContext(ctx)
 			if manager.isHTTPValidationRequest(request) {
 				logger.Info("Handle validation request", zap.Reflect("request", request))
-				manager.HandleHttpValidation(writer, request)
+				manager.HandleHTTPValidation(writer, request)
 			} else {
 				logger.Warn("Handle non validation request")
 				writer.WriteHeader(http.StatusInternalServerError)

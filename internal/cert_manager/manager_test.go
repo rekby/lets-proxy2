@@ -49,10 +49,11 @@ func init() {
 }
 
 func createTestClient(t *testing.T) *acme.Client {
-	_, err := http.Get(testACMEServer)
+	resp, err := http.Get(testACMEServer)
 	if err != nil {
 		t.Fatalf("Can't connect to buoulder server: %q", err)
 	}
+	resp.Body.Close()
 
 	client := acme.Client{}
 	client.HTTPClient = &http.Client{
