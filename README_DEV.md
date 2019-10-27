@@ -8,7 +8,7 @@ Need for boulder tests:
 Fake DNS - set to IP of devel computer, allowed from docker.
 
 Must bind docker port 4000 to local port 4000 (for integration tests).
-If use docker-machine - need ```docker-machine ssh <machine-name> -L 4000:localhost:4000```
+If use docker-machine - need ```docker-machine ssh <machine-name> -L 4001:localhost:4001```
 
 FAKE_DNS may be different for other OS.
 For example for mac os - need run other image and ping host.docker.internal for see IP for host.
