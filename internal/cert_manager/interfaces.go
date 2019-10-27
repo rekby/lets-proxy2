@@ -4,7 +4,6 @@ package cert_manager
 import (
 	"context"
 	"crypto/tls"
-	"time"
 
 	"golang.org/x/crypto/acme"
 )
@@ -18,12 +17,14 @@ type DomainChecker interface {
 
 type AcmeClient interface {
 	Accept(ctx context.Context, chal *acme.Challenge) (*acme.Challenge, error)
-	Authorize(ctx context.Context, domain string) (*acme.Authorization, error)
-	CreateCert(ctx context.Context, csr []byte, exp time.Duration, bundle bool) (der [][]byte, certURL string, err error)
+	AuthorizeOrder(ctx context.Context, id []acme.AuthzID, opt ...acme.OrderOption) (*acme.Order, error)
+	CreateOrderCert(ctx context.Context, url string, csr []byte, bundle bool) (der [][]byte, certURL string, err error)
+	GetAuthorization(ctx context.Context, url string) (*acme.Authorization, error)
 	HTTP01ChallengeResponse(token string) (string, error)
 	RevokeAuthorization(ctx context.Context, url string) error
 	TLSALPN01ChallengeCert(token, domain string, opt ...acme.CertOption) (cert tls.Certificate, err error)
 	WaitAuthorization(ctx context.Context, url string) (*acme.Authorization, error)
+	WaitOrder(ctx context.Context, url string) (*acme.Order, error)
 }
 
 type managerDefaults struct{}

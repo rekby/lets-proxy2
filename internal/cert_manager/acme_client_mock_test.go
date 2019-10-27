@@ -27,15 +27,20 @@ type AcmeClientMock struct {
 	beforeAcceptCounter uint64
 	AcceptMock          mAcmeClientMockAccept
 
-	funcAuthorize          func(ctx context.Context, domain string) (ap1 *acme.Authorization, err error)
-	afterAuthorizeCounter  uint64
-	beforeAuthorizeCounter uint64
-	AuthorizeMock          mAcmeClientMockAuthorize
+	funcAuthorizeOrder          func(ctx context.Context, id []acme.AuthzID, opt ...acme.OrderOption) (op1 *acme.Order, err error)
+	afterAuthorizeOrderCounter  uint64
+	beforeAuthorizeOrderCounter uint64
+	AuthorizeOrderMock          mAcmeClientMockAuthorizeOrder
 
-	funcCreateCert          func(ctx context.Context, csr []byte, exp time.Duration, bundle bool) (der [][]byte, certURL string, err error)
-	afterCreateCertCounter  uint64
-	beforeCreateCertCounter uint64
-	CreateCertMock          mAcmeClientMockCreateCert
+	funcCreateOrderCert          func(ctx context.Context, url string, csr []byte, bundle bool) (der [][]byte, certURL string, err error)
+	afterCreateOrderCertCounter  uint64
+	beforeCreateOrderCertCounter uint64
+	CreateOrderCertMock          mAcmeClientMockCreateOrderCert
+
+	funcGetAuthorization          func(ctx context.Context, url string) (ap1 *acme.Authorization, err error)
+	afterGetAuthorizationCounter  uint64
+	beforeGetAuthorizationCounter uint64
+	GetAuthorizationMock          mAcmeClientMockGetAuthorization
 
 	funcHTTP01ChallengeResponse          func(token string) (s1 string, err error)
 	afterHTTP01ChallengeResponseCounter  uint64
@@ -56,6 +61,11 @@ type AcmeClientMock struct {
 	afterWaitAuthorizationCounter  uint64
 	beforeWaitAuthorizationCounter uint64
 	WaitAuthorizationMock          mAcmeClientMockWaitAuthorization
+
+	funcWaitOrder          func(ctx context.Context, url string) (op1 *acme.Order, err error)
+	afterWaitOrderCounter  uint64
+	beforeWaitOrderCounter uint64
+	WaitOrderMock          mAcmeClientMockWaitOrder
 }
 
 // NewAcmeClientMock returns a mock for AcmeClient
@@ -65,12 +75,14 @@ func NewAcmeClientMock(t minimock.Tester) *AcmeClientMock {
 		controller.RegisterMocker(m)
 	}
 	m.AcceptMock = mAcmeClientMockAccept{mock: m}
-	m.AuthorizeMock = mAcmeClientMockAuthorize{mock: m}
-	m.CreateCertMock = mAcmeClientMockCreateCert{mock: m}
+	m.AuthorizeOrderMock = mAcmeClientMockAuthorizeOrder{mock: m}
+	m.CreateOrderCertMock = mAcmeClientMockCreateOrderCert{mock: m}
+	m.GetAuthorizationMock = mAcmeClientMockGetAuthorization{mock: m}
 	m.HTTP01ChallengeResponseMock = mAcmeClientMockHTTP01ChallengeResponse{mock: m}
 	m.RevokeAuthorizationMock = mAcmeClientMockRevokeAuthorization{mock: m}
 	m.TLSALPN01ChallengeCertMock = mAcmeClientMockTLSALPN01ChallengeCert{mock: m}
 	m.WaitAuthorizationMock = mAcmeClientMockWaitAuthorization{mock: m}
+	m.WaitOrderMock = mAcmeClientMockWaitOrder{mock: m}
 
 	return m
 }
@@ -250,43 +262,44 @@ func (m *AcmeClientMock) MinimockAcceptInspect() {
 	}
 }
 
-type mAcmeClientMockAuthorize struct {
+type mAcmeClientMockAuthorizeOrder struct {
 	mock               *AcmeClientMock
-	defaultExpectation *AcmeClientMockAuthorizeExpectation
-	expectations       []*AcmeClientMockAuthorizeExpectation
+	defaultExpectation *AcmeClientMockAuthorizeOrderExpectation
+	expectations       []*AcmeClientMockAuthorizeOrderExpectation
 }
 
-// AcmeClientMockAuthorizeExpectation specifies expectation struct of the AcmeClient.Authorize
-type AcmeClientMockAuthorizeExpectation struct {
+// AcmeClientMockAuthorizeOrderExpectation specifies expectation struct of the AcmeClient.AuthorizeOrder
+type AcmeClientMockAuthorizeOrderExpectation struct {
 	mock    *AcmeClientMock
-	params  *AcmeClientMockAuthorizeParams
-	results *AcmeClientMockAuthorizeResults
+	params  *AcmeClientMockAuthorizeOrderParams
+	results *AcmeClientMockAuthorizeOrderResults
 	Counter uint64
 }
 
-// AcmeClientMockAuthorizeParams contains parameters of the AcmeClient.Authorize
-type AcmeClientMockAuthorizeParams struct {
-	ctx    context.Context
-	domain string
+// AcmeClientMockAuthorizeOrderParams contains parameters of the AcmeClient.AuthorizeOrder
+type AcmeClientMockAuthorizeOrderParams struct {
+	ctx context.Context
+	id  []acme.AuthzID
+	opt []acme.OrderOption
 }
 
-// AcmeClientMockAuthorizeResults contains results of the AcmeClient.Authorize
-type AcmeClientMockAuthorizeResults struct {
-	ap1 *acme.Authorization
+// AcmeClientMockAuthorizeOrderResults contains results of the AcmeClient.AuthorizeOrder
+type AcmeClientMockAuthorizeOrderResults struct {
+	op1 *acme.Order
 	err error
 }
 
-// Expect sets up expected params for AcmeClient.Authorize
-func (m *mAcmeClientMockAuthorize) Expect(ctx context.Context, domain string) *mAcmeClientMockAuthorize {
-	if m.mock.funcAuthorize != nil {
-		m.mock.t.Fatalf("AcmeClientMock.Authorize mock is already set by Set")
+// Expect sets up expected params for AcmeClient.AuthorizeOrder
+func (m *mAcmeClientMockAuthorizeOrder) Expect(ctx context.Context, id []acme.AuthzID, opt ...acme.OrderOption) *mAcmeClientMockAuthorizeOrder {
+	if m.mock.funcAuthorizeOrder != nil {
+		m.mock.t.Fatalf("AcmeClientMock.AuthorizeOrder mock is already set by Set")
 	}
 
 	if m.defaultExpectation == nil {
-		m.defaultExpectation = &AcmeClientMockAuthorizeExpectation{}
+		m.defaultExpectation = &AcmeClientMockAuthorizeOrderExpectation{}
 	}
 
-	m.defaultExpectation.params = &AcmeClientMockAuthorizeParams{ctx, domain}
+	m.defaultExpectation.params = &AcmeClientMockAuthorizeOrderParams{ctx, id, opt}
 	for _, e := range m.expectations {
 		if minimock.Equal(e.params, m.defaultExpectation.params) {
 			m.mock.t.Fatalf("Expectation set by When has same params: %#v", *m.defaultExpectation.params)
@@ -296,175 +309,175 @@ func (m *mAcmeClientMockAuthorize) Expect(ctx context.Context, domain string) *m
 	return m
 }
 
-// Return sets up results that will be returned by AcmeClient.Authorize
-func (m *mAcmeClientMockAuthorize) Return(ap1 *acme.Authorization, err error) *AcmeClientMock {
-	if m.mock.funcAuthorize != nil {
-		m.mock.t.Fatalf("AcmeClientMock.Authorize mock is already set by Set")
+// Return sets up results that will be returned by AcmeClient.AuthorizeOrder
+func (m *mAcmeClientMockAuthorizeOrder) Return(op1 *acme.Order, err error) *AcmeClientMock {
+	if m.mock.funcAuthorizeOrder != nil {
+		m.mock.t.Fatalf("AcmeClientMock.AuthorizeOrder mock is already set by Set")
 	}
 
 	if m.defaultExpectation == nil {
-		m.defaultExpectation = &AcmeClientMockAuthorizeExpectation{mock: m.mock}
+		m.defaultExpectation = &AcmeClientMockAuthorizeOrderExpectation{mock: m.mock}
 	}
-	m.defaultExpectation.results = &AcmeClientMockAuthorizeResults{ap1, err}
+	m.defaultExpectation.results = &AcmeClientMockAuthorizeOrderResults{op1, err}
 	return m.mock
 }
 
-//Set uses given function f to mock the AcmeClient.Authorize method
-func (m *mAcmeClientMockAuthorize) Set(f func(ctx context.Context, domain string) (ap1 *acme.Authorization, err error)) *AcmeClientMock {
+//Set uses given function f to mock the AcmeClient.AuthorizeOrder method
+func (m *mAcmeClientMockAuthorizeOrder) Set(f func(ctx context.Context, id []acme.AuthzID, opt ...acme.OrderOption) (op1 *acme.Order, err error)) *AcmeClientMock {
 	if m.defaultExpectation != nil {
-		m.mock.t.Fatalf("Default expectation is already set for the AcmeClient.Authorize method")
+		m.mock.t.Fatalf("Default expectation is already set for the AcmeClient.AuthorizeOrder method")
 	}
 
 	if len(m.expectations) > 0 {
-		m.mock.t.Fatalf("Some expectations are already set for the AcmeClient.Authorize method")
+		m.mock.t.Fatalf("Some expectations are already set for the AcmeClient.AuthorizeOrder method")
 	}
 
-	m.mock.funcAuthorize = f
+	m.mock.funcAuthorizeOrder = f
 	return m.mock
 }
 
-// When sets expectation for the AcmeClient.Authorize which will trigger the result defined by the following
+// When sets expectation for the AcmeClient.AuthorizeOrder which will trigger the result defined by the following
 // Then helper
-func (m *mAcmeClientMockAuthorize) When(ctx context.Context, domain string) *AcmeClientMockAuthorizeExpectation {
-	if m.mock.funcAuthorize != nil {
-		m.mock.t.Fatalf("AcmeClientMock.Authorize mock is already set by Set")
+func (m *mAcmeClientMockAuthorizeOrder) When(ctx context.Context, id []acme.AuthzID, opt ...acme.OrderOption) *AcmeClientMockAuthorizeOrderExpectation {
+	if m.mock.funcAuthorizeOrder != nil {
+		m.mock.t.Fatalf("AcmeClientMock.AuthorizeOrder mock is already set by Set")
 	}
 
-	expectation := &AcmeClientMockAuthorizeExpectation{
+	expectation := &AcmeClientMockAuthorizeOrderExpectation{
 		mock:   m.mock,
-		params: &AcmeClientMockAuthorizeParams{ctx, domain},
+		params: &AcmeClientMockAuthorizeOrderParams{ctx, id, opt},
 	}
 	m.expectations = append(m.expectations, expectation)
 	return expectation
 }
 
-// Then sets up AcmeClient.Authorize return parameters for the expectation previously defined by the When method
-func (e *AcmeClientMockAuthorizeExpectation) Then(ap1 *acme.Authorization, err error) *AcmeClientMock {
-	e.results = &AcmeClientMockAuthorizeResults{ap1, err}
+// Then sets up AcmeClient.AuthorizeOrder return parameters for the expectation previously defined by the When method
+func (e *AcmeClientMockAuthorizeOrderExpectation) Then(op1 *acme.Order, err error) *AcmeClientMock {
+	e.results = &AcmeClientMockAuthorizeOrderResults{op1, err}
 	return e.mock
 }
 
-// Authorize implements AcmeClient
-func (m *AcmeClientMock) Authorize(ctx context.Context, domain string) (ap1 *acme.Authorization, err error) {
-	atomic.AddUint64(&m.beforeAuthorizeCounter, 1)
-	defer atomic.AddUint64(&m.afterAuthorizeCounter, 1)
+// AuthorizeOrder implements AcmeClient
+func (m *AcmeClientMock) AuthorizeOrder(ctx context.Context, id []acme.AuthzID, opt ...acme.OrderOption) (op1 *acme.Order, err error) {
+	atomic.AddUint64(&m.beforeAuthorizeOrderCounter, 1)
+	defer atomic.AddUint64(&m.afterAuthorizeOrderCounter, 1)
 
-	for _, e := range m.AuthorizeMock.expectations {
-		if minimock.Equal(*e.params, AcmeClientMockAuthorizeParams{ctx, domain}) {
+	for _, e := range m.AuthorizeOrderMock.expectations {
+		if minimock.Equal(*e.params, AcmeClientMockAuthorizeOrderParams{ctx, id, opt}) {
 			atomic.AddUint64(&e.Counter, 1)
-			return e.results.ap1, e.results.err
+			return e.results.op1, e.results.err
 		}
 	}
 
-	if m.AuthorizeMock.defaultExpectation != nil {
-		atomic.AddUint64(&m.AuthorizeMock.defaultExpectation.Counter, 1)
-		want := m.AuthorizeMock.defaultExpectation.params
-		got := AcmeClientMockAuthorizeParams{ctx, domain}
+	if m.AuthorizeOrderMock.defaultExpectation != nil {
+		atomic.AddUint64(&m.AuthorizeOrderMock.defaultExpectation.Counter, 1)
+		want := m.AuthorizeOrderMock.defaultExpectation.params
+		got := AcmeClientMockAuthorizeOrderParams{ctx, id, opt}
 		if want != nil && !minimock.Equal(*want, got) {
-			m.t.Errorf("AcmeClientMock.Authorize got unexpected parameters, want: %#v, got: %#v%s\n", *want, got, minimock.Diff(*want, got))
+			m.t.Errorf("AcmeClientMock.AuthorizeOrder got unexpected parameters, want: %#v, got: %#v%s\n", *want, got, minimock.Diff(*want, got))
 		}
 
-		results := m.AuthorizeMock.defaultExpectation.results
+		results := m.AuthorizeOrderMock.defaultExpectation.results
 		if results == nil {
-			m.t.Fatal("No results are set for the AcmeClientMock.Authorize")
+			m.t.Fatal("No results are set for the AcmeClientMock.AuthorizeOrder")
 		}
-		return (*results).ap1, (*results).err
+		return (*results).op1, (*results).err
 	}
-	if m.funcAuthorize != nil {
-		return m.funcAuthorize(ctx, domain)
+	if m.funcAuthorizeOrder != nil {
+		return m.funcAuthorizeOrder(ctx, id, opt...)
 	}
-	m.t.Fatalf("Unexpected call to AcmeClientMock.Authorize. %v %v", ctx, domain)
+	m.t.Fatalf("Unexpected call to AcmeClientMock.AuthorizeOrder. %v %v %v", ctx, id, opt)
 	return
 }
 
-// AuthorizeAfterCounter returns a count of finished AcmeClientMock.Authorize invocations
-func (m *AcmeClientMock) AuthorizeAfterCounter() uint64 {
-	return atomic.LoadUint64(&m.afterAuthorizeCounter)
+// AuthorizeOrderAfterCounter returns a count of finished AcmeClientMock.AuthorizeOrder invocations
+func (m *AcmeClientMock) AuthorizeOrderAfterCounter() uint64 {
+	return atomic.LoadUint64(&m.afterAuthorizeOrderCounter)
 }
 
-// AuthorizeBeforeCounter returns a count of AcmeClientMock.Authorize invocations
-func (m *AcmeClientMock) AuthorizeBeforeCounter() uint64 {
-	return atomic.LoadUint64(&m.beforeAuthorizeCounter)
+// AuthorizeOrderBeforeCounter returns a count of AcmeClientMock.AuthorizeOrder invocations
+func (m *AcmeClientMock) AuthorizeOrderBeforeCounter() uint64 {
+	return atomic.LoadUint64(&m.beforeAuthorizeOrderCounter)
 }
 
-// MinimockAuthorizeDone returns true if the count of the Authorize invocations corresponds
+// MinimockAuthorizeOrderDone returns true if the count of the AuthorizeOrder invocations corresponds
 // the number of defined expectations
-func (m *AcmeClientMock) MinimockAuthorizeDone() bool {
-	for _, e := range m.AuthorizeMock.expectations {
+func (m *AcmeClientMock) MinimockAuthorizeOrderDone() bool {
+	for _, e := range m.AuthorizeOrderMock.expectations {
 		if atomic.LoadUint64(&e.Counter) < 1 {
 			return false
 		}
 	}
 
 	// if default expectation was set then invocations count should be greater than zero
-	if m.AuthorizeMock.defaultExpectation != nil && atomic.LoadUint64(&m.afterAuthorizeCounter) < 1 {
+	if m.AuthorizeOrderMock.defaultExpectation != nil && atomic.LoadUint64(&m.afterAuthorizeOrderCounter) < 1 {
 		return false
 	}
 	// if func was set then invocations count should be greater than zero
-	if m.funcAuthorize != nil && atomic.LoadUint64(&m.afterAuthorizeCounter) < 1 {
+	if m.funcAuthorizeOrder != nil && atomic.LoadUint64(&m.afterAuthorizeOrderCounter) < 1 {
 		return false
 	}
 	return true
 }
 
-// MinimockAuthorizeInspect logs each unmet expectation
-func (m *AcmeClientMock) MinimockAuthorizeInspect() {
-	for _, e := range m.AuthorizeMock.expectations {
+// MinimockAuthorizeOrderInspect logs each unmet expectation
+func (m *AcmeClientMock) MinimockAuthorizeOrderInspect() {
+	for _, e := range m.AuthorizeOrderMock.expectations {
 		if atomic.LoadUint64(&e.Counter) < 1 {
-			m.t.Errorf("Expected call to AcmeClientMock.Authorize with params: %#v", *e.params)
+			m.t.Errorf("Expected call to AcmeClientMock.AuthorizeOrder with params: %#v", *e.params)
 		}
 	}
 
 	// if default expectation was set then invocations count should be greater than zero
-	if m.AuthorizeMock.defaultExpectation != nil && atomic.LoadUint64(&m.afterAuthorizeCounter) < 1 {
-		m.t.Errorf("Expected call to AcmeClientMock.Authorize with params: %#v", *m.AuthorizeMock.defaultExpectation.params)
+	if m.AuthorizeOrderMock.defaultExpectation != nil && atomic.LoadUint64(&m.afterAuthorizeOrderCounter) < 1 {
+		m.t.Errorf("Expected call to AcmeClientMock.AuthorizeOrder with params: %#v", *m.AuthorizeOrderMock.defaultExpectation.params)
 	}
 	// if func was set then invocations count should be greater than zero
-	if m.funcAuthorize != nil && atomic.LoadUint64(&m.afterAuthorizeCounter) < 1 {
-		m.t.Error("Expected call to AcmeClientMock.Authorize")
+	if m.funcAuthorizeOrder != nil && atomic.LoadUint64(&m.afterAuthorizeOrderCounter) < 1 {
+		m.t.Error("Expected call to AcmeClientMock.AuthorizeOrder")
 	}
 }
 
-type mAcmeClientMockCreateCert struct {
+type mAcmeClientMockCreateOrderCert struct {
 	mock               *AcmeClientMock
-	defaultExpectation *AcmeClientMockCreateCertExpectation
-	expectations       []*AcmeClientMockCreateCertExpectation
+	defaultExpectation *AcmeClientMockCreateOrderCertExpectation
+	expectations       []*AcmeClientMockCreateOrderCertExpectation
 }
 
-// AcmeClientMockCreateCertExpectation specifies expectation struct of the AcmeClient.CreateCert
-type AcmeClientMockCreateCertExpectation struct {
+// AcmeClientMockCreateOrderCertExpectation specifies expectation struct of the AcmeClient.CreateOrderCert
+type AcmeClientMockCreateOrderCertExpectation struct {
 	mock    *AcmeClientMock
-	params  *AcmeClientMockCreateCertParams
-	results *AcmeClientMockCreateCertResults
+	params  *AcmeClientMockCreateOrderCertParams
+	results *AcmeClientMockCreateOrderCertResults
 	Counter uint64
 }
 
-// AcmeClientMockCreateCertParams contains parameters of the AcmeClient.CreateCert
-type AcmeClientMockCreateCertParams struct {
+// AcmeClientMockCreateOrderCertParams contains parameters of the AcmeClient.CreateOrderCert
+type AcmeClientMockCreateOrderCertParams struct {
 	ctx    context.Context
+	url    string
 	csr    []byte
-	exp    time.Duration
 	bundle bool
 }
 
-// AcmeClientMockCreateCertResults contains results of the AcmeClient.CreateCert
-type AcmeClientMockCreateCertResults struct {
+// AcmeClientMockCreateOrderCertResults contains results of the AcmeClient.CreateOrderCert
+type AcmeClientMockCreateOrderCertResults struct {
 	der     [][]byte
 	certURL string
 	err     error
 }
 
-// Expect sets up expected params for AcmeClient.CreateCert
-func (m *mAcmeClientMockCreateCert) Expect(ctx context.Context, csr []byte, exp time.Duration, bundle bool) *mAcmeClientMockCreateCert {
-	if m.mock.funcCreateCert != nil {
-		m.mock.t.Fatalf("AcmeClientMock.CreateCert mock is already set by Set")
+// Expect sets up expected params for AcmeClient.CreateOrderCert
+func (m *mAcmeClientMockCreateOrderCert) Expect(ctx context.Context, url string, csr []byte, bundle bool) *mAcmeClientMockCreateOrderCert {
+	if m.mock.funcCreateOrderCert != nil {
+		m.mock.t.Fatalf("AcmeClientMock.CreateOrderCert mock is already set by Set")
 	}
 
 	if m.defaultExpectation == nil {
-		m.defaultExpectation = &AcmeClientMockCreateCertExpectation{}
+		m.defaultExpectation = &AcmeClientMockCreateOrderCertExpectation{}
 	}
 
-	m.defaultExpectation.params = &AcmeClientMockCreateCertParams{ctx, csr, exp, bundle}
+	m.defaultExpectation.params = &AcmeClientMockCreateOrderCertParams{ctx, url, csr, bundle}
 	for _, e := range m.expectations {
 		if minimock.Equal(e.params, m.defaultExpectation.params) {
 			m.mock.t.Fatalf("Expectation set by When has same params: %#v", *m.defaultExpectation.params)
@@ -474,132 +487,307 @@ func (m *mAcmeClientMockCreateCert) Expect(ctx context.Context, csr []byte, exp 
 	return m
 }
 
-// Return sets up results that will be returned by AcmeClient.CreateCert
-func (m *mAcmeClientMockCreateCert) Return(der [][]byte, certURL string, err error) *AcmeClientMock {
-	if m.mock.funcCreateCert != nil {
-		m.mock.t.Fatalf("AcmeClientMock.CreateCert mock is already set by Set")
+// Return sets up results that will be returned by AcmeClient.CreateOrderCert
+func (m *mAcmeClientMockCreateOrderCert) Return(der [][]byte, certURL string, err error) *AcmeClientMock {
+	if m.mock.funcCreateOrderCert != nil {
+		m.mock.t.Fatalf("AcmeClientMock.CreateOrderCert mock is already set by Set")
 	}
 
 	if m.defaultExpectation == nil {
-		m.defaultExpectation = &AcmeClientMockCreateCertExpectation{mock: m.mock}
+		m.defaultExpectation = &AcmeClientMockCreateOrderCertExpectation{mock: m.mock}
 	}
-	m.defaultExpectation.results = &AcmeClientMockCreateCertResults{der, certURL, err}
+	m.defaultExpectation.results = &AcmeClientMockCreateOrderCertResults{der, certURL, err}
 	return m.mock
 }
 
-//Set uses given function f to mock the AcmeClient.CreateCert method
-func (m *mAcmeClientMockCreateCert) Set(f func(ctx context.Context, csr []byte, exp time.Duration, bundle bool) (der [][]byte, certURL string, err error)) *AcmeClientMock {
+//Set uses given function f to mock the AcmeClient.CreateOrderCert method
+func (m *mAcmeClientMockCreateOrderCert) Set(f func(ctx context.Context, url string, csr []byte, bundle bool) (der [][]byte, certURL string, err error)) *AcmeClientMock {
 	if m.defaultExpectation != nil {
-		m.mock.t.Fatalf("Default expectation is already set for the AcmeClient.CreateCert method")
+		m.mock.t.Fatalf("Default expectation is already set for the AcmeClient.CreateOrderCert method")
 	}
 
 	if len(m.expectations) > 0 {
-		m.mock.t.Fatalf("Some expectations are already set for the AcmeClient.CreateCert method")
+		m.mock.t.Fatalf("Some expectations are already set for the AcmeClient.CreateOrderCert method")
 	}
 
-	m.mock.funcCreateCert = f
+	m.mock.funcCreateOrderCert = f
 	return m.mock
 }
 
-// When sets expectation for the AcmeClient.CreateCert which will trigger the result defined by the following
+// When sets expectation for the AcmeClient.CreateOrderCert which will trigger the result defined by the following
 // Then helper
-func (m *mAcmeClientMockCreateCert) When(ctx context.Context, csr []byte, exp time.Duration, bundle bool) *AcmeClientMockCreateCertExpectation {
-	if m.mock.funcCreateCert != nil {
-		m.mock.t.Fatalf("AcmeClientMock.CreateCert mock is already set by Set")
+func (m *mAcmeClientMockCreateOrderCert) When(ctx context.Context, url string, csr []byte, bundle bool) *AcmeClientMockCreateOrderCertExpectation {
+	if m.mock.funcCreateOrderCert != nil {
+		m.mock.t.Fatalf("AcmeClientMock.CreateOrderCert mock is already set by Set")
 	}
 
-	expectation := &AcmeClientMockCreateCertExpectation{
+	expectation := &AcmeClientMockCreateOrderCertExpectation{
 		mock:   m.mock,
-		params: &AcmeClientMockCreateCertParams{ctx, csr, exp, bundle},
+		params: &AcmeClientMockCreateOrderCertParams{ctx, url, csr, bundle},
 	}
 	m.expectations = append(m.expectations, expectation)
 	return expectation
 }
 
-// Then sets up AcmeClient.CreateCert return parameters for the expectation previously defined by the When method
-func (e *AcmeClientMockCreateCertExpectation) Then(der [][]byte, certURL string, err error) *AcmeClientMock {
-	e.results = &AcmeClientMockCreateCertResults{der, certURL, err}
+// Then sets up AcmeClient.CreateOrderCert return parameters for the expectation previously defined by the When method
+func (e *AcmeClientMockCreateOrderCertExpectation) Then(der [][]byte, certURL string, err error) *AcmeClientMock {
+	e.results = &AcmeClientMockCreateOrderCertResults{der, certURL, err}
 	return e.mock
 }
 
-// CreateCert implements AcmeClient
-func (m *AcmeClientMock) CreateCert(ctx context.Context, csr []byte, exp time.Duration, bundle bool) (der [][]byte, certURL string, err error) {
-	atomic.AddUint64(&m.beforeCreateCertCounter, 1)
-	defer atomic.AddUint64(&m.afterCreateCertCounter, 1)
+// CreateOrderCert implements AcmeClient
+func (m *AcmeClientMock) CreateOrderCert(ctx context.Context, url string, csr []byte, bundle bool) (der [][]byte, certURL string, err error) {
+	atomic.AddUint64(&m.beforeCreateOrderCertCounter, 1)
+	defer atomic.AddUint64(&m.afterCreateOrderCertCounter, 1)
 
-	for _, e := range m.CreateCertMock.expectations {
-		if minimock.Equal(*e.params, AcmeClientMockCreateCertParams{ctx, csr, exp, bundle}) {
+	for _, e := range m.CreateOrderCertMock.expectations {
+		if minimock.Equal(*e.params, AcmeClientMockCreateOrderCertParams{ctx, url, csr, bundle}) {
 			atomic.AddUint64(&e.Counter, 1)
 			return e.results.der, e.results.certURL, e.results.err
 		}
 	}
 
-	if m.CreateCertMock.defaultExpectation != nil {
-		atomic.AddUint64(&m.CreateCertMock.defaultExpectation.Counter, 1)
-		want := m.CreateCertMock.defaultExpectation.params
-		got := AcmeClientMockCreateCertParams{ctx, csr, exp, bundle}
+	if m.CreateOrderCertMock.defaultExpectation != nil {
+		atomic.AddUint64(&m.CreateOrderCertMock.defaultExpectation.Counter, 1)
+		want := m.CreateOrderCertMock.defaultExpectation.params
+		got := AcmeClientMockCreateOrderCertParams{ctx, url, csr, bundle}
 		if want != nil && !minimock.Equal(*want, got) {
-			m.t.Errorf("AcmeClientMock.CreateCert got unexpected parameters, want: %#v, got: %#v%s\n", *want, got, minimock.Diff(*want, got))
+			m.t.Errorf("AcmeClientMock.CreateOrderCert got unexpected parameters, want: %#v, got: %#v%s\n", *want, got, minimock.Diff(*want, got))
 		}
 
-		results := m.CreateCertMock.defaultExpectation.results
+		results := m.CreateOrderCertMock.defaultExpectation.results
 		if results == nil {
-			m.t.Fatal("No results are set for the AcmeClientMock.CreateCert")
+			m.t.Fatal("No results are set for the AcmeClientMock.CreateOrderCert")
 		}
 		return (*results).der, (*results).certURL, (*results).err
 	}
-	if m.funcCreateCert != nil {
-		return m.funcCreateCert(ctx, csr, exp, bundle)
+	if m.funcCreateOrderCert != nil {
+		return m.funcCreateOrderCert(ctx, url, csr, bundle)
 	}
-	m.t.Fatalf("Unexpected call to AcmeClientMock.CreateCert. %v %v %v %v", ctx, csr, exp, bundle)
+	m.t.Fatalf("Unexpected call to AcmeClientMock.CreateOrderCert. %v %v %v %v", ctx, url, csr, bundle)
 	return
 }
 
-// CreateCertAfterCounter returns a count of finished AcmeClientMock.CreateCert invocations
-func (m *AcmeClientMock) CreateCertAfterCounter() uint64 {
-	return atomic.LoadUint64(&m.afterCreateCertCounter)
+// CreateOrderCertAfterCounter returns a count of finished AcmeClientMock.CreateOrderCert invocations
+func (m *AcmeClientMock) CreateOrderCertAfterCounter() uint64 {
+	return atomic.LoadUint64(&m.afterCreateOrderCertCounter)
 }
 
-// CreateCertBeforeCounter returns a count of AcmeClientMock.CreateCert invocations
-func (m *AcmeClientMock) CreateCertBeforeCounter() uint64 {
-	return atomic.LoadUint64(&m.beforeCreateCertCounter)
+// CreateOrderCertBeforeCounter returns a count of AcmeClientMock.CreateOrderCert invocations
+func (m *AcmeClientMock) CreateOrderCertBeforeCounter() uint64 {
+	return atomic.LoadUint64(&m.beforeCreateOrderCertCounter)
 }
 
-// MinimockCreateCertDone returns true if the count of the CreateCert invocations corresponds
+// MinimockCreateOrderCertDone returns true if the count of the CreateOrderCert invocations corresponds
 // the number of defined expectations
-func (m *AcmeClientMock) MinimockCreateCertDone() bool {
-	for _, e := range m.CreateCertMock.expectations {
+func (m *AcmeClientMock) MinimockCreateOrderCertDone() bool {
+	for _, e := range m.CreateOrderCertMock.expectations {
 		if atomic.LoadUint64(&e.Counter) < 1 {
 			return false
 		}
 	}
 
 	// if default expectation was set then invocations count should be greater than zero
-	if m.CreateCertMock.defaultExpectation != nil && atomic.LoadUint64(&m.afterCreateCertCounter) < 1 {
+	if m.CreateOrderCertMock.defaultExpectation != nil && atomic.LoadUint64(&m.afterCreateOrderCertCounter) < 1 {
 		return false
 	}
 	// if func was set then invocations count should be greater than zero
-	if m.funcCreateCert != nil && atomic.LoadUint64(&m.afterCreateCertCounter) < 1 {
+	if m.funcCreateOrderCert != nil && atomic.LoadUint64(&m.afterCreateOrderCertCounter) < 1 {
 		return false
 	}
 	return true
 }
 
-// MinimockCreateCertInspect logs each unmet expectation
-func (m *AcmeClientMock) MinimockCreateCertInspect() {
-	for _, e := range m.CreateCertMock.expectations {
+// MinimockCreateOrderCertInspect logs each unmet expectation
+func (m *AcmeClientMock) MinimockCreateOrderCertInspect() {
+	for _, e := range m.CreateOrderCertMock.expectations {
 		if atomic.LoadUint64(&e.Counter) < 1 {
-			m.t.Errorf("Expected call to AcmeClientMock.CreateCert with params: %#v", *e.params)
+			m.t.Errorf("Expected call to AcmeClientMock.CreateOrderCert with params: %#v", *e.params)
 		}
 	}
 
 	// if default expectation was set then invocations count should be greater than zero
-	if m.CreateCertMock.defaultExpectation != nil && atomic.LoadUint64(&m.afterCreateCertCounter) < 1 {
-		m.t.Errorf("Expected call to AcmeClientMock.CreateCert with params: %#v", *m.CreateCertMock.defaultExpectation.params)
+	if m.CreateOrderCertMock.defaultExpectation != nil && atomic.LoadUint64(&m.afterCreateOrderCertCounter) < 1 {
+		m.t.Errorf("Expected call to AcmeClientMock.CreateOrderCert with params: %#v", *m.CreateOrderCertMock.defaultExpectation.params)
 	}
 	// if func was set then invocations count should be greater than zero
-	if m.funcCreateCert != nil && atomic.LoadUint64(&m.afterCreateCertCounter) < 1 {
-		m.t.Error("Expected call to AcmeClientMock.CreateCert")
+	if m.funcCreateOrderCert != nil && atomic.LoadUint64(&m.afterCreateOrderCertCounter) < 1 {
+		m.t.Error("Expected call to AcmeClientMock.CreateOrderCert")
+	}
+}
+
+type mAcmeClientMockGetAuthorization struct {
+	mock               *AcmeClientMock
+	defaultExpectation *AcmeClientMockGetAuthorizationExpectation
+	expectations       []*AcmeClientMockGetAuthorizationExpectation
+}
+
+// AcmeClientMockGetAuthorizationExpectation specifies expectation struct of the AcmeClient.GetAuthorization
+type AcmeClientMockGetAuthorizationExpectation struct {
+	mock    *AcmeClientMock
+	params  *AcmeClientMockGetAuthorizationParams
+	results *AcmeClientMockGetAuthorizationResults
+	Counter uint64
+}
+
+// AcmeClientMockGetAuthorizationParams contains parameters of the AcmeClient.GetAuthorization
+type AcmeClientMockGetAuthorizationParams struct {
+	ctx context.Context
+	url string
+}
+
+// AcmeClientMockGetAuthorizationResults contains results of the AcmeClient.GetAuthorization
+type AcmeClientMockGetAuthorizationResults struct {
+	ap1 *acme.Authorization
+	err error
+}
+
+// Expect sets up expected params for AcmeClient.GetAuthorization
+func (m *mAcmeClientMockGetAuthorization) Expect(ctx context.Context, url string) *mAcmeClientMockGetAuthorization {
+	if m.mock.funcGetAuthorization != nil {
+		m.mock.t.Fatalf("AcmeClientMock.GetAuthorization mock is already set by Set")
+	}
+
+	if m.defaultExpectation == nil {
+		m.defaultExpectation = &AcmeClientMockGetAuthorizationExpectation{}
+	}
+
+	m.defaultExpectation.params = &AcmeClientMockGetAuthorizationParams{ctx, url}
+	for _, e := range m.expectations {
+		if minimock.Equal(e.params, m.defaultExpectation.params) {
+			m.mock.t.Fatalf("Expectation set by When has same params: %#v", *m.defaultExpectation.params)
+		}
+	}
+
+	return m
+}
+
+// Return sets up results that will be returned by AcmeClient.GetAuthorization
+func (m *mAcmeClientMockGetAuthorization) Return(ap1 *acme.Authorization, err error) *AcmeClientMock {
+	if m.mock.funcGetAuthorization != nil {
+		m.mock.t.Fatalf("AcmeClientMock.GetAuthorization mock is already set by Set")
+	}
+
+	if m.defaultExpectation == nil {
+		m.defaultExpectation = &AcmeClientMockGetAuthorizationExpectation{mock: m.mock}
+	}
+	m.defaultExpectation.results = &AcmeClientMockGetAuthorizationResults{ap1, err}
+	return m.mock
+}
+
+//Set uses given function f to mock the AcmeClient.GetAuthorization method
+func (m *mAcmeClientMockGetAuthorization) Set(f func(ctx context.Context, url string) (ap1 *acme.Authorization, err error)) *AcmeClientMock {
+	if m.defaultExpectation != nil {
+		m.mock.t.Fatalf("Default expectation is already set for the AcmeClient.GetAuthorization method")
+	}
+
+	if len(m.expectations) > 0 {
+		m.mock.t.Fatalf("Some expectations are already set for the AcmeClient.GetAuthorization method")
+	}
+
+	m.mock.funcGetAuthorization = f
+	return m.mock
+}
+
+// When sets expectation for the AcmeClient.GetAuthorization which will trigger the result defined by the following
+// Then helper
+func (m *mAcmeClientMockGetAuthorization) When(ctx context.Context, url string) *AcmeClientMockGetAuthorizationExpectation {
+	if m.mock.funcGetAuthorization != nil {
+		m.mock.t.Fatalf("AcmeClientMock.GetAuthorization mock is already set by Set")
+	}
+
+	expectation := &AcmeClientMockGetAuthorizationExpectation{
+		mock:   m.mock,
+		params: &AcmeClientMockGetAuthorizationParams{ctx, url},
+	}
+	m.expectations = append(m.expectations, expectation)
+	return expectation
+}
+
+// Then sets up AcmeClient.GetAuthorization return parameters for the expectation previously defined by the When method
+func (e *AcmeClientMockGetAuthorizationExpectation) Then(ap1 *acme.Authorization, err error) *AcmeClientMock {
+	e.results = &AcmeClientMockGetAuthorizationResults{ap1, err}
+	return e.mock
+}
+
+// GetAuthorization implements AcmeClient
+func (m *AcmeClientMock) GetAuthorization(ctx context.Context, url string) (ap1 *acme.Authorization, err error) {
+	atomic.AddUint64(&m.beforeGetAuthorizationCounter, 1)
+	defer atomic.AddUint64(&m.afterGetAuthorizationCounter, 1)
+
+	for _, e := range m.GetAuthorizationMock.expectations {
+		if minimock.Equal(*e.params, AcmeClientMockGetAuthorizationParams{ctx, url}) {
+			atomic.AddUint64(&e.Counter, 1)
+			return e.results.ap1, e.results.err
+		}
+	}
+
+	if m.GetAuthorizationMock.defaultExpectation != nil {
+		atomic.AddUint64(&m.GetAuthorizationMock.defaultExpectation.Counter, 1)
+		want := m.GetAuthorizationMock.defaultExpectation.params
+		got := AcmeClientMockGetAuthorizationParams{ctx, url}
+		if want != nil && !minimock.Equal(*want, got) {
+			m.t.Errorf("AcmeClientMock.GetAuthorization got unexpected parameters, want: %#v, got: %#v%s\n", *want, got, minimock.Diff(*want, got))
+		}
+
+		results := m.GetAuthorizationMock.defaultExpectation.results
+		if results == nil {
+			m.t.Fatal("No results are set for the AcmeClientMock.GetAuthorization")
+		}
+		return (*results).ap1, (*results).err
+	}
+	if m.funcGetAuthorization != nil {
+		return m.funcGetAuthorization(ctx, url)
+	}
+	m.t.Fatalf("Unexpected call to AcmeClientMock.GetAuthorization. %v %v", ctx, url)
+	return
+}
+
+// GetAuthorizationAfterCounter returns a count of finished AcmeClientMock.GetAuthorization invocations
+func (m *AcmeClientMock) GetAuthorizationAfterCounter() uint64 {
+	return atomic.LoadUint64(&m.afterGetAuthorizationCounter)
+}
+
+// GetAuthorizationBeforeCounter returns a count of AcmeClientMock.GetAuthorization invocations
+func (m *AcmeClientMock) GetAuthorizationBeforeCounter() uint64 {
+	return atomic.LoadUint64(&m.beforeGetAuthorizationCounter)
+}
+
+// MinimockGetAuthorizationDone returns true if the count of the GetAuthorization invocations corresponds
+// the number of defined expectations
+func (m *AcmeClientMock) MinimockGetAuthorizationDone() bool {
+	for _, e := range m.GetAuthorizationMock.expectations {
+		if atomic.LoadUint64(&e.Counter) < 1 {
+			return false
+		}
+	}
+
+	// if default expectation was set then invocations count should be greater than zero
+	if m.GetAuthorizationMock.defaultExpectation != nil && atomic.LoadUint64(&m.afterGetAuthorizationCounter) < 1 {
+		return false
+	}
+	// if func was set then invocations count should be greater than zero
+	if m.funcGetAuthorization != nil && atomic.LoadUint64(&m.afterGetAuthorizationCounter) < 1 {
+		return false
+	}
+	return true
+}
+
+// MinimockGetAuthorizationInspect logs each unmet expectation
+func (m *AcmeClientMock) MinimockGetAuthorizationInspect() {
+	for _, e := range m.GetAuthorizationMock.expectations {
+		if atomic.LoadUint64(&e.Counter) < 1 {
+			m.t.Errorf("Expected call to AcmeClientMock.GetAuthorization with params: %#v", *e.params)
+		}
+	}
+
+	// if default expectation was set then invocations count should be greater than zero
+	if m.GetAuthorizationMock.defaultExpectation != nil && atomic.LoadUint64(&m.afterGetAuthorizationCounter) < 1 {
+		m.t.Errorf("Expected call to AcmeClientMock.GetAuthorization with params: %#v", *m.GetAuthorizationMock.defaultExpectation.params)
+	}
+	// if func was set then invocations count should be greater than zero
+	if m.funcGetAuthorization != nil && atomic.LoadUint64(&m.afterGetAuthorizationCounter) < 1 {
+		m.t.Error("Expected call to AcmeClientMock.GetAuthorization")
 	}
 }
 
@@ -1302,14 +1490,191 @@ func (m *AcmeClientMock) MinimockWaitAuthorizationInspect() {
 	}
 }
 
+type mAcmeClientMockWaitOrder struct {
+	mock               *AcmeClientMock
+	defaultExpectation *AcmeClientMockWaitOrderExpectation
+	expectations       []*AcmeClientMockWaitOrderExpectation
+}
+
+// AcmeClientMockWaitOrderExpectation specifies expectation struct of the AcmeClient.WaitOrder
+type AcmeClientMockWaitOrderExpectation struct {
+	mock    *AcmeClientMock
+	params  *AcmeClientMockWaitOrderParams
+	results *AcmeClientMockWaitOrderResults
+	Counter uint64
+}
+
+// AcmeClientMockWaitOrderParams contains parameters of the AcmeClient.WaitOrder
+type AcmeClientMockWaitOrderParams struct {
+	ctx context.Context
+	url string
+}
+
+// AcmeClientMockWaitOrderResults contains results of the AcmeClient.WaitOrder
+type AcmeClientMockWaitOrderResults struct {
+	op1 *acme.Order
+	err error
+}
+
+// Expect sets up expected params for AcmeClient.WaitOrder
+func (m *mAcmeClientMockWaitOrder) Expect(ctx context.Context, url string) *mAcmeClientMockWaitOrder {
+	if m.mock.funcWaitOrder != nil {
+		m.mock.t.Fatalf("AcmeClientMock.WaitOrder mock is already set by Set")
+	}
+
+	if m.defaultExpectation == nil {
+		m.defaultExpectation = &AcmeClientMockWaitOrderExpectation{}
+	}
+
+	m.defaultExpectation.params = &AcmeClientMockWaitOrderParams{ctx, url}
+	for _, e := range m.expectations {
+		if minimock.Equal(e.params, m.defaultExpectation.params) {
+			m.mock.t.Fatalf("Expectation set by When has same params: %#v", *m.defaultExpectation.params)
+		}
+	}
+
+	return m
+}
+
+// Return sets up results that will be returned by AcmeClient.WaitOrder
+func (m *mAcmeClientMockWaitOrder) Return(op1 *acme.Order, err error) *AcmeClientMock {
+	if m.mock.funcWaitOrder != nil {
+		m.mock.t.Fatalf("AcmeClientMock.WaitOrder mock is already set by Set")
+	}
+
+	if m.defaultExpectation == nil {
+		m.defaultExpectation = &AcmeClientMockWaitOrderExpectation{mock: m.mock}
+	}
+	m.defaultExpectation.results = &AcmeClientMockWaitOrderResults{op1, err}
+	return m.mock
+}
+
+//Set uses given function f to mock the AcmeClient.WaitOrder method
+func (m *mAcmeClientMockWaitOrder) Set(f func(ctx context.Context, url string) (op1 *acme.Order, err error)) *AcmeClientMock {
+	if m.defaultExpectation != nil {
+		m.mock.t.Fatalf("Default expectation is already set for the AcmeClient.WaitOrder method")
+	}
+
+	if len(m.expectations) > 0 {
+		m.mock.t.Fatalf("Some expectations are already set for the AcmeClient.WaitOrder method")
+	}
+
+	m.mock.funcWaitOrder = f
+	return m.mock
+}
+
+// When sets expectation for the AcmeClient.WaitOrder which will trigger the result defined by the following
+// Then helper
+func (m *mAcmeClientMockWaitOrder) When(ctx context.Context, url string) *AcmeClientMockWaitOrderExpectation {
+	if m.mock.funcWaitOrder != nil {
+		m.mock.t.Fatalf("AcmeClientMock.WaitOrder mock is already set by Set")
+	}
+
+	expectation := &AcmeClientMockWaitOrderExpectation{
+		mock:   m.mock,
+		params: &AcmeClientMockWaitOrderParams{ctx, url},
+	}
+	m.expectations = append(m.expectations, expectation)
+	return expectation
+}
+
+// Then sets up AcmeClient.WaitOrder return parameters for the expectation previously defined by the When method
+func (e *AcmeClientMockWaitOrderExpectation) Then(op1 *acme.Order, err error) *AcmeClientMock {
+	e.results = &AcmeClientMockWaitOrderResults{op1, err}
+	return e.mock
+}
+
+// WaitOrder implements AcmeClient
+func (m *AcmeClientMock) WaitOrder(ctx context.Context, url string) (op1 *acme.Order, err error) {
+	atomic.AddUint64(&m.beforeWaitOrderCounter, 1)
+	defer atomic.AddUint64(&m.afterWaitOrderCounter, 1)
+
+	for _, e := range m.WaitOrderMock.expectations {
+		if minimock.Equal(*e.params, AcmeClientMockWaitOrderParams{ctx, url}) {
+			atomic.AddUint64(&e.Counter, 1)
+			return e.results.op1, e.results.err
+		}
+	}
+
+	if m.WaitOrderMock.defaultExpectation != nil {
+		atomic.AddUint64(&m.WaitOrderMock.defaultExpectation.Counter, 1)
+		want := m.WaitOrderMock.defaultExpectation.params
+		got := AcmeClientMockWaitOrderParams{ctx, url}
+		if want != nil && !minimock.Equal(*want, got) {
+			m.t.Errorf("AcmeClientMock.WaitOrder got unexpected parameters, want: %#v, got: %#v%s\n", *want, got, minimock.Diff(*want, got))
+		}
+
+		results := m.WaitOrderMock.defaultExpectation.results
+		if results == nil {
+			m.t.Fatal("No results are set for the AcmeClientMock.WaitOrder")
+		}
+		return (*results).op1, (*results).err
+	}
+	if m.funcWaitOrder != nil {
+		return m.funcWaitOrder(ctx, url)
+	}
+	m.t.Fatalf("Unexpected call to AcmeClientMock.WaitOrder. %v %v", ctx, url)
+	return
+}
+
+// WaitOrderAfterCounter returns a count of finished AcmeClientMock.WaitOrder invocations
+func (m *AcmeClientMock) WaitOrderAfterCounter() uint64 {
+	return atomic.LoadUint64(&m.afterWaitOrderCounter)
+}
+
+// WaitOrderBeforeCounter returns a count of AcmeClientMock.WaitOrder invocations
+func (m *AcmeClientMock) WaitOrderBeforeCounter() uint64 {
+	return atomic.LoadUint64(&m.beforeWaitOrderCounter)
+}
+
+// MinimockWaitOrderDone returns true if the count of the WaitOrder invocations corresponds
+// the number of defined expectations
+func (m *AcmeClientMock) MinimockWaitOrderDone() bool {
+	for _, e := range m.WaitOrderMock.expectations {
+		if atomic.LoadUint64(&e.Counter) < 1 {
+			return false
+		}
+	}
+
+	// if default expectation was set then invocations count should be greater than zero
+	if m.WaitOrderMock.defaultExpectation != nil && atomic.LoadUint64(&m.afterWaitOrderCounter) < 1 {
+		return false
+	}
+	// if func was set then invocations count should be greater than zero
+	if m.funcWaitOrder != nil && atomic.LoadUint64(&m.afterWaitOrderCounter) < 1 {
+		return false
+	}
+	return true
+}
+
+// MinimockWaitOrderInspect logs each unmet expectation
+func (m *AcmeClientMock) MinimockWaitOrderInspect() {
+	for _, e := range m.WaitOrderMock.expectations {
+		if atomic.LoadUint64(&e.Counter) < 1 {
+			m.t.Errorf("Expected call to AcmeClientMock.WaitOrder with params: %#v", *e.params)
+		}
+	}
+
+	// if default expectation was set then invocations count should be greater than zero
+	if m.WaitOrderMock.defaultExpectation != nil && atomic.LoadUint64(&m.afterWaitOrderCounter) < 1 {
+		m.t.Errorf("Expected call to AcmeClientMock.WaitOrder with params: %#v", *m.WaitOrderMock.defaultExpectation.params)
+	}
+	// if func was set then invocations count should be greater than zero
+	if m.funcWaitOrder != nil && atomic.LoadUint64(&m.afterWaitOrderCounter) < 1 {
+		m.t.Error("Expected call to AcmeClientMock.WaitOrder")
+	}
+}
+
 // MinimockFinish checks that all mocked methods have been called the expected number of times
 func (m *AcmeClientMock) MinimockFinish() {
 	if !m.minimockDone() {
 		m.MinimockAcceptInspect()
 
-		m.MinimockAuthorizeInspect()
+		m.MinimockAuthorizeOrderInspect()
 
-		m.MinimockCreateCertInspect()
+		m.MinimockCreateOrderCertInspect()
+
+		m.MinimockGetAuthorizationInspect()
 
 		m.MinimockHTTP01ChallengeResponseInspect()
 
@@ -1318,6 +1683,8 @@ func (m *AcmeClientMock) MinimockFinish() {
 		m.MinimockTLSALPN01ChallengeCertInspect()
 
 		m.MinimockWaitAuthorizationInspect()
+
+		m.MinimockWaitOrderInspect()
 		m.t.FailNow()
 	}
 }
@@ -1342,10 +1709,12 @@ func (m *AcmeClientMock) minimockDone() bool {
 	done := true
 	return done &&
 		m.MinimockAcceptDone() &&
-		m.MinimockAuthorizeDone() &&
-		m.MinimockCreateCertDone() &&
+		m.MinimockAuthorizeOrderDone() &&
+		m.MinimockCreateOrderCertDone() &&
+		m.MinimockGetAuthorizationDone() &&
 		m.MinimockHTTP01ChallengeResponseDone() &&
 		m.MinimockRevokeAuthorizationDone() &&
 		m.MinimockTLSALPN01ChallengeCertDone() &&
-		m.MinimockWaitAuthorizationDone()
+		m.MinimockWaitAuthorizationDone() &&
+		m.MinimockWaitOrderDone()
 }

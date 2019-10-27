@@ -29,7 +29,7 @@ func TestManager_GetCertificateHttp01(t *testing.T) {
 	mc := minimock.NewController(t)
 	defer mc.Finish()
 
-	cacheMock := NewCacheMock(mc)
+	cacheMock := NewBytesMock(mc)
 	cacheMock.GetMock.Set(func(ctx context.Context, key string) (ba1 []byte, err error) {
 		zc.L(ctx).Debug("Cache mock get", zap.String("key", key))
 
@@ -195,7 +195,7 @@ func TestManager_GetCertificateTls(t *testing.T) {
 	mc := minimock.NewController(t)
 	defer mc.Finish()
 
-	cacheMock := NewCacheMock(mc)
+	cacheMock := NewBytesMock(mc)
 	cacheMock.GetMock.Set(func(ctx context.Context, key string) (ba1 []byte, err error) {
 		zc.L(ctx).Debug("Cache mock get", zap.String("key", key))
 
