@@ -16,10 +16,12 @@ require (
 	github.com/rekby/zapcontext v0.0.3
 	github.com/satori/go.uuid v1.2.0
 	go.uber.org/zap v1.9.1
-	golang.org/x/crypto v0.0.0-20190426145343-a29dc8fdc734
-	golang.org/x/net v0.0.0-20190424112056-4829fb13d2c6
-	golang.org/x/sys v0.0.0-20190428183149-804c0c7841b5 // indirect
+	golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550
+	golang.org/x/net v0.0.0-20191014212845-da9a3fd4c582
+	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e // indirect
+	golang.org/x/sys v0.0.0-20191020212454-3e7259c5e7c2 // indirect
 	golang.org/x/text v0.3.2 // indirect
-	golang.org/x/tools v0.0.0-20190428024724-550556f78a90 // indirect
+	golang.org/x/tools v0.0.0-20191018212557-ed542cd5b28a // indirect
+	golang.org/x/xerrors v0.0.0-20191011141410-1b5146add898 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
