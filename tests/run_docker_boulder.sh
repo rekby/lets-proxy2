@@ -2,7 +2,11 @@
 set -ev
 
 GOPATH=$(go env GOPATH)
-git clone --depth=50  https://github.com/letsencrypt/boulder/ $GOPATH/src/github.com/letsencrypt/boulder
+
+LAST_BOULDER_RELEASE_TAG=$(git ls-remote -t https://github.com/letsencrypt/boulder/ | awk '{print $2}' | tr -d '^{}' | sort | tail -n 1 | cut -d '/' -f 3)
+
+echo git checkout boulder release: $LAST_BOULDER_RELEASE_TAG
+git clone "--branch=$LAST_BOULDER_RELEASE_TAG" --depth=1  https://github.com/letsencrypt/boulder/ $GOPATH/src/github.com/letsencrypt/boulder
 cd $GOPATH/src/github.com/letsencrypt/boulder
 
 sed -i -e 's/FAKE_DNS.*/FAKE_DNS: 172.17.0.1/' docker-compose.yml # Fake dns to docker host
