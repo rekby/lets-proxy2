@@ -73,43 +73,13 @@ func (p *ListenersHandler) Start(ctx context.Context) error {
 
 	logger := zc.L(ctx)
 	logger.Info("StartAutoRenew handleListeners")
+
 	for _, listenerForTLS := range p.ListenersForHandleTLS {
-		go func(l net.Listener) {
-			for {
-				conn, err := l.Accept()
-				if err != nil {
-					if ctx.Err() != nil {
-						err = nil
-					}
-					log.InfoError(logger, err, "Close listener", zap.String("local_addr", l.Addr().String()))
-					err = l.Close()
-					log.DebugError(logger, err, "Listener closed", zap.String("local_addr", l.Addr().String()))
-					listenerClosed <- struct{}{}
-					return
-				}
-				go p.handleTCPTLSConnection(ctx, conn)
-			}
-		}(listenerForTLS)
+		go handleConnections(ctx, listenerForTLS, p.handleTCPTLSConnection, listenerClosed)
 	}
 
 	for _, listener := range p.Listeners {
-		go func(l net.Listener) {
-			for {
-				conn, err := l.Accept()
-				if err != nil {
-					if ctx.Err() != nil {
-						err = nil
-					}
-					log.InfoError(logger, err, "Close listener", zap.String("local_addr", l.Addr().String()))
-					err = l.Close()
-					log.DebugError(logger, err, "Listener closed", zap.String("local_addr", l.Addr().String()))
-					listenerClosed <- struct{}{}
-					return
-				}
-				go p.handleTCPConnection(ctx, conn)
-			}
-		}(listener)
-
+		go handleConnections(ctx, listener, p.handleTCPConnection, listenerClosed)
 	}
 
 	go func() {
@@ -128,6 +98,25 @@ func (p *ListenersHandler) Start(ctx context.Context) error {
 	}()
 
 	return nil
+}
+
+func handleConnections(ctx context.Context, l net.Listener, handleFunc func(ctx context.Context, conn net.Conn), listenerClosed chan<- struct{}) {
+	logger := zc.L(ctx)
+
+	for {
+		conn, err := l.Accept()
+		if err != nil {
+			if ctx.Err() != nil {
+				err = nil
+			}
+			log.InfoError(logger, err, "Close listener", zap.String("local_addr", l.Addr().String()))
+			err = l.Close()
+			log.DebugError(logger, err, "Listener closed", zap.String("local_addr", l.Addr().String()))
+			listenerClosed <- struct{}{}
+			return
+		}
+		go handleFunc(ctx, conn)
+	}
 }
 
 func (p *ListenersHandler) init() {

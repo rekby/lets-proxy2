@@ -401,5 +401,4 @@ func TestResolverReal(t *testing.T) {
 			net.IPAddr{IP: net.ParseIP("127.0.0.1").To16()},
 		),
 	)
-
 }

@@ -137,5 +137,4 @@ func TestCombinedContext_Done(t *testing.T) {
 
 	wait()
 	td.True(done)
-
 }

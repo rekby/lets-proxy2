@@ -103,7 +103,6 @@ func TestValueLRULimitAtPut(t *testing.T) {
 	res, err = c.Get(ctx, "6")
 	td.CmpDeeply(res, 6)
 	td.CmpNoError(err)
-
 }
 
 func TestValueLRULimitClean(t *testing.T) {
@@ -260,5 +259,4 @@ func TestLimitValueRenumberItems(t *testing.T) {
 	td.CmpDeeply(c.m["4"].lastUsedTime, uint64(4))
 	td.CmpDeeply(c.m["5"].lastUsedTime, uint64(5))
 	td.CmpDeeply(c.m["6"].lastUsedTime, uint64(6))
-
 }
