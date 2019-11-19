@@ -142,7 +142,11 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 		}
 	}
 	if err != nil {
-		logger.Debug("Can't get certificate from local state", zap.Error(err))
+		logLevel := zapcore.ErrorLevel
+		if err == cache.ErrCacheMiss {
+			logLevel = zapcore.DebugLevel
+		}
+		log.LevelParam(logger, logLevel, "Can't get certificate from local state", zap.Error(err))
 	}
 
 	locked, err := isCertLocked(ctx, m.Cache, certName)
@@ -152,9 +156,9 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 	}
 
 	cert, err = loadCertificateFromCache(ctx, m.Cache, certName, keyRSA)
-	logLevel := zapcore.DebugLevel
-	if err != nil && err != cache.ErrCacheMiss {
-		logLevel = zapcore.ErrorLevel
+	logLevel := zapcore.ErrorLevel
+	if err == nil || err == cache.ErrCacheMiss {
+		logLevel = zapcore.DebugLevel
 	}
 	log.LevelParam(logger, logLevel, "Load certificate from cache", zap.Error(err))
 
@@ -716,7 +720,12 @@ func loadCertificateFromCache(ctx context.Context, c cache.Bytes, certName certN
 	certKeyName := string(certName) + "." + string(keyType) + ".cer"
 
 	certBytes, err := c.Get(ctx, certKeyName)
-	log.DebugError(logger, err, "Get certificate from cache")
+	logLevel := zapcore.ErrorLevel
+	if err == nil || err == cache.ErrCacheMiss {
+		logLevel = zapcore.DebugLevel
+	}
+	log.LevelParam(logger, logLevel, "Get certificate from cache", zap.Error(err))
+
 	if err != nil {
 		return nil, err
 	}
