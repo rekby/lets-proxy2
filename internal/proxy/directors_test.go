@@ -70,7 +70,6 @@ func TestDirectorDestMap(t *testing.T) {
 		ctx, http.LocalAddrContextKey, &net.TCPAddr{IP: net.ParseIP("1.2.3.2"), Port: 443}))
 	d.Director(req)
 	td.CmpDeeply(req.URL.Host, "2.2.2.2:80")
-
 }
 
 func TestDirectorHost(t *testing.T) {
@@ -80,7 +79,6 @@ func TestDirectorHost(t *testing.T) {
 	req := &http.Request{}
 	d.Director(req)
 	td.CmpDeeply(req.URL.Host, "haha:81")
-
 }
 
 func TestDirectorSameIP(t *testing.T) {

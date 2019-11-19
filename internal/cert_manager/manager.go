@@ -147,6 +147,9 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 
 	locked, err := isCertLocked(ctx, m.Cache, certName)
 	log.DebugDPanic(logger, err, "Check if certificate locked", zap.Bool("locked", locked))
+	if err != nil {
+		return nil, errHaveNoCert
+	}
 
 	cert, err = loadCertificateFromCache(ctx, m.Cache, certName, keyRSA)
 	logLevel := zapcore.DebugLevel

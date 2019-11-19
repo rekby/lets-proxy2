@@ -77,7 +77,6 @@ func (c *Config) getDefaultTargetDirector(ctx context.Context) (Director, error)
 	}
 	logger.Info("Create host ip director", zap.Int("port", defaultTarget.Port))
 	return NewDirectorHost(defaultTarget.String()), nil
-
 }
 
 //can return nil,nil

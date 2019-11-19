@@ -41,7 +41,6 @@ func initLogger(config logConfig) *zap.Logger {
 		writeSyncer := (*logWriteSyncer)(lr)
 		writers = append(writers, writeSyncer)
 	}
-
 	if config.EnableLogToStdErr {
 		writer, _, err := zap.Open("stderr")
 		if err != nil {
