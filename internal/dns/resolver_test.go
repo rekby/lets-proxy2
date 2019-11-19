@@ -203,8 +203,10 @@ func TestLookupWithClient(t *testing.T) {
 			},
 		}, 0, nil
 	})
+
 	timeoutCtx, timeoutCancelCtx := context.WithTimeout(ctx, time.Millisecond*10)
 	defer timeoutCancelCtx()
+
 	ips, err = lookupWithClient(timeoutCtx, "asd.com", "1.2.3.4:53", mdns.TypeA, 1, client)
 	td.CmpError(err)
 	td.Nil(ips)

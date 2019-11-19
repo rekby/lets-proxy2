@@ -104,6 +104,7 @@ func TestCombinedContext_Value(t *testing.T) {
 
 	td := testdeep.NewT(t)
 	var ctx = CombineContext()
+
 	td.CmpDeeply(ctx.Value(one), nil)
 
 	ctx1 := context.WithValue(context.Background(), one, 2)
@@ -130,6 +131,7 @@ func TestCombinedContext_Done(t *testing.T) {
 
 	done = false
 	ctx = CombineContext(ctx1)
+
 	go func() {
 		<-ctx.Done()
 		done = true

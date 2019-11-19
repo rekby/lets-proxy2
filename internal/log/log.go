@@ -19,6 +19,7 @@ func (c *certLogger) String() string {
 	if cert == nil {
 		return "x509 nil"
 	}
+
 	return fmt.Sprintf("Common name: %q, Domains: %q, Expire: %q, SerialNumber: %q",
 		cert.Subject.CommonName, cert.DNSNames, cert.NotAfter, cert.Subject.SerialNumber)
 }
@@ -69,6 +70,7 @@ func DebugDPanicCtx(ctx context.Context, err error, mess string, fields ...zap.F
 
 func debugDpanic(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
 	logger = logger.WithOptions(zap.AddCallerSkip(2))
+
 	if err == nil {
 		logger.Debug(mess, fields...)
 	} else {
@@ -86,6 +88,7 @@ func DebugFatalCtx(ctx context.Context, err error, mess string, fields ...zap.Fi
 
 func debugFatal(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
 	logger = logger.WithOptions(zap.AddCallerSkip(2))
+
 	if err == nil {
 		logger.Debug(mess, fields...)
 	} else {

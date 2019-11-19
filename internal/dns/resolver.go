@@ -58,14 +58,14 @@ func (r *Resolver) LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr,
 	var errA, errAAAA error
 
 	wg.Add(1)
-	go func() {
+	go func() { //nolint:wsl
 		defer wg.Done()
 		errA = errPanic
 		ipAddrA, errA = r.lookup(ctx, host, mdns.TypeA)
 	}()
 
 	wg.Add(1)
-	go func() {
+	go func() { //nolint:wsl
 		defer wg.Done()
 		errAAAA = errPanic
 		ipAddrAAAA, errAAAA = r.lookup(ctx, host, mdns.TypeAAAA)
@@ -80,6 +80,7 @@ func (r *Resolver) LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr,
 	if errA != nil {
 		resultErr = errA
 	}
+
 	log.DebugErrorCtx(ctx, resultErr, "Host lookup", zap.NamedError("errA", errA),
 		zap.NamedError("errAAAA", errAAAA), zap.Any("ipAddrA", ipAddrA),
 		zap.Any("ipAddrAAAA", ipAddrAAAA))
@@ -102,6 +103,7 @@ func (r *Resolver) lookup(ctx context.Context, host string, recordType uint16) (
 	return res, err
 }
 
+//nolint:funlen
 func lookupWithClient(ctx context.Context, host string, server string, recordType uint16, recursion int, client mDNSClient) (ipResults []net.IPAddr, err error) {
 	logger := zc.L(ctx)
 
@@ -114,6 +116,7 @@ func lookupWithClient(ctx context.Context, host string, server string, recordTyp
 		logger.Debug("Context canceled")
 		return nil, ctx.Err()
 	}
+
 	defer func() {
 		log.DebugError(logger, err, "Resolved ips", zap.Any("ipResults", ipResults),
 			zap.Uint16("record_type", recordType))
@@ -136,7 +139,7 @@ func lookupWithClient(ctx context.Context, host string, server string, recordTyp
 	exchangeCompleted := make(chan struct{})
 
 	var dnsAnswer *mdns.Msg
-	go func() {
+	go func() { // nolint:wsl
 		dnsAnswer, _, err = client.Exchange(&msg, server)
 		close(exchangeCompleted)
 	}()
@@ -154,6 +157,7 @@ func lookupWithClient(ctx context.Context, host string, server string, recordTyp
 		var resIPs []net.IPAddr
 		for _, r := range dnsAnswer.Answer {
 			rType := r.Header().Rrtype
+
 			switch {
 			case rType == mdns.TypeA && rType == recordType:
 				resIPs = append(resIPs, net.IPAddr{IP: r.(*mdns.A).A})

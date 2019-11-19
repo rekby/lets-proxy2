@@ -21,7 +21,6 @@ import (
 )
 
 func TestProxyListenerType(t *testing.T) {
-
 	listener := listenerType{connections: make(chan net.Conn)}
 
 	// test proxy

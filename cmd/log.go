@@ -41,11 +41,13 @@ func initLogger(config logConfig) *zap.Logger {
 		writeSyncer := (*logWriteSyncer)(lr)
 		writers = append(writers, writeSyncer)
 	}
+
 	if config.EnableLogToStdErr {
 		writer, _, err := zap.Open("stderr")
 		if err != nil {
 			panic("Can't open stderr to log")
 		}
+
 		writers = append(writers, writer)
 	}
 
@@ -76,7 +78,7 @@ func initLogger(config logConfig) *zap.Logger {
 func parseLogLevel(logLevelS string) (zapcore.Level, error) {
 	logLevelS = strings.TrimSpace(logLevelS)
 	logLevelS = strings.ToLower(logLevelS)
-	switch logLevelS {
+	switch logLevelS { //nolint:wsl
 	case "debug":
 		return zapcore.DebugLevel, nil
 	case "info":
@@ -90,7 +92,6 @@ func parseLogLevel(logLevelS string) (zapcore.Level, error) {
 	default:
 		return zapcore.InfoLevel, errors.New("undefined log level")
 	}
-
 }
 
 func getLogOptions(config logConfig) (res []zap.Option) {

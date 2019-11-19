@@ -109,6 +109,7 @@ func handleConnections(ctx context.Context, l net.Listener, handleFunc func(ctx 
 			if ctx.Err() != nil {
 				err = nil
 			}
+
 			log.InfoError(logger, err, "Close listener", zap.String("local_addr", l.Addr().String()))
 			err = l.Close()
 			log.DebugError(logger, err, "Listener closed", zap.String("local_addr", l.Addr().String()))

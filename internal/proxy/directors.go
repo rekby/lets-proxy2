@@ -39,6 +39,7 @@ func (c DirectorChain) Director(request *http.Request) {
 // skip nil directors
 func NewDirectorChain(directors ...Director) DirectorChain {
 	cnt := 0
+
 	for _, item := range directors {
 		if item != nil {
 			cnt++
@@ -46,11 +47,13 @@ func NewDirectorChain(directors ...Director) DirectorChain {
 	}
 
 	ownDirectors := make(DirectorChain, 0, cnt)
+
 	for _, item := range directors {
 		if item != nil {
 			ownDirectors = append(ownDirectors, item)
 		}
 	}
+
 	return ownDirectors
 }
 
@@ -135,6 +138,7 @@ func (h DirectorSetHeaders) Director(request *http.Request) {
 
 	for name, headerVal := range h {
 		var value string
+
 		switch headerVal {
 		case ConnectionID:
 			value = request.Context().Value(contextlabel.ConnectionID).(string)
@@ -161,6 +165,7 @@ func (h DirectorSetHeaders) Director(request *http.Request) {
 		if request.Header == nil {
 			request.Header = make(http.Header)
 		}
+
 		request.Header.Set(name, value)
 	}
 }

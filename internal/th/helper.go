@@ -13,6 +13,7 @@ func TestContext() (ctx context.Context, flush func()) {
 	flush = func() {
 		cancel()
 	}
+
 	return ctx, flush
 }
 

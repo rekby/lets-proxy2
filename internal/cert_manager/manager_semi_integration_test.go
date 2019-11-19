@@ -53,6 +53,7 @@ func TestManager_GetCertificateHttp01(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	defer lisneter.Close()
 
 	go func() {
@@ -217,6 +218,7 @@ func TestManager_GetCertificateTls(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	defer lisneter.Close()
 
 	go func() {

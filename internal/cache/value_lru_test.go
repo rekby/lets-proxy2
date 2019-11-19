@@ -12,6 +12,7 @@ import (
 
 func TestValueLRUAsCache(t *testing.T) {
 	td := testdeep.NewT(t)
+
 	ctx, flush := th.TestContext()
 	defer flush()
 
@@ -41,6 +42,7 @@ func TestValueLRUAsCache(t *testing.T) {
 
 func TestValueLRULimitAtPut(t *testing.T) {
 	td := testdeep.NewT(t)
+
 	ctx, flush := th.TestContext()
 	defer flush()
 

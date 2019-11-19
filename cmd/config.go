@@ -135,6 +135,7 @@ func mergeConfigByFilepath(ctx context.Context, c *configType, filename string) 
 			log.DebugFatal(logger, err, "Restore workdir to", zap.String("dir", dir))
 		}()
 	}
+
 	mergeConfigBytes(ctx, c, content, filename)
 }
 

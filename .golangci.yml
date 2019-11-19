@@ -13,6 +13,8 @@ linters-settings:
     locale: US
   gocyclo:
     min-complexity: 20
+  wsl:
+    allow-trailing-comment: true
 
 issues:
   exclude-rules:
@@ -32,4 +34,5 @@ linters:
   enable-all: true
   disable:
     - gochecknoglobals
+    - wsl
 

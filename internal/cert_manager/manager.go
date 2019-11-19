@@ -94,6 +94,7 @@ func New(client AcmeClient, c cache.Bytes) *Manager {
 }
 
 // GetCertificate implements the tls.Config.GetCertificate hook.
+// nolint:funlen
 func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Certificate, err error) {
 	var ctx context.Context
 	if getContext, ok := hello.Conn.(GetContext); ok {
@@ -124,6 +125,7 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 	ctx = zc.WithLogger(ctx, zc.L(ctx).With(logCertName(certName)))
 
 	now := time.Now()
+
 	defer func() {
 		if isNeedRenew(resultCert, now) {
 			go m.renewCertInBackground(ctx, certName)
@@ -178,22 +180,26 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 		return nil, errHaveNoCert
 	}
 
+	return m.issueNewCert(ctx, needDomain, certName)
+}
+
+func (m *Manager) issueNewCert(ctx context.Context, needDomain DomainName, certName certNameType) (*tls.Certificate, error) {
+	logger := zc.L(ctx)
+
 	allowed, err := m.DomainChecker.IsDomainAllowed(ctx, needDomain.ASCII())
 	log.DebugError(logger, err, "Check if domain allowed for certificate", zap.Bool("allowed", allowed))
 	if err != nil {
 		return nil, errHaveNoCert
 	}
-
 	if !allowed {
 		logger.Info("Deny certificate issue by filter")
 		return nil, errHaveNoCert
 	}
-
 	certIssueContext, cancelFunc := context.WithTimeout(ctx, m.CertificateIssueTimeout)
 	defer cancelFunc()
-
 	domains := domainNamesFromCertificateName(certName)
 	domains, err = filterDomains(ctx, m.DomainChecker, domains, needDomain)
+	log.DebugError(logger, err, "Filter domains", logDomains(domains))
 
 	res, err := m.createCertificateForDomains(certIssueContext, certName, domains)
 	if err == nil {
@@ -203,7 +209,6 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 	}
 	logger.Warn("Can't issue certificate", zap.Error(err))
 	return nil, errHaveNoCert
-
 }
 
 func (m *Manager) handleTLSALPN(logger *zap.Logger, ctx context.Context, needDomain DomainName) (*tls.Certificate, error) {
@@ -223,9 +228,10 @@ func filterDomains(ctx context.Context, checker DomainChecker, originalDomains [
 	logger.Debug("filter domains from certificate list", logDomains(originalDomains))
 	var allowedDomains = make(chan DomainName, len(originalDomains))
 	var hasNeedDomain bool
-
 	var wg sync.WaitGroup
+
 	wg.Add(len(originalDomains))
+
 	for _, domain := range originalDomains {
 		domain := domain // pin var
 
@@ -319,10 +325,10 @@ func (m *Manager) supportedChallenges() []string {
 	return allowedChallenges
 }
 
+// createOrderForDomains similar to func (m *Manager) verifyRFC(ctx context.Context, client *acme.Client, domain string) (*acme.Order, error)
+// from acme/autocert
+//nolint:funlen
 func (m *Manager) createOrderForDomains(ctx context.Context, domains ...DomainName) (*acme.Order, error) {
-	// similar to func (m *Manager) verifyRFC(ctx context.Context, client *acme.Client, domain string) (*acme.Order, error)
-	// from acme/autocert
-
 	client := m.Client
 	logger := zc.L(ctx)
 	challengeTypes := m.supportedChallenges()
@@ -547,6 +553,7 @@ func (m *Manager) certKeyGetOrCreate(ctx context.Context, certName certNameType,
 
 func (m *Manager) fulfill(ctx context.Context, challenge *acme.Challenge, domain DomainName) (func(context.Context), error) {
 	logger := zc.L(ctx)
+
 	switch challenge.Type {
 	case tlsAlpn01:
 		cert, err := m.Client.TLSALPN01ChallengeCert(challenge.Token, domain.String())
@@ -631,6 +638,7 @@ func storeCertificate(ctx context.Context, cache cache.Bytes, certName certNameT
 	var keyType = getKeyType(cert)
 
 	var certBuf bytes.Buffer
+
 	for _, block := range cert.Certificate {
 		pemBlock := pem.Block{Type: "CERTIFICATE", Bytes: block}
 		err := pem.Encode(&certBuf, &pemBlock)
@@ -779,6 +787,7 @@ func parsePrivateKey(keyPEMBlock []byte) (crypto.Signer, error) {
 
 	var keyDERBlock *pem.Block
 	var skippedBlockTypes []string
+
 	for {
 		keyDERBlock, keyPEMBlock = pem.Decode(keyPEMBlock)
 		if keyDERBlock == nil {
@@ -788,6 +797,7 @@ func parsePrivateKey(keyPEMBlock []byte) (crypto.Signer, error) {
 		if keyDERBlock.Type == "PRIVATE KEY" || strings.HasSuffix(keyDERBlock.Type, " PRIVATE KEY") {
 			break
 		}
+
 		skippedBlockTypes = append(skippedBlockTypes, keyDERBlock.Type)
 	}
 
@@ -830,6 +840,7 @@ func isNeedRenew(cert *tls.Certificate, now time.Time) bool {
 
 func isCertLocked(ctx context.Context, storage cache.Bytes, certName certNameType) (bool, error) {
 	lockName := certName.String() + ".lock"
+
 	_, err := storage.Get(ctx, lockName)
 	switch err {
 	case cache.ErrCacheMiss:
