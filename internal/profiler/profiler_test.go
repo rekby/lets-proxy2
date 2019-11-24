@@ -11,8 +11,6 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	const argName = "pass"
-	const pass = "qwe"
 	td := testdeep.NewT(t)
 	profiler := New(zap.NewNop(), Config{AllowedNetworks: []string{"127.0.0.1/32", "::1/128"}})
 	td.Len(profiler.secretHandler.AllowedNetworks, 2)
@@ -21,8 +19,6 @@ func TestNew(t *testing.T) {
 }
 
 func TestProfiler_ServeHTTP(t *testing.T) {
-	const argName = "pass"
-	const pass = "qwe"
 	td := testdeep.NewT(t)
 	profiler := New(zap.NewNop(), Config{AllowedNetworks: []string{"127.0.0.1/32", "::1/128"}})
 
@@ -34,4 +30,5 @@ func TestProfiler_ServeHTTP(t *testing.T) {
 	resp := respWriter.Result()
 	td.Cmp(resp.StatusCode, http.StatusOK)
 	td.True(strings.Contains(resp.Header.Get("content-type"), "text/html"))
+	_ = resp.Body.Close()
 }

@@ -45,6 +45,7 @@ func TestSecretHandler_ServeHTTP(t *testing.T) {
 	resp := respWriter.Result()
 	td.Cmp(resp.StatusCode, http.StatusOK)
 	td.True(nextCalled)
+	_ = resp.Body.Close()
 
 	nextCalled = false
 	respWriter = httptest.NewRecorder()
@@ -56,6 +57,7 @@ func TestSecretHandler_ServeHTTP(t *testing.T) {
 	td.Cmp(resp.StatusCode, http.StatusForbidden)
 	td.False(nextCalled)
 	nextCalled = false
+	_ = resp.Body.Close()
 
 	nextCalled = false
 	respWriter = httptest.NewRecorder()
@@ -67,4 +69,5 @@ func TestSecretHandler_ServeHTTP(t *testing.T) {
 	td.Cmp(resp.StatusCode, http.StatusInternalServerError)
 	td.False(nextCalled)
 	nextCalled = false
+	_ = resp.Body.Close()
 }
