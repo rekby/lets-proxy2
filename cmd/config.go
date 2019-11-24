@@ -11,6 +11,7 @@ import (
 
 	"github.com/gobuffalo/packr"
 
+	"github.com/rekby/lets-proxy2/internal/profiler"
 	"github.com/rekby/lets-proxy2/internal/tlslistener"
 
 	"github.com/rekby/lets-proxy2/internal/proxy"
@@ -31,6 +32,7 @@ type ConfigGeneral struct {
 	StoreJSONMetadata  bool
 	IncludeConfigs     []string
 	MaxConfigFilesRead int
+	Profiler           profiler.Config
 }
 
 //go:generate packr
