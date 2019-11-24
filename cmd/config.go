@@ -11,6 +11,7 @@ import (
 
 	"github.com/gobuffalo/packr"
 
+	"github.com/rekby/lets-proxy2/internal/profiler"
 	"github.com/rekby/lets-proxy2/internal/tlslistener"
 
 	"github.com/rekby/lets-proxy2/internal/proxy"
@@ -40,6 +41,7 @@ type configType struct {
 	Proxy        proxy.Config
 	CheckDomains domain_checker.Config
 	Listen       tlslistener.Config
+	Profiler     profiler.Config
 }
 
 //nolint:maligned
@@ -135,6 +137,7 @@ func mergeConfigByFilepath(ctx context.Context, c *configType, filename string) 
 			log.DebugFatal(logger, err, "Restore workdir to", zap.String("dir", dir))
 		}()
 	}
+
 	mergeConfigBytes(ctx, c, content, filename)
 }
 

@@ -1,5 +1,5 @@
 service:
-  golangci-lint-version: 1.16.0
+  golangci-lint-version: 1.20.0
 run:
   deadline: 5m
   issues-exit-code: 1
@@ -13,6 +13,8 @@ linters-settings:
     locale: US
   gocyclo:
     min-complexity: 20
+  wsl:
+    allow-trailing-comment: true
 
 issues:
   exclude-rules:
@@ -26,10 +28,11 @@ issues:
         - funlen
     - linters:
         - stylecheck
-      source: "package (cert_manager|domain_checker)"
+      source: "package (acme_client_manager|cert_manager|domain_checker)"
 
 linters:
   enable-all: true
   disable:
     - gochecknoglobals
+    - wsl
 

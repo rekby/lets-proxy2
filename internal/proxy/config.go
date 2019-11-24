@@ -27,6 +27,7 @@ type Config struct {
 
 func (c *Config) Apply(ctx context.Context, p *HTTPProxy) error {
 	var resErr error
+
 	var chain []Director
 	appendDirector := func(f func(ctx context.Context) (Director, error)) {
 		if resErr != nil {
@@ -34,6 +35,7 @@ func (c *Config) Apply(ctx context.Context, p *HTTPProxy) error {
 		}
 		director, err := f(ctx)
 		resErr = err
+
 		chain = append(chain, director)
 	}
 
@@ -62,6 +64,7 @@ func (c *Config) getDefaultTargetDirector(ctx context.Context) (Director, error)
 	}
 	defaultTarget, err := net.ResolveTCPAddr("tcp", c.DefaultTarget)
 	logger.Debug("Parse default target as tcp address", zap.Stringer("default_target", defaultTarget), zap.Error(err))
+
 	if err != nil {
 		defaultTargetIP, err := net.ResolveIPAddr("ip", c.DefaultTarget)
 		logger.Debug("Parse default target as ip address", zap.Stringer("default_target", defaultTarget), zap.Error(err))
@@ -71,13 +74,14 @@ func (c *Config) getDefaultTargetDirector(ctx context.Context) (Director, error)
 		}
 		defaultTarget = &net.TCPAddr{IP: defaultTargetIP.IP, Port: defaultHTTPPort}
 	}
+
 	if len(defaultTarget.IP) == 0 {
 		logger.Info("Create same ip director", zap.Int("port", defaultTarget.Port))
 		return NewDirectorSameIP(defaultTarget.Port), nil
 	}
+
 	logger.Info("Create host ip director", zap.Int("port", defaultTarget.Port))
 	return NewDirectorHost(defaultTarget.String()), nil
-
 }
 
 //can return nil,nil
@@ -89,6 +93,7 @@ func (c *Config) getHeadersDirector(ctx context.Context) (Director, error) {
 	}
 
 	m := make(map[string]string)
+
 	for _, line := range c.Headers {
 		line = strings.TrimSpace(line)
 		lineParts := strings.SplitN(line, ":", 2)
@@ -98,6 +103,7 @@ func (c *Config) getHeadersDirector(ctx context.Context) (Director, error) {
 		}
 		m[lineParts[0]] = lineParts[1]
 	}
+
 	logger.Info("Create headers director", zap.Any("headers", m))
 	return NewDirectorSetHeaders(m), nil
 }
@@ -108,6 +114,7 @@ func (c *Config) getMapDirector(ctx context.Context) (Director, error) {
 	if len(c.TargetMap) == 0 {
 		return nil, nil
 	}
+
 	m := make(map[string]string)
 	for _, line := range c.TargetMap {
 		from, to, err := parseTCPMapPair(line)
@@ -118,6 +125,7 @@ func (c *Config) getMapDirector(ctx context.Context) (Director, error) {
 		}
 		m[from] = to
 	}
+
 	logger.Info("Add target-map director", zap.Any("map", m))
 	return NewDirectorDestMap(m), nil
 }

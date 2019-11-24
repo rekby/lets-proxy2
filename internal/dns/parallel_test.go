@@ -73,7 +73,6 @@ func TestParallel(t *testing.T) {
 	ips, err = p.LookupIPAddr(ctx, "6")
 	td.Any(err, []interface{}{error61, error62})
 	td.Nil(ips)
-
 }
 
 func TestParallelReadl(t *testing.T) {
@@ -91,5 +90,4 @@ func TestParallelReadl(t *testing.T) {
 			net.IPAddr{IP: net.IPv4(1, 1, 1, 1).To16()},
 		),
 	)
-
 }

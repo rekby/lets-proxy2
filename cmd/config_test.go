@@ -55,6 +55,7 @@ StorageDir = "storage2"
 `), 0600)
 
 	var config configType
+
 	mergeConfigBytes(ctx, &config, defaultConfig(ctx), "")
 	mergeConfigByFilepath(ctx, &config, filepath.Join(tmpDir, "config.toml"))
 	td.CmpDeeply(config.General.IssueTimeout, 1)

@@ -94,6 +94,7 @@ func New(client AcmeClient, c cache.Bytes) *Manager {
 }
 
 // GetCertificate implements the tls.Config.GetCertificate hook.
+// nolint:funlen
 func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Certificate, err error) {
 	var ctx context.Context
 	if getContext, ok := hello.Conn.(GetContext); ok {
@@ -115,18 +116,7 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 	logger = logger.With(logDomain(needDomain))
 	logger.Info("Get certificate", zap.String("original_domain", hello.ServerName))
 	if isTLSALPN01Hello(hello) {
-		logger.Debug("It is tls-alpn-01 token request.")
-
-		certInterface, err := m.certForDomainAuthorize.Get(ctx, needDomain.String())
-		logger.Debug("Got authcert from cache", zap.Error(err))
-
-		cert, _ := certInterface.(*tls.Certificate)
-
-		if cert == nil {
-			logger.Warn("Doesn't have token for request domain")
-			return nil, errHaveNoCert
-		}
-		return cert, nil
+		return m.handleTLSALPN(logger, ctx, needDomain)
 	}
 
 	certName := certNameFromDomain(needDomain)
@@ -135,6 +125,7 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 	ctx = zc.WithLogger(ctx, zc.L(ctx).With(logCertName(certName)))
 
 	now := time.Now()
+
 	defer func() {
 		if isNeedRenew(resultCert, now) {
 			go m.renewCertInBackground(ctx, certName)
@@ -153,16 +144,23 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 		}
 	}
 	if err != nil {
-		logger.Debug("Can't get certificate from local state", zap.Error(err))
+		logLevel := zapcore.ErrorLevel
+		if err == cache.ErrCacheMiss {
+			logLevel = zapcore.DebugLevel
+		}
+		log.LevelParam(logger, logLevel, "Can't get certificate from local state", zap.Error(err))
 	}
 
 	locked, err := isCertLocked(ctx, m.Cache, certName)
 	log.DebugDPanic(logger, err, "Check if certificate locked", zap.Bool("locked", locked))
+	if err != nil {
+		return nil, errHaveNoCert
+	}
 
 	cert, err = loadCertificateFromCache(ctx, m.Cache, certName, keyRSA)
-	logLevel := zapcore.DebugLevel
-	if err != nil && err != cache.ErrCacheMiss {
-		logLevel = zapcore.ErrorLevel
+	logLevel := zapcore.ErrorLevel
+	if err == nil || err == cache.ErrCacheMiss {
+		logLevel = zapcore.DebugLevel
 	}
 	log.LevelParam(logger, logLevel, "Load certificate from cache", zap.Error(err))
 
@@ -182,23 +180,26 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 		return nil, errHaveNoCert
 	}
 
+	return m.issueNewCert(ctx, needDomain, certName)
+}
+
+func (m *Manager) issueNewCert(ctx context.Context, needDomain DomainName, certName certNameType) (*tls.Certificate, error) {
+	logger := zc.L(ctx)
+
 	allowed, err := m.DomainChecker.IsDomainAllowed(ctx, needDomain.ASCII())
 	log.DebugError(logger, err, "Check if domain allowed for certificate", zap.Bool("allowed", allowed))
 	if err != nil {
 		return nil, errHaveNoCert
 	}
-
 	if !allowed {
 		logger.Info("Deny certificate issue by filter")
 		return nil, errHaveNoCert
 	}
-
-	// TODO: check domain
 	certIssueContext, cancelFunc := context.WithTimeout(ctx, m.CertificateIssueTimeout)
 	defer cancelFunc()
-
 	domains := domainNamesFromCertificateName(certName)
 	domains, err = filterDomains(ctx, m.DomainChecker, domains, needDomain)
+	log.DebugError(logger, err, "Filter domains", logDomains(domains))
 
 	res, err := m.createCertificateForDomains(certIssueContext, certName, domains)
 	if err == nil {
@@ -208,7 +209,18 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 	}
 	logger.Warn("Can't issue certificate", zap.Error(err))
 	return nil, errHaveNoCert
+}
 
+func (m *Manager) handleTLSALPN(logger *zap.Logger, ctx context.Context, needDomain DomainName) (*tls.Certificate, error) {
+	logger.Debug("It is tls-alpn-01 token request.")
+	certInterface, err := m.certForDomainAuthorize.Get(ctx, needDomain.String())
+	logger.Debug("Got authcert from cache", zap.Error(err))
+	cert, _ := certInterface.(*tls.Certificate)
+	if cert == nil {
+		logger.Warn("Doesn't have token for request domain")
+		return nil, errHaveNoCert
+	}
+	return cert, nil
 }
 
 func filterDomains(ctx context.Context, checker DomainChecker, originalDomains []DomainName, needDomain DomainName) ([]DomainName, error) {
@@ -216,9 +228,10 @@ func filterDomains(ctx context.Context, checker DomainChecker, originalDomains [
 	logger.Debug("filter domains from certificate list", logDomains(originalDomains))
 	var allowedDomains = make(chan DomainName, len(originalDomains))
 	var hasNeedDomain bool
-
 	var wg sync.WaitGroup
+
 	wg.Add(len(originalDomains))
+
 	for _, domain := range originalDomains {
 		domain := domain // pin var
 
@@ -312,10 +325,10 @@ func (m *Manager) supportedChallenges() []string {
 	return allowedChallenges
 }
 
+// createOrderForDomains similar to func (m *Manager) verifyRFC(ctx context.Context, client *acme.Client, domain string) (*acme.Order, error)
+// from acme/autocert
+//nolint:funlen
 func (m *Manager) createOrderForDomains(ctx context.Context, domains ...DomainName) (*acme.Order, error) {
-	// similar to func (m *Manager) verifyRFC(ctx context.Context, client *acme.Client, domain string) (*acme.Order, error)
-	// from acme/autocert
-
 	client := m.Client
 	logger := zc.L(ctx)
 	challengeTypes := m.supportedChallenges()
@@ -540,6 +553,7 @@ func (m *Manager) certKeyGetOrCreate(ctx context.Context, certName certNameType,
 
 func (m *Manager) fulfill(ctx context.Context, challenge *acme.Challenge, domain DomainName) (func(context.Context), error) {
 	logger := zc.L(ctx)
+
 	switch challenge.Type {
 	case tlsAlpn01:
 		cert, err := m.Client.TLSALPN01ChallengeCert(challenge.Token, domain.String())
@@ -615,10 +629,6 @@ func (m *Manager) deleteCertToken(ctx context.Context, key DomainName) {
 func storeCertificate(ctx context.Context, cache cache.Bytes, certName certNameType,
 	cert *tls.Certificate) error {
 	logger := zc.L(ctx)
-	if cache == nil {
-		logger.Debug("Can't save certificate to nil cache")
-		return nil
-	}
 
 	locked, _ := isCertLocked(ctx, cache, certName)
 	if locked {
@@ -628,6 +638,7 @@ func storeCertificate(ctx context.Context, cache cache.Bytes, certName certNameT
 	var keyType = getKeyType(cert)
 
 	var certBuf bytes.Buffer
+
 	for _, block := range cert.Certificate {
 		pemBlock := pem.Block{Type: "CERTIFICATE", Bytes: block}
 		err := pem.Encode(&certBuf, &pemBlock)
@@ -662,15 +673,15 @@ func storeCertificate(ctx context.Context, cache cache.Bytes, certName certNameT
 	keyKeyName := string(certName) + "." + string(keyType) + ".key"
 
 	err := cache.Put(ctx, certKeyName, certBuf.Bytes())
+	zc.InfoError(logger, err, "Store certificate file", zap.String("cert_key", certKeyName))
 	if err != nil {
-		logger.Error("Can't store certificate file", zap.Error(err))
 		return err
 	}
 
 	err = cache.Put(ctx, keyKeyName, privateKeyBuf.Bytes())
+	zc.InfoError(logger, err, "Store key file", zap.String("key_key", keyKeyName))
 	if err != nil {
 		_ = cache.Delete(ctx, certKeyName)
-		logger.Error("Can't store certificate key file", zap.Error(err))
 		return err
 	}
 	return nil
@@ -717,7 +728,12 @@ func loadCertificateFromCache(ctx context.Context, c cache.Bytes, certName certN
 	certKeyName := string(certName) + "." + string(keyType) + ".cer"
 
 	certBytes, err := c.Get(ctx, certKeyName)
-	log.DebugError(logger, err, "Get certificate from cache")
+	logLevel := zapcore.ErrorLevel
+	if err == nil || err == cache.ErrCacheMiss {
+		logLevel = zapcore.DebugLevel
+	}
+	log.LevelParam(logger, logLevel, "Get certificate from cache", zap.Error(err))
+
 	if err != nil {
 		return nil, err
 	}
@@ -771,6 +787,7 @@ func parsePrivateKey(keyPEMBlock []byte) (crypto.Signer, error) {
 
 	var keyDERBlock *pem.Block
 	var skippedBlockTypes []string
+
 	for {
 		keyDERBlock, keyPEMBlock = pem.Decode(keyPEMBlock)
 		if keyDERBlock == nil {
@@ -780,6 +797,7 @@ func parsePrivateKey(keyPEMBlock []byte) (crypto.Signer, error) {
 		if keyDERBlock.Type == "PRIVATE KEY" || strings.HasSuffix(keyDERBlock.Type, " PRIVATE KEY") {
 			break
 		}
+
 		skippedBlockTypes = append(skippedBlockTypes, keyDERBlock.Type)
 	}
 
@@ -822,6 +840,7 @@ func isNeedRenew(cert *tls.Certificate, now time.Time) bool {
 
 func isCertLocked(ctx context.Context, storage cache.Bytes, certName certNameType) (bool, error) {
 	lockName := certName.String() + ".lock"
+
 	_, err := storage.Get(ctx, lockName)
 	switch err {
 	case cache.ErrCacheMiss:

@@ -37,8 +37,8 @@ func (p Parallel) LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, 
 	var errs = make([]error, len(p))
 
 	var wg sync.WaitGroup
-	wg.Add(len(p))
-	for i := range p {
+	wg.Add(len(p))     // nolint:wsl
+	for i := range p { // nolint:wsl
 		go func(i int) {
 			ips[i], errs[i] = p[i].LookupIPAddr(ctx, host)
 			wg.Done()

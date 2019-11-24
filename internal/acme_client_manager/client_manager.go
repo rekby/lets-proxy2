@@ -70,15 +70,18 @@ func (m *AcmeManager) GetClient(ctx context.Context) (*acme.Client, error) {
 	}
 
 	client := &acme.Client{DirectoryURL: m.DirectoryURL}
+
 	key, account, err := createAccount(ctx, client, m.AgreeFunction)
 	if err != nil {
 		return nil, err
 	}
+
 	m.account = account
 	m.client = client
 	state := acmeManagerState{PrivateKey: key, AcmeAccount: account}
 	stateBytes, err := json.Marshal(state)
 	log.InfoPanicCtx(ctx, err, "Marshal account state to json")
+
 	if m.cache != nil {
 		err = m.cache.Put(ctx, certName(m.DirectoryURL), stateBytes)
 		if err != nil {
@@ -96,6 +99,7 @@ func (m *AcmeManager) GetClient(ctx context.Context) (*acme.Client, error) {
 func (m *AcmeManager) accountRenew() {
 	ticker := time.NewTicker(m.RenewAccountInterval)
 	ctxDone := m.ctx.Done()
+
 	for {
 		select {
 		case <-ctxDone:
@@ -128,20 +132,23 @@ func (m *AcmeManager) loadFromCache(ctx context.Context) (err error) {
 
 	var state acmeManagerState
 	err = json.Unmarshal(content, &state)
-	if err != nil {
+	if err != nil { // nolint:wsl
 		return err
 	}
 
 	if state.PrivateKey == nil {
 		return errors.New("empty private key")
 	}
+
 	if state.AcmeAccount == nil {
 		return errors.New("empty account info")
 	}
 
 	m.client = &acme.Client{DirectoryURL: m.DirectoryURL, Key: state.PrivateKey}
 	m.account = state.AcmeAccount
+
 	go m.accountRenew()
+
 	return nil
 }
 

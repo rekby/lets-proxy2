@@ -173,6 +173,7 @@ func getBindedIPAddress(ctx context.Context, interfacesAddr InterfacesAddrFunc) 
 	log.DebugDPanic(logger, err, "Get system addresses", zap.Any("addresses", binded))
 
 	var parsed = make([]net.IP, 0, len(binded))
+
 	for _, addr := range binded {
 		ip, _, err := net.ParseCIDR(addr.String())
 		log.DebugDPanic(logger, err, "Parse ip from interface", zap.Any("ip", ip),
@@ -189,7 +190,7 @@ func getBindedIPAddress(ctx context.Context, interfacesAddr InterfacesAddrFunc) 
 
 func filterPublicOnlyIPs(ips []net.IP) []net.IP {
 	var public = make([]net.IP, 0, len(ips))
-	for _, ip := range ips {
+	for _, ip := range ips { // nolint:wsl
 		if isPublicIP(ip) {
 			public = append(public, ip)
 		}
@@ -258,6 +259,8 @@ func truncatedCopyIPs(ips []net.IP) []net.IP {
 	}
 
 	var res = make([]net.IP, len(ips))
+
 	copy(res, ips)
+
 	return res
 }

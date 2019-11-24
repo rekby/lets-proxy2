@@ -10,7 +10,10 @@ import (
 	"runtime"
 	"time"
 
+	"go.uber.org/zap/zapcore"
+
 	"github.com/rekby/lets-proxy2/internal/cert_manager"
+	"github.com/rekby/lets-proxy2/internal/profiler"
 
 	_ "github.com/kardianos/minwinsvc"
 	"github.com/rekby/lets-proxy2/internal/acme_client_manager"
@@ -57,6 +60,8 @@ func startProgram(config *configType) {
 
 	logger.Info("StartAutoRenew program version", zap.String("version", version()))
 
+	startProfiler(ctx, config.Profiler)
+
 	err := os.MkdirAll(config.General.StorageDir, defaultDirMode)
 	log.InfoFatal(logger, err, "Create storage dir", zap.String("dir", config.General.StorageDir))
 
@@ -97,4 +102,30 @@ func startProgram(config *configType) {
 		effectiveError = nil
 	}
 	log.DebugErrorCtx(ctx, effectiveError, "Handle request stopped")
+}
+
+func startProfiler(ctx context.Context, config profiler.Config) {
+	logger := zc.L(ctx)
+
+	if !config.Enable {
+		logger.Info("Profiler disabled")
+		return
+	}
+
+	go func() {
+		httpServer := http.Server{
+			Addr:    config.BindAddress,
+			Handler: profiler.New(logger.Named("profiler"), config),
+		}
+
+		logger.Info("Start profiler", zap.String("bind_address", httpServer.Addr))
+		err := httpServer.ListenAndServe()
+		var logLevel zapcore.Level
+		if err == http.ErrServerClosed {
+			logLevel = zapcore.InfoLevel
+		} else {
+			logLevel = zapcore.ErrorLevel
+		}
+		log.LevelParam(logger, logLevel, "Profiler stopped")
+	}()
 }

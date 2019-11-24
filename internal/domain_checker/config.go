@@ -69,11 +69,11 @@ func (c *Config) CreateDomainChecker(ctx context.Context) (DomainChecker, error)
 		if err != nil {
 			return nil, err
 		}
-		whiteIpList := NewIPList(ctx, func(ctx context.Context) ([]net.IP, error) {
+		whiteIPList := NewIPList(ctx, func(ctx context.Context) ([]net.IP, error) {
 			return ips, nil
 		})
 		// ipList.StartAutoRenew() - doesn't need renew, because list static
-		ipCheckers = append(ipCheckers, whiteIpList)
+		ipCheckers = append(ipCheckers, whiteIPList)
 	}
 
 	// If no ip checks - allow domain without ip check

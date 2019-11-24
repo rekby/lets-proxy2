@@ -127,7 +127,6 @@ func TestIPList_Update(t *testing.T) {
 	td.CmpNotPanic(func() {
 		l.updateIPs()
 	})
-
 }
 
 func TestIPList_UpdateByTimer(t *testing.T) {
@@ -187,7 +186,7 @@ func TestIPList_UpdateByTimer(t *testing.T) {
 
 func TestSetDefaultResolver(t *testing.T) {
 	oldResolver := defaultResolver
-	defer func() {
+	defer func() { // nolint:wsl
 		defaultResolver = oldResolver
 	}()
 
@@ -261,7 +260,6 @@ func TestSelfPublicIP_IsDomainAllowed(t *testing.T) {
 	res, err = s.IsDomainAllowed(ctx2, "asd8")
 	td.False(res)
 	td.CmpError(err)
-
 }
 
 func TestSelfPublicIP_IsDomainAllowed_CanceledMainContext(t *testing.T) {

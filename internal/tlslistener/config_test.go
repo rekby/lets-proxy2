@@ -63,12 +63,12 @@ func TestConfig_Apply(t *testing.T) {
 
 	tlsListenerAddresses := []string{l.ListenersForHandleTLS[0].Addr().String(), l.ListenersForHandleTLS[1].Addr().String(), l.ListenersForHandleTLS[2].Addr().String()}
 	td.CmpDeeply(tlsListenerAddresses, []string{addr + ":" + ports[2], addr + ":" + ports[3], addr + ":" + ports[4]})
-
 }
 
 func getFreePorts(ip string, cnt int) []string {
 	var res = make([]string, cnt)
 	var listeners = make([]net.Listener, cnt)
+
 	for i := 0; i < cnt; i++ {
 		listener, err := net.Listen("tcp", ip+":0")
 		if err != nil {

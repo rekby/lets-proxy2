@@ -27,6 +27,7 @@ func (c *DiskCache) Get(ctx context.Context, key string) ([]byte, error) {
 	defer c.mu.RUnlock()
 
 	filePath := c.filepath(key)
+
 	res, err := ioutil.ReadFile(filePath)
 	if os.IsNotExist(err) {
 		err = ErrCacheMiss

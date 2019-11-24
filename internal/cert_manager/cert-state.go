@@ -4,11 +4,12 @@ package cert_manager
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"sync"
 
-	"github.com/rekby/lets-proxy2/internal/log"
 	zc "github.com/rekby/zapcontext"
+
+	"github.com/rekby/lets-proxy2/internal/cache"
+	"github.com/rekby/lets-proxy2/internal/log"
 
 	"go.uber.org/zap"
 )
@@ -95,7 +96,7 @@ func (s *certState) Cert() (cert *tls.Certificate, lastError error) {
 
 	cert = s.cert
 	if cert == nil && s.lastError == nil {
-		lastError = errors.New("have no cert in state")
+		lastError = cache.ErrCacheMiss
 	} else {
 		lastError = s.lastError
 	}

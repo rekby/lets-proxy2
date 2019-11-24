@@ -28,6 +28,7 @@ func TestHttpProxy_HandleHttpValidationDefault(t *testing.T) {
 	td.FailureIsFatal()
 	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	td.CmpNoError(err)
+
 	defer func() { _ = listener.Close() }()
 
 	proxy := NewHTTPProxy(ctx, listener)

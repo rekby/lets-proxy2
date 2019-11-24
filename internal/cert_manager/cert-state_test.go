@@ -39,7 +39,6 @@ func TestCertState(t *testing.T) {
 	rCert, rErr = s.Cert()
 	testdeep.CmpNil(t, rCert)
 	testdeep.CmpDeeply(t, rErr, err1)
-
 }
 
 func TestCertStateManyIssuers(t *testing.T) {
@@ -66,6 +65,7 @@ func TestCertStateManyIssuers(t *testing.T) {
 	lockFunc := func() []lockTimeStruct {
 		res := make([]lockTimeStruct, 0, cnt)
 		i := 0
+
 		for {
 			if i%checkEvery == 0 {
 				if timeoutCtx.Err() != nil {
@@ -79,14 +79,16 @@ func TestCertStateManyIssuers(t *testing.T) {
 				time.Sleep(pause)
 				item.end = time.Now()
 				s.FinishIssue(ctxNoLog, nil, err1)
+
 				res = append(res, item)
+
 				i = 0 // for check exit
 			}
 		}
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(cnt)
+	wg.Add(cnt) //nolint:wsl
 
 	lockTimesChan := make(chan []lockTimeStruct, cnt)
 
@@ -100,6 +102,7 @@ func TestCertStateManyIssuers(t *testing.T) {
 	close(lockTimesChan)
 
 	var lockTimesSlice []lockTimeStruct
+
 	for i := 0; i < cnt; i++ {
 		items := <-lockTimesChan
 		lockTimesSlice = append(lockTimesSlice, items...)
@@ -213,7 +216,6 @@ func TestCertState_FinishIssuePanic(t *testing.T) {
 	testdeep.CmpPanic(t, func() {
 		s.FinishIssue(th.NoLog(ctx), cert1, err1)
 	}, testdeep.NotEmpty())
-
 }
 
 func TestCertState_CertSet(t *testing.T) {

@@ -66,7 +66,6 @@ func TestAny(t *testing.T) {
 	res, err = any.IsDomainAllowed(ctx, "edc")
 	td.False(res)
 	td.CmpError(err)
-
 }
 
 func TestAll(t *testing.T) {
@@ -117,7 +116,6 @@ func TestAll(t *testing.T) {
 	res, err = any.IsDomainAllowed(ctx, "edc")
 	td.False(res)
 	td.CmpNoError(err)
-
 }
 
 func TestNot(t *testing.T) {
@@ -152,5 +150,4 @@ func TestNot(t *testing.T) {
 	res, err = not.IsDomainAllowed(ctx, "kkk")
 	td.False(res)
 	td.CmpError(err)
-
 }

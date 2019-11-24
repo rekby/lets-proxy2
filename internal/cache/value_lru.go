@@ -98,10 +98,12 @@ func (c *MemoryValueLRU) time() uint64 {
 
 func (c *MemoryValueLRU) renumberTime() {
 	c.mu.Lock()
+
 	items := c.getSortedItems()
 	for i, item := range items {
 		item.lastUsedTime = uint64(i) + 1
 	}
+
 	c.mu.Unlock()
 }
 
