@@ -32,7 +32,6 @@ type ConfigGeneral struct {
 	StoreJSONMetadata  bool
 	IncludeConfigs     []string
 	MaxConfigFilesRead int
-	Profiler           profiler.Config
 }
 
 //go:generate packr
@@ -42,6 +41,7 @@ type configType struct {
 	Proxy        proxy.Config
 	CheckDomains domain_checker.Config
 	Listen       tlslistener.Config
+	Profiler     profiler.Config
 }
 
 //nolint:maligned

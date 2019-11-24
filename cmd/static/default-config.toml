@@ -122,3 +122,13 @@ TLSAddresses = [":443"]
 
 # Bind addresses without TLS secure (for HTTP reverse proxy and http-01 validation without redirect to https)
 TCPAddresses = []
+
+[Profiler]
+Enable = false
+
+# IP networks for allow to use profiler.
+# Default - deny from all.
+# Example:
+# [ "1.2.3.4/32", "192.168.0.0/24", "::1/128" ]
+AllowedNetworks = []
+BindAddress = "localhost:31344"
