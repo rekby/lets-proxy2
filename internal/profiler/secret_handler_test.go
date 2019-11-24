@@ -1,12 +1,14 @@
 package profiler
 
 import (
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/gojuno/minimock/v3"
 	"github.com/maxatome/go-testdeep"
+	"go.uber.org/zap"
 )
 
 //go:generate minimock -g -i net/http.Handler -o ./handler_mock_test.go
@@ -15,6 +17,9 @@ func TestSecretHandler_ServeHTTP(t *testing.T) {
 	td := testdeep.NewT(t)
 	mt := minimock.NewController(td)
 	defer mt.Finish()
+
+	_, n, _ := net.ParseCIDR("1.2.3.4/32")
+	var localNetworks = []net.IPNet{*n}
 
 	nextHandler := NewHandlerMock(mt)
 	nextCalled := false
@@ -25,18 +30,16 @@ func TestSecretHandler_ServeHTTP(t *testing.T) {
 	})
 	defer nextHandler.MinimockFinish()
 
-	const argName = "pass"
-	const secret = "asd"
-
 	secretHandler := secretHandler{
-		next:    nextHandler,
-		argName: argName,
-		secret:  secret,
+		next:            nextHandler,
+		AllowedNetworks: localNetworks,
+		logger:          zap.NewNop(),
 	}
 
 	nextCalled = false
 	respWriter := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "http://test?pass=asd", nil)
+	req := httptest.NewRequest(http.MethodGet, "http://test", nil)
+	req.RemoteAddr = "1.2.3.4:1234"
 	secretHandler.ServeHTTP(respWriter, req)
 	respWriter.Flush()
 	resp := respWriter.Result()
@@ -46,6 +49,7 @@ func TestSecretHandler_ServeHTTP(t *testing.T) {
 	nextCalled = false
 	respWriter = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "http://test", nil)
+	req.RemoteAddr = "2.3.4.5:1234"
 	secretHandler.ServeHTTP(respWriter, req)
 	respWriter.Flush()
 	resp = respWriter.Result()
@@ -53,11 +57,14 @@ func TestSecretHandler_ServeHTTP(t *testing.T) {
 	td.False(nextCalled)
 	nextCalled = false
 
+	nextCalled = false
 	respWriter = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "http://test?pass=asdf", nil)
+	req = httptest.NewRequest(http.MethodGet, "http://test", nil)
+	req.RemoteAddr = "asdf"
 	secretHandler.ServeHTTP(respWriter, req)
 	respWriter.Flush()
 	resp = respWriter.Result()
-	td.Cmp(resp.StatusCode, http.StatusForbidden)
+	td.Cmp(resp.StatusCode, http.StatusInternalServerError)
 	td.False(nextCalled)
+	nextCalled = false
 }
