@@ -185,6 +185,48 @@ func TestManager_GetCertificateHttp01(t *testing.T) {
 			td.CmpDeeply(t, cert2, cert)
 		}
 	})
+
+	t.Run("RenewSoonExpiredCert", func(t *testing.T) {
+		const domain = "soon-expired.com"
+
+		// issue certificate
+		cert, err := manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain})
+		if err != nil {
+			t.Errorf("cant issue certificate: %v", err)
+			return
+		}
+		certNumber := cert.Leaf.SerialNumber
+		newExpire := time.Now().Add(time.Hour)
+		cert.Leaf.NotAfter = newExpire
+
+		// get expired soon certificate and trigger reissue new
+		cert, err = manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain})
+		if err != nil {
+			t.Errorf("cant issue certificate: %v", err)
+			return
+		}
+		if certNumber.Cmp(cert.Leaf.SerialNumber) != 0 {
+			t.Error("Got other sertificate, need same.")
+		}
+		if !cert.Leaf.NotAfter.Equal(newExpire) {
+			t.Errorf("Bad expire time: '%v' instead of '%v'", cert.Leaf.NotAfter, newExpire)
+		}
+
+		time.Sleep(time.Second * 10)
+
+		// get renewed cert
+		cert, err = manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain})
+		if err != nil {
+			t.Errorf("cant issue certificate: %v", err)
+			return
+		}
+		if certNumber.Cmp(cert.Leaf.SerialNumber) == 0 {
+			t.Error("Need new certificate")
+		}
+		if !cert.Leaf.NotAfter.After(newExpire) {
+			t.Errorf("Bad expire time: %v", cert.Leaf.NotAfter)
+		}
+	})
 }
 
 func TestManager_GetCertificateTls(t *testing.T) {

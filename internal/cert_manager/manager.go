@@ -128,7 +128,7 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 
 	defer func() {
 		if isNeedRenew(resultCert, now) {
-			go m.renewCertInBackground(ctx, certName)
+			go m.renewCertInBackground(ctx, needDomain, certName)
 		}
 	}()
 
@@ -137,7 +137,7 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 	if cert != nil {
 		logger.Debug("Got certificate from local state", log.Cert(cert))
 
-		cert, err = validCertDer([]DomainName{needDomain}, cert.Certificate, cert.PrivateKey, certState.GetUseAsIs(), now)
+		cert, err = validCertTLS(cert, []DomainName{needDomain}, certState.GetUseAsIs(), now)
 		logger.Debug("Validate certificate from local state", zap.Error(err))
 		if err == nil {
 			return cert, nil
@@ -295,7 +295,7 @@ func (m *Manager) createCertificateForDomains(ctx context.Context, certName cert
 	} else {
 		waitTimeout, waitTimeoutCancel := context.WithTimeout(ctx, m.CertificateIssueTimeout)
 		defer waitTimeoutCancel()
-
+		logger.Debug("Certificate issue in process already - wait result")
 		return certState.WaitFinishIssue(waitTimeout)
 	}
 
@@ -482,24 +482,17 @@ func (m *Manager) issueCertificate(ctx context.Context, certName certNameType, o
 	return cert, nil
 }
 
-func (m *Manager) renewCertInBackground(ctx context.Context, certName certNameType) {
+func (m *Manager) renewCertInBackground(ctx context.Context, needDomain DomainName, certName certNameType) {
 	// detach from request lifetime, but save log context
 	logger := zc.L(ctx).Named("background")
 	ctx, ctxCancel := context.WithTimeout(context.Background(), m.CertificateIssueTimeout)
 	defer ctxCancel()
 
-	ctx = zc.WithLogger(ctx, logger)
-	certState := m.certStateGet(ctx, certName)
+	logger.Debug("Start reissue certificate in background")
 
-	if !certState.StartIssue(ctx) {
-		// already has other cert issue process
-		return
-	}
-	domains := domainNamesFromCertificateName(certName)
-	logger.Info("StartAutoRenew background certificate issue")
-	cert, err := m.createCertificateForDomains(ctx, certName, domains)
-	certState.FinishIssue(ctx, cert, err)
-	log.InfoError(logger, err, "Renew certificate in background finished", log.Cert(cert))
+	ctx = zc.WithLogger(ctx, logger)
+	_, err := m.issueNewCert(ctx, needDomain, certName)
+	log.DebugError(logger, err, "Cert reissue in background finished")
 }
 
 func (m *Manager) deactivatePendingAuthz(ctx context.Context, uries []string) {
