@@ -114,6 +114,9 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 	}
 
 	logger = logger.With(logDomain(needDomain))
+
+	defer handlePanic(logger)
+
 	logger.Info("Get certificate", zap.String("original_domain", hello.ServerName))
 	if isTLSALPN01Hello(hello) {
 		return m.handleTLSALPN(logger, ctx, needDomain)
@@ -197,6 +200,7 @@ func (m *Manager) issueNewCert(ctx context.Context, needDomain DomainName, certN
 	}
 	certIssueContext, cancelFunc := context.WithTimeout(ctx, m.CertificateIssueTimeout)
 	defer cancelFunc()
+
 	domains := domainNamesFromCertificateName(certName)
 	domains, err = filterDomains(ctx, m.DomainChecker, domains, needDomain)
 	log.DebugError(logger, err, "Filter domains", logDomains(domains))
@@ -287,17 +291,19 @@ func (m *Manager) createCertificateForDomains(ctx context.Context, certName cert
 	logger := zc.L(ctx).With(logDomains(domainNames))
 	certState := m.certStateGet(ctx, certName)
 
-	if certState.StartIssue(ctx) {
-		// outer func need for get argument values in defer time
-		defer func() {
-			certState.FinishIssue(ctx, res, err)
-		}()
-	} else {
+	if !certState.StartIssue(ctx) {
 		waitTimeout, waitTimeoutCancel := context.WithTimeout(ctx, m.CertificateIssueTimeout)
 		defer waitTimeoutCancel()
+
 		logger.Debug("Certificate issue in process already - wait result")
 		return certState.WaitFinishIssue(waitTimeout)
 	}
+	// outer func need for get argument values in defer time
+	defer func() {
+		certState.FinishIssue(ctx, res, err)
+	}()
+
+	logger.Debug("Start issue process")
 
 	order, err := m.createOrderForDomains(ctx, domainNames...)
 	log.DebugWarning(logger, err, "Domains authorized")
@@ -306,11 +312,7 @@ func (m *Manager) createCertificateForDomains(ctx context.Context, certName cert
 	}
 
 	res, err = m.issueCertificate(ctx, certName, order)
-	if err == nil {
-		logger.Debug("Certificate created.")
-	} else {
-		logger.Warn("Can't issue certificate", zap.Error(err))
-	}
+	log.DebugWarning(logger, err, "Issue certificate")
 	return res, err
 }
 
@@ -447,10 +449,11 @@ func (m *Manager) issueCertificate(ctx context.Context, certName certNameType, o
 	logger := zc.L(ctx).With(logDomains(domains))
 
 	key, err := m.certKeyGetOrCreate(ctx, certName, keyRSA)
+	log.DebugError(logger, err, "Get cert key")
 	if err != nil {
-		logger.Error("Can't get domain key", zap.Error(err))
 		return nil, err
 	}
+
 	csr, err := createCertRequest(key, domains[0], domains...)
 	log.DebugDPanic(logger, err, "Create certificate request")
 	if err != nil {
@@ -468,6 +471,7 @@ func (m *Manager) issueCertificate(ctx context.Context, certName certNameType, o
 	if err != nil {
 		return nil, err
 	}
+
 	err = storeCertificate(ctx, m.Cache, certName, cert)
 	log.DebugDPanic(logger, err, "Certificate stored")
 	if err != nil {
@@ -829,6 +833,14 @@ func isNeedRenew(cert *tls.Certificate, now time.Time) bool {
 		return false
 	}
 	return cert.Leaf.NotAfter.Add(-time.Hour * 24 * 30).Before(now)
+}
+
+// must called as defer handlepanic(logger)
+func handlePanic(logger *zap.Logger) {
+	err := recover()
+	if err != nil {
+		logger.DPanic("Panic handled", zap.Any("panic", err))
+	}
 }
 
 func isCertLocked(ctx context.Context, storage cache.Bytes, certName certNameType) (bool, error) {
