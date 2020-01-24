@@ -147,7 +147,7 @@ func (p *ListenersHandler) registerConnection(conn net.Conn, tls bool) ContextCo
 		logger := p.logger.With(zap.String("connection_id", connectionUUID))
 		ctxStruct.ctx = context.WithValue(ctxStruct.ctx, contextlabel.TLSConnection, tls)
 		ctxStruct.ctx = context.WithValue(ctxStruct.ctx, contextlabel.ConnectionID, connectionUUID)
-		ctxStruct.ctx = zc.WithLogger(p.ctx, logger)
+		ctxStruct.ctx = zc.WithLogger(ctxStruct.ctx, logger)
 		p.connectionsContext[key] = ctxStruct
 	}
 
