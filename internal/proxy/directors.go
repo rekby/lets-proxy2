@@ -70,7 +70,6 @@ func (s DirectorSameIP) Director(request *http.Request) {
 	if request.URL == nil {
 		request.URL = &url.URL{}
 	}
-	request.URL.Scheme = ProtocolHTTP
 	request.URL.Host = localAddr.IP.String() + ":" + s.Port
 	zc.L(request.Context()).Debug("Set target as same ip",
 		zap.Stringer("local_addr", localAddr), zap.String("dest_host", request.Host))
@@ -168,4 +167,17 @@ func (h DirectorSetHeaders) Director(request *http.Request) {
 
 		request.Header.Set(name, value)
 	}
+}
+
+type DirectorSetScheme string
+
+func (d DirectorSetScheme) Director(req *http.Request) {
+	if req.URL == nil {
+		req.URL = &url.URL{}
+	}
+	req.URL.Scheme = string(d)
+}
+
+func NewSetSchemeDirector(scheme string) DirectorSetScheme {
+	return DirectorSetScheme(scheme)
 }
