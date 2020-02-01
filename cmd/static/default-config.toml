@@ -59,7 +59,8 @@ MaxCount = 10
 [Proxy]
 
 # Default rule of select destination address.
-#It can be: IP (with default port 80), :Port (default - same IP as receive connection), IPv4:Port or [IPv6]:Port
+# It can be: IP (with default port 80), :Port (default - same IP as receive connection), IPv4:Port or [IPv6]:Port
+# Must define port force if HTTPSBackend is true
 DefaultTarget = ":80"
 
 # After KeepAliveTimeoutSeconds of inactive incoming connection will close.
@@ -86,6 +87,12 @@ TargetMap = []
 # Example:
 # ["IP:{{SOURCE_IP}}", "Proxy:lets-proxy", "Protocol:{{HTTP_PROTO}}" ]
 Headers = []
+
+# Use https requests to backend instead of http
+HTTPSBackend = false
+
+# Ignore backend https certificate validations if HTTPSBackend is true
+HTTPSBackendIgnoreCert = true
 
 [CheckDomains]
 

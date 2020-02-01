@@ -12,6 +12,9 @@ If use docker-machine - need ```docker-machine ssh <machine-name> -L 4001:localh
 
 FAKE_DNS may be different for other OS.
 For example for mac os - need run other image and ping host.docker.internal for see IP for host.
+```bash
+docker run --rm alpine ping host.docker.internal
+```
 
 https://docs.docker.com/docker-for-mac/networking/#/known-limitations-use-cases-and-workarounds
 

@@ -90,6 +90,5 @@ func (p *HTTPProxy) director(request *http.Request) {
 	if request.URL == nil {
 		request.URL = &url.URL{}
 	}
-	request.URL.Scheme = ProtocolHTTP
 	p.Director.Director(request)
 }

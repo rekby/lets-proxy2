@@ -201,6 +201,30 @@ func TestConfig_getMapDirector(t *testing.T) {
 	td.CmpNoError(err)
 }
 
+func TestConfig_getSchemeDirector(t *testing.T) {
+	ctx, flush := th.TestContext()
+	defer flush()
+
+	td := testdeep.NewT(t)
+
+	var director Director
+	var err error
+
+	c := &Config{
+		HTTPSBackend: false,
+	}
+	director, err = c.getSchemaDirector(ctx)
+	td.CmpNoError(err)
+	td.CmpDeeply(director, NewSetSchemeDirector(ProtocolHTTP))
+
+	c = &Config{
+		HTTPSBackend: true,
+	}
+	director, err = c.getSchemaDirector(ctx)
+	td.CmpNoError(err)
+	td.CmpDeeply(director, NewSetSchemeDirector(ProtocolHTTPS))
+}
+
 func TestConfig_Apply(t *testing.T) {
 	ctx, flush := th.TestContext()
 	defer flush()
@@ -228,9 +252,16 @@ func TestConfig_Apply(t *testing.T) {
 	p = &HTTPProxy{}
 	err = c.Apply(ctx, p)
 	td.CmpNoError(err)
-	td.CmpDeeply(p.Director, NewDirectorChain(NewDirectorSameIP(94), NewDirectorSetHeaders(map[string]string{"aaa": "bbb"})))
+	td.CmpDeeply(p.Director,
+		NewDirectorChain(
+			NewDirectorSameIP(94),
+			NewDirectorSetHeaders(map[string]string{"aaa": "bbb"}),
+			NewSetSchemeDirector(ProtocolHTTP),
+		),
+	)
 
 	c = Config{
+		HTTPSBackend:  true,
 		DefaultTarget: "1.2.3.4:94",
 		TargetMap:     []string{"1.2.3.4:33-4.5.6.7:88"},
 		Headers:       []string{"aaa:bbb"},
@@ -242,5 +273,20 @@ func TestConfig_Apply(t *testing.T) {
 		NewDirectorHost("1.2.3.4:94"),
 		NewDirectorDestMap(map[string]string{"1.2.3.4:33": "4.5.6.7:88"}),
 		NewDirectorSetHeaders(map[string]string{"aaa": "bbb"}),
+		NewSetSchemeDirector(ProtocolHTTPS),
 	))
+
+	// Test backendSchemas
+
+	c = Config{HTTPSBackendIgnoreCert: false}
+	p = &HTTPProxy{}
+	c.Apply(ctx, p)
+	transport := p.httpReverseProxy.Transport.(Transport)
+	transport.IgnoreHttpsCertificate = false
+
+	c = Config{HTTPSBackendIgnoreCert: true}
+	p = &HTTPProxy{}
+	c.Apply(ctx, p)
+	transport = p.httpReverseProxy.Transport.(Transport)
+	transport.IgnoreHttpsCertificate = true
 }

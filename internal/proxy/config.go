@@ -23,6 +23,8 @@ type Config struct {
 	TargetMap               []string
 	Headers                 []string
 	KeepAliveTimeoutSeconds int
+	HTTPSBackend            bool
+	HTTPSBackendIgnoreCert  bool
 }
 
 func (c *Config) Apply(ctx context.Context, p *HTTPProxy) error {
@@ -42,6 +44,8 @@ func (c *Config) Apply(ctx context.Context, p *HTTPProxy) error {
 	appendDirector(c.getDefaultTargetDirector)
 	appendDirector(c.getMapDirector)
 	appendDirector(c.getHeadersDirector)
+	appendDirector(c.getSchemaDirector)
+	p.httpReverseProxy.Transport = Transport{c.HTTPSBackendIgnoreCert}
 
 	if resErr != nil {
 		zc.L(ctx).Error("Can't parse proxy config", zap.Error(resErr))
@@ -128,6 +132,13 @@ func (c *Config) getMapDirector(ctx context.Context) (Director, error) {
 
 	logger.Info("Add target-map director", zap.Any("map", m))
 	return NewDirectorDestMap(m), nil
+}
+
+func (c *Config) getSchemaDirector(ctx context.Context) (Director, error) {
+	if c.HTTPSBackend {
+		return NewSetSchemeDirector(ProtocolHTTPS), nil
+	}
+	return NewSetSchemeDirector(ProtocolHTTP), nil
 }
 
 func parseTCPMapPair(line string) (from, to string, err error) {
