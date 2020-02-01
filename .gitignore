@@ -5,6 +5,8 @@
 .vscode/
 lets-proxy.iml
 log.txt
+lets-proxy.log
+lets-proxy2.log
 storage/
 output/
 config.toml
