@@ -108,14 +108,7 @@ func New(client AcmeClient, c cache.Bytes) *Manager {
 // GetCertificate implements the tls.Config.GetCertificate hook.
 // nolint:funlen
 func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Certificate, err error) {
-	var ctx context.Context
-	if getContext, ok := hello.Conn.(GetContext); ok {
-		ctx = getContext.GetContext()
-	} else {
-		defaultLogger := zc.L(context.Background())
-		defaultLogger.DPanic("hello.Conn must implement GetContext interface")
-		ctx = zc.WithLogger(context.Background(), defaultLogger)
-	}
+	ctx := hello.Conn.(GetContext).GetContext()
 
 	logger := zc.L(ctx)
 
