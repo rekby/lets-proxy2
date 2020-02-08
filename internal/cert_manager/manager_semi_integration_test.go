@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -156,73 +157,23 @@ func TestManager_GetCertificateTls(t *testing.T) {
 
 func getCertificatesTests(t *testing.T, manager *Manager, ctx context.Context, logger *zap.Logger) {
 	t.Run("OneCert", func(t *testing.T) {
-		domain := "onecert.ru"
+		checkOkDomain(ctx, t, manager, "onecert.ru")
+	})
 
-		cert, err := manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain, Conn: contextConnection{Context: ctx}})
-		if err != nil {
-			t.Fatal(err)
-		}
+	t.Run("punycode-domain", func(t *testing.T) {
+		checkOkDomain(ctx, t, manager, "xn--80adjurfhd.xn--p1ai") // проверка.рф
+	})
 
-		if cert.Leaf.NotBefore.After(time.Now()) {
-			t.Error(cert.Leaf.NotBefore)
-		}
-		if cert.Leaf.NotAfter.Before(time.Now()) {
-			t.Error(cert.Leaf.NotAfter)
-		}
-		if cert.Leaf.VerifyHostname(domain) != nil {
-			t.Error(cert.Leaf.VerifyHostname(domain))
-		}
-		if cert.Leaf.VerifyHostname("www."+domain) != nil {
-			t.Error(cert.Leaf.VerifyHostname(domain))
-		}
+	t.Run("OneCertCamelCase", func(t *testing.T) {
+		checkOkDomain(ctx, t, manager, "onecertCamelCase.ru")
 	})
 
 	t.Run("Locked", func(t *testing.T) {
 		domain := "locked.ru"
 
-		cert, err := manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain, Conn: contextConnection{Context: ctx}})
+		cert, err := manager.GetCertificate(createTlsHello(ctx, domain))
 		td.CmpError(t, err)
 		td.CmpNil(t, cert)
-	})
-
-	t.Run("punycode-domain", func(t *testing.T) {
-		domain := "xn--80adjurfhd.xn--p1ai" // проверка.рф
-
-		cert, err := manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain, Conn: contextConnection{Context: ctx}})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if cert.Leaf.NotBefore.After(time.Now()) {
-			t.Error(cert.Leaf.NotBefore)
-		}
-		if cert.Leaf.NotAfter.Before(time.Now()) {
-			t.Error(cert.Leaf.NotAfter)
-		}
-		if cert.Leaf.VerifyHostname(domain) != nil {
-			t.Error(cert.Leaf.VerifyHostname(domain))
-		}
-		if cert.Leaf.VerifyHostname("www."+domain) != nil {
-			t.Error(cert.Leaf.VerifyHostname(domain))
-		}
-	})
-
-	t.Run("OneCertCamelCase", func(t *testing.T) {
-		domain := "onecertCamelCase.ru"
-		cert, err := manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain, Conn: contextConnection{Context: ctx}})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if cert.Leaf.NotBefore.After(time.Now()) {
-			t.Error(cert.Leaf.NotBefore)
-		}
-		if cert.Leaf.NotAfter.Before(time.Now()) {
-			t.Error(cert.Leaf.NotAfter)
-		}
-		if cert.Leaf.VerifyHostname(domain) != nil {
-			t.Error(cert.Leaf.VerifyHostname(domain))
-		}
 	})
 
 	//nolint[:dupl]
@@ -245,7 +196,7 @@ func getCertificatesTests(t *testing.T, manager *Manager, ctx context.Context, l
 
 		for i := 0; i < cnt; i++ {
 			go func() {
-				cert, err := manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain, Conn: contextConnection{Context: ctx}})
+				cert, err := manager.GetCertificate(createTlsHello(ctx, domain))
 				if err != nil {
 					t.Error(err)
 				}
@@ -266,7 +217,7 @@ func getCertificatesTests(t *testing.T, manager *Manager, ctx context.Context, l
 		const domain = "soon-expired.com"
 
 		// issue certificate
-		cert, err := manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain})
+		cert, err := manager.GetCertificate(createTlsHello(ctx, domain))
 		if err != nil {
 			t.Errorf("cant issue certificate: %v", err)
 			return
@@ -276,7 +227,7 @@ func getCertificatesTests(t *testing.T, manager *Manager, ctx context.Context, l
 		cert.Leaf.NotAfter = newExpire
 
 		// get expired soon certificate and trigger reissue new
-		cert, err = manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain})
+		cert, err = manager.GetCertificate(createTlsHello(ctx, domain))
 		if err != nil {
 			t.Errorf("cant issue certificate: %v", err)
 			return
@@ -291,7 +242,7 @@ func getCertificatesTests(t *testing.T, manager *Manager, ctx context.Context, l
 		time.Sleep(time.Second * 10)
 
 		// get renewed cert
-		cert, err = manager.GetCertificate(&tls.ClientHelloInfo{ServerName: domain})
+		cert, err = manager.GetCertificate(createTlsHello(ctx, domain))
 		if err != nil {
 			t.Errorf("cant issue certificate: %v", err)
 			return
@@ -303,4 +254,29 @@ func getCertificatesTests(t *testing.T, manager *Manager, ctx context.Context, l
 			t.Errorf("Bad expire time: %v", cert.Leaf.NotAfter)
 		}
 	})
+}
+
+func createTlsHello(ctx context.Context, domain string) *tls.ClientHelloInfo {
+	return &tls.ClientHelloInfo{ServerName: domain, Conn: contextConnection{Context: ctx}}
+}
+
+func checkOkDomain(ctx context.Context, t *testing.T, manager *Manager, domain string) {
+	cert, err := manager.GetCertificate(createTlsHello(ctx, domain))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	certDomain := strings.TrimPrefix(strings.ToLower(domain), "www.")
+	if cert.Leaf.NotBefore.After(time.Now()) {
+		t.Error(cert.Leaf.NotBefore)
+	}
+	if cert.Leaf.NotAfter.Before(time.Now()) {
+		t.Error(cert.Leaf.NotAfter)
+	}
+	if cert.Leaf.VerifyHostname(certDomain) != nil {
+		t.Error(cert.Leaf.VerifyHostname(certDomain))
+	}
+	if cert.Leaf.VerifyHostname("www."+certDomain) != nil {
+		t.Error(cert.Leaf.VerifyHostname(certDomain))
+	}
 }
