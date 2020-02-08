@@ -3,6 +3,7 @@ package cert_manager
 
 import (
 	"crypto"
+	"crypto/ecdsa"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -99,10 +100,19 @@ func validCertTLS(cert *tls.Certificate, domains []DomainName, useAsIs bool, now
 	case *rsa.PublicKey:
 		prv, ok := cert.PrivateKey.(*rsa.PrivateKey)
 		if !ok {
-			return nil, errors.New("private key type does not match public key type")
+			return nil, errors.New("rsa private key type does not match public key type")
 		}
 		if pub.N.Cmp(prv.N) != 0 {
-			return nil, errors.New("private key does not match public key")
+			return nil, errors.New("rsa private key does not match public key")
+		}
+	case *ecdsa.PublicKey:
+		prv, ok := cert.PrivateKey.(*ecdsa.PrivateKey)
+		if !ok {
+			return nil, errors.New("ecdsa private key type does not match public key type")
+		}
+		pubFromPriv := prv.Public().(*ecdsa.PublicKey)
+		if pub.X.Cmp(pubFromPriv.X) != 0 || pub.Y.Cmp(pubFromPriv.Y) != 0 {
+			return nil, errors.New("ecdsa private key does not match public key")
 		}
 	default:
 		return nil, errors.New("unknown public key algorithm")

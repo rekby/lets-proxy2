@@ -7,8 +7,6 @@ import (
 	"go.uber.org/zap"
 )
 
-const defaultKeyType = KeyRSA
-
 type CertDescription struct {
 	MainDomain string
 	KeyType    KeyType

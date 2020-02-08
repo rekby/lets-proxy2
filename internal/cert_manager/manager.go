@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -56,6 +57,8 @@ func (t KeyType) Generate() (crypto.Signer, error) {
 	switch t {
 	case KeyRSA:
 		return rsa.GenerateKey(rand.Reader, domainKeyRSALength)
+	case KeyECDSA:
+		return ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	default:
 		panic("Unexpected key type for generate: " + t.String())
 	}
@@ -127,7 +130,12 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 		return m.handleTLSALPN(logger, ctx, needDomain)
 	}
 
-	certDescription := CertDescriptionFromDomain(needDomain, KeyRSA)
+	certType := KeyRSA
+	if supportsECDSA(hello) {
+		certType = KeyECDSA
+	}
+
+	certDescription := CertDescriptionFromDomain(needDomain, certType)
 
 	logger = logger.With(certDescription.ZapField())
 	ctx = zc.WithLogger(ctx, zc.L(ctx).With(certDescription.ZapField()))
@@ -165,7 +173,7 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 		return nil, errHaveNoCert
 	}
 
-	cert, err = loadCertificateFromCache(ctx, m.Cache, certDescription, KeyRSA)
+	cert, err = loadCertificateFromCache(ctx, m.Cache, certDescription)
 	logLevel := zapcore.ErrorLevel
 	if err == nil || err == cache.ErrCacheMiss {
 		logLevel = zapcore.DebugLevel
@@ -526,11 +534,6 @@ func (m *Manager) deactivatePendingAuthz(ctx context.Context, uries []string) {
 func (m *Manager) certKeyGetOrCreate(ctx context.Context, cd CertDescription) (crypto.Signer, error) {
 	logger := zc.L(ctx)
 
-	if cd.KeyType != KeyRSA {
-		logger.DPanic("Unknown key type", zap.Stringer("key_type", cd.KeyType))
-		return nil, errors.New("unknown key type for generate key")
-	}
-
 	key, err := getCertificateKey(ctx, m.Cache, cd)
 	log.DebugError(logger, err, "Got certificate key from cache and reuse old key")
 	if err == nil {
@@ -655,6 +658,18 @@ func storeCertificate(ctx context.Context, cache cache.Bytes, cd CertDescription
 			logger.DPanic("Can't marshal rsa private key", zap.Error(err))
 			return err
 		}
+	case KeyECDSA:
+		privateKey := cert.PrivateKey.(*ecdsa.PrivateKey)
+		keyBytes, err := x509.MarshalECPrivateKey(privateKey)
+		if err != nil {
+			return err
+		}
+		pemBlock := pem.Block{Type: "EC PRIVATE KEY", Bytes: keyBytes}
+		err = pem.Encode(&privateKeyBuf, &pemBlock)
+		if err != nil {
+			logger.DPanic("Can't marshal ecdsa private key", zap.Error(err))
+			return err
+		}
 	default:
 		logger.DPanic("Unknow private key type", zap.String("type", reflect.TypeOf(cert.PrivateKey).String()))
 		return errors.New("unknow private key type")
@@ -710,7 +725,7 @@ func getKeyType(cert *tls.Certificate) KeyType {
 	}
 }
 
-func loadCertificateFromCache(ctx context.Context, c cache.Bytes, cd CertDescription, keyType KeyType) (cert *tls.Certificate, err error) {
+func loadCertificateFromCache(ctx context.Context, c cache.Bytes, cd CertDescription) (cert *tls.Certificate, err error) {
 	logger := zc.L(ctx)
 	logger.Debug("Check certificate in cache")
 	defer func() {
@@ -855,4 +870,52 @@ func isCertLocked(ctx context.Context, storage cache.Bytes, certName CertDescrip
 	default:
 		return false, err
 	}
+}
+
+// copy from golang.org/x/crypto/acme/autocert/autocert.go
+// https://github.com/golang/crypto/blob/87dc89f01550277dc22b74ffcf4cd89fa2f40f4c/acme/autocert/autocert.go#L322
+func supportsECDSA(hello *tls.ClientHelloInfo) bool {
+	// The "signature_algorithms" extension, if present, limits the key exchange
+	// algorithms allowed by the cipher suites. See RFC 5246, section 7.4.1.4.1.
+	if hello.SignatureSchemes != nil {
+		ecdsaOK := false
+	schemeLoop:
+		for _, scheme := range hello.SignatureSchemes {
+			const tlsECDSAWithSHA1 tls.SignatureScheme = 0x0203 // constant added in Go 1.10
+			switch scheme {
+			case tlsECDSAWithSHA1, tls.ECDSAWithP256AndSHA256,
+				tls.ECDSAWithP384AndSHA384, tls.ECDSAWithP521AndSHA512:
+				ecdsaOK = true
+				break schemeLoop
+			}
+		}
+		if !ecdsaOK {
+			return false
+		}
+	}
+	if hello.SupportedCurves != nil {
+		ecdsaOK := false
+		for _, curve := range hello.SupportedCurves {
+			if curve == tls.CurveP256 {
+				ecdsaOK = true
+				break
+			}
+		}
+		if !ecdsaOK {
+			return false
+		}
+	}
+	for _, suite := range hello.CipherSuites {
+		switch suite {
+		case tls.TLS_ECDHE_ECDSA_WITH_RC4_128_SHA,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305:
+			return true
+		}
+	}
+	return false
 }

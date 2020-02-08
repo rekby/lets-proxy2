@@ -29,22 +29,7 @@ func TestManager_GetCertificateHttp01(t *testing.T) {
 	mc := minimock.NewController(t)
 	defer mc.Finish()
 
-	cacheMock := NewBytesMock(mc)
-	cacheMock.GetMock.Set(func(ctx context.Context, key string) (ba1 []byte, err error) {
-		zc.L(ctx).Debug("Cache mock get", zap.String("key", key))
-
-		if key == "locked.ru.lock" {
-			return []byte{}, nil
-		}
-
-		return nil, cache.ErrCacheMiss
-	})
-	cacheMock.PutMock.Set(func(ctx context.Context, key string, data []byte) (err error) {
-		zc.L(ctx).Debug("Cache mock put", zap.String("key", key))
-		return nil
-	})
-
-	manager := New(createTestClient(t), cacheMock)
+	manager := New(createTestClient(t), newCacheMock(mc))
 	manager.EnableTLSValidation = false
 	manager.EnableHTTPValidation = true
 
@@ -92,22 +77,7 @@ func TestManager_GetCertificateTls(t *testing.T) {
 	mc := minimock.NewController(t)
 	defer mc.Finish()
 
-	cacheMock := NewBytesMock(mc)
-	cacheMock.GetMock.Set(func(ctx context.Context, key string) (ba1 []byte, err error) {
-		zc.L(ctx).Debug("Cache mock get", zap.String("key", key))
-
-		if key == "locked.ru.lock" {
-			return []byte{}, nil
-		}
-
-		return nil, cache.ErrCacheMiss
-	})
-	cacheMock.PutMock.Set(func(ctx context.Context, key string, data []byte) (err error) {
-		zc.L(ctx).Debug("Cache mock put", zap.String("key", key))
-		return nil
-	})
-
-	manager := New(createTestClient(t), cacheMock)
+	manager := New(createTestClient(t), newCacheMock(mc))
 
 	lisneter, err := net.ListenTCP("tcp", &net.TCPAddr{Port: 5001})
 
@@ -151,27 +121,53 @@ func TestManager_GetCertificateTls(t *testing.T) {
 			}
 		}
 	}()
-
 	getCertificatesTests(t, manager, ctx, logger)
 }
 
+func newCacheMock(t minimock.Tester) *BytesMock {
+	cacheMock := NewBytesMock(t)
+	cacheMock.GetMock.Set(func(ctx context.Context, key string) (ba1 []byte, err error) {
+		zc.L(ctx).Debug("Cache mock get", zap.String("key", key))
+
+		if key == "locked.ru.lock" {
+			return []byte{}, nil
+		}
+
+		return nil, cache.ErrCacheMiss
+	})
+	cacheMock.PutMock.Set(func(ctx context.Context, key string, data []byte) (err error) {
+		zc.L(ctx).Debug("Cache mock put", zap.String("key", key))
+		return nil
+	})
+	return cacheMock
+}
+
 func getCertificatesTests(t *testing.T, manager *Manager, ctx context.Context, logger *zap.Logger) {
+	t.Run("ECDSA", func(t *testing.T) {
+		getCertificatesTestsKeyType(t, manager, KeyECDSA, ctx, logger)
+	})
+	t.Run("RSA", func(t *testing.T) {
+		getCertificatesTestsKeyType(t, manager, KeyRSA, ctx, logger)
+	})
+}
+
+func getCertificatesTestsKeyType(t *testing.T, manager *Manager, keyType KeyType, ctx context.Context, logger *zap.Logger) {
 	t.Run("OneCert", func(t *testing.T) {
-		checkOkDomain(ctx, t, manager, "onecert.ru")
+		checkOkDomain(ctx, t, manager, keyType, "onecert.ru")
 	})
 
 	t.Run("punycode-domain", func(t *testing.T) {
-		checkOkDomain(ctx, t, manager, "xn--80adjurfhd.xn--p1ai") // проверка.рф
+		checkOkDomain(ctx, t, manager, keyType, "xn--80adjurfhd.xn--p1ai") // проверка.рф
 	})
 
 	t.Run("OneCertCamelCase", func(t *testing.T) {
-		checkOkDomain(ctx, t, manager, "onecertCamelCase.ru")
+		checkOkDomain(ctx, t, manager, keyType, "onecertCamelCase.ru")
 	})
 
 	t.Run("Locked", func(t *testing.T) {
 		domain := "locked.ru"
 
-		cert, err := manager.GetCertificate(createTlsHello(ctx, domain))
+		cert, err := manager.GetCertificate(createTlsHello(ctx, keyType, domain))
 		td.CmpError(t, err)
 		td.CmpNil(t, cert)
 	})
@@ -196,7 +192,7 @@ func getCertificatesTests(t *testing.T, manager *Manager, ctx context.Context, l
 
 		for i := 0; i < cnt; i++ {
 			go func() {
-				cert, err := manager.GetCertificate(createTlsHello(ctx, domain))
+				cert, err := manager.GetCertificate(createTlsHello(ctx, keyType, domain))
 				if err != nil {
 					t.Error(err)
 				}
@@ -217,7 +213,7 @@ func getCertificatesTests(t *testing.T, manager *Manager, ctx context.Context, l
 		const domain = "soon-expired.com"
 
 		// issue certificate
-		cert, err := manager.GetCertificate(createTlsHello(ctx, domain))
+		cert, err := manager.GetCertificate(createTlsHello(ctx, keyType, domain))
 		if err != nil {
 			t.Errorf("cant issue certificate: %v", err)
 			return
@@ -227,7 +223,7 @@ func getCertificatesTests(t *testing.T, manager *Manager, ctx context.Context, l
 		cert.Leaf.NotAfter = newExpire
 
 		// get expired soon certificate and trigger reissue new
-		cert, err = manager.GetCertificate(createTlsHello(ctx, domain))
+		cert, err = manager.GetCertificate(createTlsHello(ctx, keyType, domain))
 		if err != nil {
 			t.Errorf("cant issue certificate: %v", err)
 			return
@@ -242,7 +238,7 @@ func getCertificatesTests(t *testing.T, manager *Manager, ctx context.Context, l
 		time.Sleep(time.Second * 10)
 
 		// get renewed cert
-		cert, err = manager.GetCertificate(createTlsHello(ctx, domain))
+		cert, err = manager.GetCertificate(createTlsHello(ctx, keyType, domain))
 		if err != nil {
 			t.Errorf("cant issue certificate: %v", err)
 			return
@@ -256,14 +252,33 @@ func getCertificatesTests(t *testing.T, manager *Manager, ctx context.Context, l
 	})
 }
 
-func createTlsHello(ctx context.Context, domain string) *tls.ClientHelloInfo {
-	return &tls.ClientHelloInfo{ServerName: domain, Conn: contextConnection{Context: ctx}}
+func createTlsHello(ctx context.Context, keyType KeyType, domain string) *tls.ClientHelloInfo {
+	switch keyType {
+	case KeyRSA:
+		return &tls.ClientHelloInfo{
+			ServerName: domain,
+			Conn:       contextConnection{Context: ctx},
+		}
+	case KeyECDSA:
+		return &tls.ClientHelloInfo{
+			ServerName:       domain,
+			Conn:             contextConnection{Context: ctx},
+			SignatureSchemes: []tls.SignatureScheme{tls.ECDSAWithP256AndSHA256},
+			SupportedCurves:  []tls.CurveID{tls.CurveP256},
+			CipherSuites:     []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384},
+		}
+	default:
+		panic("unexpected key type")
+	}
 }
 
-func checkOkDomain(ctx context.Context, t *testing.T, manager *Manager, domain string) {
-	cert, err := manager.GetCertificate(createTlsHello(ctx, domain))
+func checkOkDomain(ctx context.Context, t *testing.T, manager *Manager, keyType KeyType, domain string) {
+	cert, err := manager.GetCertificate(createTlsHello(ctx, keyType, domain))
 	if err != nil {
 		t.Fatal(err)
+	}
+	if getKeyType(cert) != keyType {
+		t.Errorf("Bad certificate key type")
 	}
 
 	certDomain := strings.TrimPrefix(strings.ToLower(domain), "www.")
