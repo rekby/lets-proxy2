@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto"
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/tls"
@@ -47,11 +48,25 @@ type GetContext interface {
 	GetContext() context.Context
 }
 
-type keyType string
+type KeyType string
 
-const keyRSA keyType = "rsa"
-const keyECDSA keyType = "ecdsa"
-const keyUnknown keyType = "unknown"
+const KeyRSA KeyType = "rsa"
+const KeyECDSA KeyType = "ecdsa"
+
+func (t KeyType) Generate() (crypto.Signer, error) {
+	switch t {
+	case KeyRSA:
+		return rsa.GenerateKey(rand.Reader, domainKeyRSALength)
+	case KeyECDSA:
+		return ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	default:
+		panic("Unexpected key type for generate: " + t.String())
+	}
+}
+
+func (t KeyType) String() string {
+	return string(t)
+}
 
 // Interface inspired to https://godoc.org/golang.org/x/crypto/acme/autocert#Manager but not compatible guarantee
 type Manager struct {
@@ -96,14 +111,7 @@ func New(client AcmeClient, c cache.Bytes) *Manager {
 // GetCertificate implements the tls.Config.GetCertificate hook.
 // nolint:funlen
 func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Certificate, err error) {
-	var ctx context.Context
-	if getContext, ok := hello.Conn.(GetContext); ok {
-		ctx = getContext.GetContext()
-	} else {
-		defaultLogger := zc.L(context.Background())
-		defaultLogger.DPanic("hello.Conn must implement GetContext interface")
-		ctx = zc.WithLogger(context.Background(), defaultLogger)
-	}
+	ctx := hello.Conn.(GetContext).GetContext()
 
 	logger := zc.L(ctx)
 
@@ -122,20 +130,25 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 		return m.handleTLSALPN(logger, ctx, needDomain)
 	}
 
-	certName := certNameFromDomain(needDomain)
+	certType := KeyRSA
+	if supportsECDSA(hello) {
+		certType = KeyECDSA
+	}
 
-	logger = logger.With(logCertName(certName))
-	ctx = zc.WithLogger(ctx, zc.L(ctx).With(logCertName(certName)))
+	certDescription := CertDescriptionFromDomain(needDomain, certType)
+
+	logger = logger.With(certDescription.ZapField())
+	ctx = zc.WithLogger(ctx, zc.L(ctx).With(certDescription.ZapField()))
 
 	now := time.Now()
 
 	defer func() {
 		if isNeedRenew(resultCert, now) {
-			go m.renewCertInBackground(ctx, needDomain, certName)
+			go m.renewCertInBackground(ctx, needDomain, certDescription)
 		}
 	}()
 
-	certState := m.certStateGet(ctx, certName)
+	certState := m.certStateGet(ctx, certDescription)
 	cert, err := certState.Cert()
 	if cert != nil {
 		logger.Debug("Got certificate from local state", log.Cert(cert))
@@ -154,13 +167,13 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 		log.LevelParam(logger, logLevel, "Can't get certificate from local state", zap.Error(err))
 	}
 
-	locked, err := isCertLocked(ctx, m.Cache, certName)
+	locked, err := isCertLocked(ctx, m.Cache, certDescription)
 	log.DebugDPanic(logger, err, "Check if certificate locked", zap.Bool("locked", locked))
 	if err != nil {
 		return nil, errHaveNoCert
 	}
 
-	cert, err = loadCertificateFromCache(ctx, m.Cache, certName, keyRSA)
+	cert, err = loadCertificateFromCache(ctx, m.Cache, certDescription)
 	logLevel := zapcore.ErrorLevel
 	if err == nil || err == cache.ErrCacheMiss {
 		logLevel = zapcore.DebugLevel
@@ -183,10 +196,10 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 		return nil, errHaveNoCert
 	}
 
-	return m.issueNewCert(ctx, needDomain, certName)
+	return m.issueNewCert(ctx, needDomain, certDescription)
 }
 
-func (m *Manager) issueNewCert(ctx context.Context, needDomain DomainName, certName certNameType) (*tls.Certificate, error) {
+func (m *Manager) issueNewCert(ctx context.Context, needDomain DomainName, cd CertDescription) (*tls.Certificate, error) {
 	logger := zc.L(ctx)
 
 	allowed, err := m.DomainChecker.IsDomainAllowed(ctx, needDomain.ASCII())
@@ -201,11 +214,11 @@ func (m *Manager) issueNewCert(ctx context.Context, needDomain DomainName, certN
 	certIssueContext, cancelFunc := context.WithTimeout(ctx, m.CertificateIssueTimeout)
 	defer cancelFunc()
 
-	domains := domainNamesFromCertificateName(certName)
+	domains := cd.DomainNames()
 	domains, err = filterDomains(ctx, m.DomainChecker, domains, needDomain)
 	log.DebugError(logger, err, "Filter domains", logDomains(domains))
 
-	res, err := m.createCertificateForDomains(certIssueContext, certName, domains)
+	res, err := m.createCertificateForDomains(certIssueContext, cd, domains)
 	if err == nil {
 		logger.Info("Certificate issued.", log.Cert(res),
 			zap.Time("expire", res.Leaf.NotAfter))
@@ -270,26 +283,26 @@ func filterDomains(ctx context.Context, checker DomainChecker, originalDomains [
 	return res, nil
 }
 
-func (m *Manager) certStateGet(ctx context.Context, certName certNameType) *certState {
+func (m *Manager) certStateGet(ctx context.Context, cd CertDescription) *certState {
 	m.certStateMu.Lock()
 	defer m.certStateMu.Unlock()
 
-	resInterface, err := m.certState.Get(ctx, certName.String())
+	resInterface, err := m.certState.Get(ctx, cd.String())
 	if err == cache.ErrCacheMiss {
 		err = nil
 	}
-	log.DebugFatalCtx(ctx, err, "Got cert state from cache")
+	log.DebugFatalCtx(ctx, err, "Got cert state from cache", zap.Bool("is_emapty", resInterface == nil))
 	if resInterface == nil {
 		resInterface = &certState{}
-		err = m.certState.Put(ctx, certName.String(), resInterface)
+		err = m.certState.Put(ctx, cd.String(), resInterface)
 		log.DebugFatalCtx(ctx, err, "Put empty cert state to cache")
 	}
 	return resInterface.(*certState)
 }
 
-func (m *Manager) createCertificateForDomains(ctx context.Context, certName certNameType, domainNames []DomainName) (res *tls.Certificate, err error) {
+func (m *Manager) createCertificateForDomains(ctx context.Context, cd CertDescription, domainNames []DomainName) (res *tls.Certificate, err error) {
 	logger := zc.L(ctx).With(logDomains(domainNames))
-	certState := m.certStateGet(ctx, certName)
+	certState := m.certStateGet(ctx, cd)
 
 	if !certState.StartIssue(ctx) {
 		waitTimeout, waitTimeoutCancel := context.WithTimeout(ctx, m.CertificateIssueTimeout)
@@ -311,7 +324,7 @@ func (m *Manager) createCertificateForDomains(ctx context.Context, certName cert
 		return nil, errors.New("order authorization error")
 	}
 
-	res, err = m.issueCertificate(ctx, certName, order)
+	res, err = m.issueCertificate(ctx, cd, order)
 	log.DebugWarning(logger, err, "Issue certificate")
 	return res, err
 }
@@ -437,7 +450,7 @@ authorizeOrderLoop:
 	return order, nil
 }
 
-func (m *Manager) issueCertificate(ctx context.Context, certName certNameType, order *acme.Order) (*tls.Certificate, error) {
+func (m *Manager) issueCertificate(ctx context.Context, cd CertDescription, order *acme.Order) (*tls.Certificate, error) {
 	if len(order.Identifiers) == 0 {
 		return nil, errors.New("no domains for issue certificate")
 	}
@@ -448,7 +461,7 @@ func (m *Manager) issueCertificate(ctx context.Context, certName certNameType, o
 	}
 	logger := zc.L(ctx).With(logDomains(domains))
 
-	key, err := m.certKeyGetOrCreate(ctx, certName, keyRSA)
+	key, err := m.certKeyGetOrCreate(ctx, cd)
 	log.DebugError(logger, err, "Get cert key")
 	if err != nil {
 		return nil, err
@@ -472,13 +485,13 @@ func (m *Manager) issueCertificate(ctx context.Context, certName certNameType, o
 		return nil, err
 	}
 
-	err = storeCertificate(ctx, m.Cache, certName, cert)
+	err = storeCertificate(ctx, m.Cache, cd, cert)
 	log.DebugDPanic(logger, err, "Certificate stored")
 	if err != nil {
 		return nil, err
 	}
 	if m.SaveJSONMeta {
-		err = storeCertificateMeta(ctx, m.Cache, certName, cert)
+		err = storeCertificateMeta(ctx, m.Cache, cd, cert)
 		if err != nil {
 			return nil, err
 		}
@@ -486,7 +499,7 @@ func (m *Manager) issueCertificate(ctx context.Context, certName certNameType, o
 	return cert, nil
 }
 
-func (m *Manager) renewCertInBackground(ctx context.Context, needDomain DomainName, certName certNameType) {
+func (m *Manager) renewCertInBackground(ctx context.Context, needDomain DomainName, cd CertDescription) {
 	// detach from request lifetime, but save log context
 	logger := zc.L(ctx).Named("background")
 	ctx, ctxCancel := context.WithTimeout(context.Background(), m.CertificateIssueTimeout)
@@ -495,7 +508,7 @@ func (m *Manager) renewCertInBackground(ctx context.Context, needDomain DomainNa
 	logger.Debug("Start reissue certificate in background")
 
 	ctx = zc.WithLogger(ctx, logger)
-	_, err := m.issueNewCert(ctx, needDomain, certName)
+	_, err := m.issueNewCert(ctx, needDomain, cd)
 	log.DebugError(logger, err, "Cert reissue in background finished")
 }
 
@@ -518,34 +531,21 @@ func (m *Manager) deactivatePendingAuthz(ctx context.Context, uries []string) {
 	}
 }
 
-func (m *Manager) certKeyGetOrCreate(ctx context.Context, certName certNameType, keyType keyType) (crypto.Signer, error) {
+func (m *Manager) certKeyGetOrCreate(ctx context.Context, cd CertDescription) (crypto.Signer, error) {
 	logger := zc.L(ctx)
 
-	if keyType != keyRSA {
-		logger.DPanic("Unknown key type", zap.String("key_type", string(keyType)))
-		return nil, errors.New("unknown key type for generate key")
-	}
-
-	key, err := getCertificateKey(ctx, m.Cache, certName, keyType)
+	key, err := getCertificateKey(ctx, m.Cache, cd)
+	log.DebugError(logger, err, "Got certificate key from cache and reuse old key")
 	if err == nil {
-		logger.Debug("Got certificate key from cache and reuse old key")
 		return key, nil
 	}
-	if err == cache.ErrCacheMiss {
-		logger.Debug("Cert key no in cache. Create new.")
-	} else {
-		logger.Error("Error while check cert key in cache", zap.Error(err))
+	if err != cache.ErrCacheMiss {
 		return nil, err
 	}
 
-	logger.Debug("Generate new rsa key")
-	key, err = rsa.GenerateKey(rand.Reader, domainKeyRSALength)
-	if err != nil {
-		logger.Error("Can't generate rsa key", zap.Error(err))
-		return nil, err
-	}
-
-	return key, nil
+	key, err = cd.KeyType.Generate()
+	log.InfoError(logger, err, "Generate new key")
+	return key, err
 }
 
 func (m *Manager) fulfill(ctx context.Context, challenge *acme.Challenge, domain DomainName) (func(context.Context), error) {
@@ -623,13 +623,14 @@ func (m *Manager) deleteCertToken(ctx context.Context, key DomainName) {
 }
 
 // It isn't atomic syncronized - caller must not save two certificates with same name same time
-func storeCertificate(ctx context.Context, cache cache.Bytes, certName certNameType,
+func storeCertificate(ctx context.Context, cache cache.Bytes, cd CertDescription,
 	cert *tls.Certificate) error {
 	logger := zc.L(ctx)
 
-	locked, _ := isCertLocked(ctx, cache, certName)
+	locked, err := isCertLocked(ctx, cache, cd)
+	log.DebugError(logger, err, "Check if cert locked", zap.Bool("key_locked", locked))
 	if locked {
-		logger.Panic("Logical error - try to save to locked certificate")
+		logger.DPanic("Logical error - try to save to locked certificate")
 	}
 
 	var keyType = getKeyType(cert)
@@ -648,13 +649,25 @@ func storeCertificate(ctx context.Context, cache cache.Bytes, certName certNameT
 	var privateKeyBuf bytes.Buffer
 
 	switch keyType {
-	case keyRSA:
+	case KeyRSA:
 		privateKey := cert.PrivateKey.(*rsa.PrivateKey)
 		keyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
 		pemBlock := pem.Block{Type: "RSA PRIVATE KEY", Bytes: keyBytes}
 		err := pem.Encode(&privateKeyBuf, &pemBlock)
 		if err != nil {
 			logger.DPanic("Can't marshal rsa private key", zap.Error(err))
+			return err
+		}
+	case KeyECDSA:
+		privateKey := cert.PrivateKey.(*ecdsa.PrivateKey)
+		keyBytes, err := x509.MarshalECPrivateKey(privateKey)
+		if err != nil {
+			return err
+		}
+		pemBlock := pem.Block{Type: "EC PRIVATE KEY", Bytes: keyBytes}
+		err = pem.Encode(&privateKeyBuf, &pemBlock)
+		if err != nil {
+			logger.DPanic("Can't marshal ecdsa private key", zap.Error(err))
 			return err
 		}
 	default:
@@ -666,10 +679,10 @@ func storeCertificate(ctx context.Context, cache cache.Bytes, certName certNameT
 		logger.DPanic("store cert key type doesn't init")
 	}
 
-	certKeyName := string(certName) + "." + string(keyType) + ".cer"
-	keyKeyName := string(certName) + "." + string(keyType) + ".key"
+	certKeyName := cd.CertStoreName()
+	keyKeyName := cd.KeyStoreName()
 
-	err := cache.Put(ctx, certKeyName, certBuf.Bytes())
+	err = cache.Put(ctx, certKeyName, certBuf.Bytes())
 	zc.InfoError(logger, err, "Store certificate file", zap.String("cert_key", certKeyName))
 	if err != nil {
 		return err
@@ -684,7 +697,7 @@ func storeCertificate(ctx context.Context, cache cache.Bytes, certName certNameT
 	return nil
 }
 
-func storeCertificateMeta(ctx context.Context, storage cache.Bytes, key certNameType, certificate *tls.Certificate) error {
+func storeCertificateMeta(ctx context.Context, storage cache.Bytes, cd CertDescription, certificate *tls.Certificate) error {
 	info := struct {
 		Domains    []string
 		ExpireDate time.Time
@@ -693,36 +706,33 @@ func storeCertificateMeta(ctx context.Context, storage cache.Bytes, key certName
 		ExpireDate: certificate.Leaf.NotAfter,
 	}
 	infoBytes, _ := json.MarshalIndent(info, "", "    ")
-	keyTypeName := string(getKeyType(certificate))
-	keyName := fmt.Sprintf("%v.%v.json", key.String(), keyTypeName)
-	err := storage.Put(ctx, keyName, infoBytes)
+	err := storage.Put(ctx, cd.MetaStoreName(), infoBytes)
 	log.DebugDPanicCtx(ctx, err, "Save cert metadata")
 	return err
 }
 
-func getKeyType(cert *tls.Certificate) keyType {
-	if cert == nil || cert.PrivateKey == nil {
-		return keyUnknown
+func getKeyType(cert *tls.Certificate) KeyType {
+	if cert == nil {
+		panic("cert is nil")
 	}
-
 	switch cert.PrivateKey.(type) {
 	case *rsa.PrivateKey:
-		return keyRSA
+		return KeyRSA
 	case *ecdsa.PrivateKey:
-		return keyECDSA
+		return KeyECDSA
 	default:
-		return keyUnknown
+		panic("unexexpected key type: " + reflect.TypeOf(cert.PrivateKey).PkgPath() + "." + reflect.TypeOf(cert.PrivateKey).Name())
 	}
 }
 
-func loadCertificateFromCache(ctx context.Context, c cache.Bytes, certName certNameType, keyType keyType) (cert *tls.Certificate, err error) {
+func loadCertificateFromCache(ctx context.Context, c cache.Bytes, cd CertDescription) (cert *tls.Certificate, err error) {
 	logger := zc.L(ctx)
 	logger.Debug("Check certificate in cache")
 	defer func() {
 		logger.Debug("Checked certificate in cache", log.Cert(cert), zap.Error(err))
 	}()
 
-	certKeyName := string(certName) + "." + string(keyType) + ".cer"
+	certKeyName := cd.KeyStoreName()
 
 	certBytes, err := c.Get(ctx, certKeyName)
 	logLevel := zapcore.ErrorLevel
@@ -734,8 +744,13 @@ func loadCertificateFromCache(ctx context.Context, c cache.Bytes, certName certN
 	if err != nil {
 		return nil, err
 	}
-	keyBytes, err := getCertificateKeyBytes(ctx, c, certName, keyType)
-	log.DebugError(logger, err, "Get certificate key from cache")
+
+	keyBytes, err := getCertificateKeyBytes(ctx, c, cd)
+	logLevel = zapcore.ErrorLevel
+	if err == nil || err == cache.ErrCacheMiss {
+		logLevel = zapcore.DebugLevel
+	}
+	log.LevelParam(logger, logLevel, "Get certificate key from cache")
 	if err != nil {
 		return nil, err
 	}
@@ -753,7 +768,7 @@ func loadCertificateFromCache(ctx context.Context, c cache.Bytes, certName certN
 			return nil, err
 		}
 	}
-	locked, err := isCertLocked(ctx, c, certName)
+	locked, err := isCertLocked(ctx, c, cd)
 	log.DebugError(logger, err, "Check if certificate locked")
 	if err != nil {
 		// logical error, may be system failure
@@ -762,13 +777,13 @@ func loadCertificateFromCache(ctx context.Context, c cache.Bytes, certName certN
 	return validCertTLS(&cert2, nil, locked, time.Now())
 }
 
-func getCertificateKeyBytes(ctx context.Context, cache cache.Bytes, certName certNameType, keyType keyType) ([]byte, error) {
-	keyKeyName := string(certName) + "." + string(keyType) + ".key"
+func getCertificateKeyBytes(ctx context.Context, cache cache.Bytes, cd CertDescription) ([]byte, error) {
+	keyKeyName := cd.KeyStoreName()
 	return cache.Get(ctx, keyKeyName)
 }
 
-func getCertificateKey(ctx context.Context, cache cache.Bytes, certName certNameType, keyType keyType) (crypto.Signer, error) {
-	certBytes, err := getCertificateKeyBytes(ctx, cache, certName, keyType)
+func getCertificateKey(ctx context.Context, cache cache.Bytes, cd CertDescription) (crypto.Signer, error) {
+	certBytes, err := getCertificateKeyBytes(ctx, cache, cd)
 	if err != nil {
 		return nil, err
 	}
@@ -843,8 +858,8 @@ func handlePanic(logger *zap.Logger) {
 	}
 }
 
-func isCertLocked(ctx context.Context, storage cache.Bytes, certName certNameType) (bool, error) {
-	lockName := certName.String() + ".lock"
+func isCertLocked(ctx context.Context, storage cache.Bytes, certName CertDescription) (bool, error) {
+	lockName := certName.LockName()
 
 	_, err := storage.Get(ctx, lockName)
 	switch err {
@@ -855,4 +870,52 @@ func isCertLocked(ctx context.Context, storage cache.Bytes, certName certNameTyp
 	default:
 		return false, err
 	}
+}
+
+// copy from golang.org/x/crypto/acme/autocert/autocert.go
+// https://github.com/golang/crypto/blob/87dc89f01550277dc22b74ffcf4cd89fa2f40f4c/acme/autocert/autocert.go#L322
+func supportsECDSA(hello *tls.ClientHelloInfo) bool {
+	// The "signature_algorithms" extension, if present, limits the key exchange
+	// algorithms allowed by the cipher suites. See RFC 5246, section 7.4.1.4.1.
+	if hello.SignatureSchemes != nil {
+		ecdsaOK := false
+	schemeLoop:
+		for _, scheme := range hello.SignatureSchemes {
+			const tlsECDSAWithSHA1 tls.SignatureScheme = 0x0203 // constant added in Go 1.10
+			switch scheme {
+			case tlsECDSAWithSHA1, tls.ECDSAWithP256AndSHA256,
+				tls.ECDSAWithP384AndSHA384, tls.ECDSAWithP521AndSHA512:
+				ecdsaOK = true
+				break schemeLoop
+			}
+		}
+		if !ecdsaOK {
+			return false
+		}
+	}
+	if hello.SupportedCurves != nil {
+		ecdsaOK := false
+		for _, curve := range hello.SupportedCurves {
+			if curve == tls.CurveP256 {
+				ecdsaOK = true
+				break
+			}
+		}
+		if !ecdsaOK {
+			return false
+		}
+	}
+	for _, suite := range hello.CipherSuites {
+		switch suite {
+		case tls.TLS_ECDHE_ECDSA_WITH_RC4_128_SHA,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305:
+			return true
+		}
+	}
+	return false
 }

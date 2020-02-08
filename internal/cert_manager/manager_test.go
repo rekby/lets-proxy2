@@ -82,23 +82,23 @@ func TestGetKeyType(t *testing.T) {
 	cert := &tls.Certificate{
 		PrivateKey: &rsa.PrivateKey{},
 	}
-	td.CmpDeeply(getKeyType(cert), keyRSA)
+	td.CmpDeeply(getKeyType(cert), KeyRSA)
 
 	cert = &tls.Certificate{
 		PrivateKey: &ecdsa.PrivateKey{},
 	}
-	td.CmpDeeply(getKeyType(cert), keyECDSA)
+	td.CmpDeeply(getKeyType(cert), KeyECDSA)
 
 	cert = &tls.Certificate{
 		PrivateKey: "string - no key",
 	}
-	td.CmpDeeply(getKeyType(cert), keyUnknown)
+	td.CmpPanic(func() {
+		getKeyType(cert)
+	}, "unexexpected key type: .string")
 
-	cert = &tls.Certificate{}
-	td.CmpDeeply(getKeyType(cert), keyUnknown)
-
-	cert = nil
-	td.CmpDeeply(getKeyType(cert), keyUnknown)
+	td.CmpPanic(func() {
+		getKeyType(nil)
+	}, "cert is nil")
 }
 
 func TestStoreCertificate(t *testing.T) {
@@ -123,7 +123,7 @@ func TestStoreCertificate(t *testing.T) {
 	})
 	cacheMock.GetMock.Return(nil, cache.ErrCacheMiss)
 
-	storeCertificate(ctx, cacheMock, "asd", cert)
+	storeCertificate(ctx, cacheMock, CertDescription{MainDomain: "asd", KeyType: KeyRSA}, cert)
 }
 
 func TestIsNeedRenew(t *testing.T) {
