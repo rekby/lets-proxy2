@@ -175,8 +175,12 @@ func getBindedIPAddress(ctx context.Context, interfacesAddr InterfacesAddrFunc) 
 	var parsed = make([]net.IP, 0, len(binded))
 
 	for _, addr := range binded {
-		ip, _, err := net.ParseCIDR(addr.String())
-		log.DebugDPanic(logger, err, "Parse ip from interface", zap.Any("ip", ip),
+		addrS := addr.String()
+		if addrS == "<nil>" {
+			continue
+		}
+		ip, _, err := net.ParseCIDR(addrS)
+		log.DebugDPanic(logger, err, "Parse ip from interface", zap.String("addr", addrS), zap.Any("ip", ip),
 			zap.Stringer("original_ip", addr))
 		if ip == nil {
 			continue

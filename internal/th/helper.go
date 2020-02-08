@@ -9,7 +9,7 @@ import (
 )
 
 func TestContext() (ctx context.Context, flush func()) {
-	ctx, cancel := context.WithCancel(zc.WithLogger(context.Background(), zap.NewNop()))
+	ctx, cancel := context.WithCancel(zc.WithLogger(context.Background(), zap.NewNop().WithOptions(zap.Development())))
 	flush = func() {
 		cancel()
 	}

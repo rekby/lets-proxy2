@@ -292,12 +292,12 @@ func TestIPList_DoubleStart(t *testing.T) {
 	s.StartAutoRenew()
 
 	td.CmpPanic(func() {
-		s.ctx = zc.WithLogger(ctx, zap.NewNop().WithOptions(zap.Development()))
+		s.ctx = zc.WithLogger(ctx, zap.NewNop().WithOptions(zap.Development())) // force panic on dpanic
 		s.StartAutoRenew()
 	}, testdeep.NotNil())
 
 	td.CmpNotPanic(func() {
-		s.ctx = ctx
+		s.ctx = zc.WithLogger(ctx, zap.NewNop()) // force no panic on dpanic
 		s.StartAutoRenew()
 	})
 }
