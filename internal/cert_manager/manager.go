@@ -290,7 +290,7 @@ func (m *Manager) certStateGet(ctx context.Context, cd CertDescription) *certSta
 	if err == cache.ErrCacheMiss {
 		err = nil
 	}
-	log.DebugFatalCtx(ctx, err, "Got cert state from cache")
+	log.DebugFatalCtx(ctx, err, "Got cert state from cache", zap.Bool("is_emapty", resInterface == nil))
 	if resInterface == nil {
 		resInterface = &certState{}
 		err = m.certState.Put(ctx, cd.String(), resInterface)
@@ -736,8 +736,13 @@ func loadCertificateFromCache(ctx context.Context, c cache.Bytes, cd CertDescrip
 	if err != nil {
 		return nil, err
 	}
+
 	keyBytes, err := getCertificateKeyBytes(ctx, c, cd)
-	log.DebugError(logger, err, "Get certificate key from cache")
+	logLevel = zapcore.ErrorLevel
+	if err == nil || err == cache.ErrCacheMiss {
+		logLevel = zapcore.DebugLevel
+	}
+	log.LevelParam(logger, logLevel, "Get certificate key from cache")
 	if err != nil {
 		return nil, err
 	}

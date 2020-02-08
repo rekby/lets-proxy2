@@ -6,8 +6,6 @@ import (
 	"crypto/x509"
 	"fmt"
 
-	"github.com/rekby/lets-proxy2/internal/cache"
-
 	zc "github.com/rekby/zapcontext"
 	"go.uber.org/zap/zapcore"
 
@@ -51,7 +49,7 @@ func DebugWarning(logger *zap.Logger, err error, mess string, fields ...zap.Fiel
 
 func debugWarning(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
 	logger = logger.WithOptions(zap.AddCallerSkip(2))
-	if isNoError(err) {
+	if err == nil {
 		logger.Debug(mess, fields...)
 	} else {
 		logger.Warn(mess, append(fields, zap.Error(err))...)
@@ -73,7 +71,7 @@ func DebugDPanicCtx(ctx context.Context, err error, mess string, fields ...zap.F
 func debugDpanic(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
 	logger = logger.WithOptions(zap.AddCallerSkip(2))
 
-	if isNoError(err) {
+	if err == nil {
 		logger.Debug(mess, fields...)
 	} else {
 		logger.DPanic(mess, append(fields, zap.Error(err))...)
@@ -91,7 +89,7 @@ func DebugFatalCtx(ctx context.Context, err error, mess string, fields ...zap.Fi
 func debugFatal(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
 	logger = logger.WithOptions(zap.AddCallerSkip(2))
 
-	if isNoError(err) {
+	if err == nil {
 		logger.Debug(mess, fields...)
 	} else {
 		logger.Fatal(mess, append(fields, zap.Error(err))...)
@@ -121,7 +119,7 @@ func InfoFatalCtx(ctx context.Context, err error, mess string, fields ...zap.Fie
 
 func infoFatal(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
 	logger = logger.WithOptions(zap.AddCallerSkip(2))
-	if isNoError(err) {
+	if err == nil {
 		logger.Info(mess, fields...)
 	} else {
 		logger.Fatal(mess, append(fields, zap.Error(err))...)
@@ -146,7 +144,7 @@ func DebugErrorCtx(ctx context.Context, err error, mess string, fields ...zap.Fi
 
 func debugInfo(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
 	logger = logger.WithOptions(zap.AddCallerSkip(2))
-	if isNoError(err) {
+	if err == nil {
 		logger.Debug(mess, fields...)
 	} else {
 		logger.Info(mess, append(fields, zap.Error(err))...)
@@ -155,7 +153,7 @@ func debugInfo(logger *zap.Logger, err error, mess string, fields ...zap.Field) 
 
 func debugError(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
 	logger = logger.WithOptions(zap.AddCallerSkip(2))
-	if isNoError(err) {
+	if err == nil {
 		logger.Debug(mess, fields...)
 	} else {
 		logger.Error(mess, append(fields, zap.Error(err))...)
@@ -164,7 +162,7 @@ func debugError(logger *zap.Logger, err error, mess string, fields ...zap.Field)
 
 func infoError(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
 	logger = logger.WithOptions(zap.AddCallerSkip(2))
-	if isNoError(err) {
+	if err == nil {
 		logger.Info(mess, fields...)
 	} else {
 		logger.Error(mess, append(fields, zap.Error(err))...)
@@ -173,7 +171,7 @@ func infoError(logger *zap.Logger, err error, mess string, fields ...zap.Field) 
 
 func infoDPanic(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
 	logger = logger.WithOptions(zap.AddCallerSkip(2))
-	if isNoError(err) {
+	if err == nil {
 		logger.Info(mess, fields...)
 	} else {
 		logger.DPanic(mess, append(fields, zap.Error(err))...)
@@ -182,7 +180,7 @@ func infoDPanic(logger *zap.Logger, err error, mess string, fields ...zap.Field)
 
 func infoPanic(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
 	logger = logger.WithOptions(zap.AddCallerSkip(2))
-	if isNoError(err) {
+	if err == nil {
 		logger.Info(mess, fields...)
 	} else {
 		logger.Panic(mess, append(fields, zap.Error(err))...)
@@ -192,16 +190,5 @@ func infoPanic(logger *zap.Logger, err error, mess string, fields ...zap.Field) 
 func LevelParam(logger *zap.Logger, level zapcore.Level, mess string, fields ...zap.Field) {
 	if ce := logger.Check(level, mess); ce != nil {
 		ce.Write(fields...)
-	}
-}
-
-func isNoError(err error) bool {
-	switch err {
-	case nil:
-		return true
-	case cache.ErrCacheMiss:
-		return true
-	default:
-		return false
 	}
 }
