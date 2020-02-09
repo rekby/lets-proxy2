@@ -151,9 +151,21 @@ func (m *Manager) getCertificate(ctx context.Context, needDomain DomainName, cer
 
 	now := time.Now()
 
+	var locked = false
+	var lockedChecked = false
+
 	defer func() {
 		if isNeedRenew(resultCert, now) {
-			go m.renewCertInBackground(ctx, needDomain, certDescription)
+			if !lockedChecked {
+				locked, err = isCertLocked(ctx, m.Cache, certDescription)
+				log.DebugError(logger, err, "Check locked before renew", zap.Bool("locked", locked))
+				if err != nil {
+					return
+				}
+			}
+			if !locked {
+				go m.renewCertInBackground(ctx, needDomain, certDescription)
+			}
 		}
 	}()
 
@@ -176,7 +188,8 @@ func (m *Manager) getCertificate(ctx context.Context, needDomain DomainName, cer
 		log.LevelParam(logger, logLevel, "Can't get certificate from local state", zap.Error(err))
 	}
 
-	locked, err := isCertLocked(ctx, m.Cache, certDescription)
+	locked, err = isCertLocked(ctx, m.Cache, certDescription)
+	lockedChecked = true
 	log.DebugDPanic(logger, err, "Check if certificate locked", zap.Bool("locked", locked))
 	if err != nil {
 		return nil, errHaveNoCert
