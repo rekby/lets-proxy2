@@ -41,9 +41,6 @@ const domainKeyRSALength = 2048
 
 var errHaveNoCert = errors.New("have no certificate for domain") // may return for any internal error
 
-//nolint:varcheck,deadcode,unused
-var errNotImplementedError = errors.New("not implemented yet")
-
 type GetContext interface {
 	GetContext() context.Context
 }
@@ -109,7 +106,6 @@ func New(client AcmeClient, c cache.Bytes) *Manager {
 }
 
 // GetCertificate implements the tls.Config.GetCertificate hook.
-// nolint:funlen
 func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Certificate, err error) {
 	ctx := hello.Conn.(GetContext).GetContext()
 
@@ -122,18 +118,31 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 	}
 
 	logger = logger.With(logDomain(needDomain))
-
+	ctx = zc.WithLogger(ctx, logger)
 	defer handlePanic(logger)
 
 	logger.Info("Get certificate", zap.String("original_domain", hello.ServerName))
 	if isTLSALPN01Hello(hello) {
-		return m.handleTLSALPN(logger, ctx, needDomain)
+		return m.handleTLSALPN(ctx, needDomain)
 	}
 
 	certType := KeyRSA
 	if supportsECDSA(hello) {
 		certType = KeyECDSA
 	}
+	cert, err := m.getCertificate(ctx, needDomain, certType)
+	log.DebugInfo(logger, err, "Got certificate", log.Cert(cert))
+	if err == nil || certType == KeyRSA {
+		return cert, err
+	}
+
+	logger.Info("ECDSA certificate was failed, try to get RSA certificate")
+	ctx = zc.WithLogger(ctx, logger.With(zap.String("retry_type", "rsa")))
+	return m.getCertificate(ctx, needDomain, KeyRSA)
+}
+
+func (m *Manager) getCertificate(ctx context.Context, needDomain DomainName, certType KeyType) (resultCert *tls.Certificate, err error) {
+	logger := zc.L(ctx)
 
 	certDescription := CertDescriptionFromDomain(needDomain, certType)
 
@@ -228,7 +237,8 @@ func (m *Manager) issueNewCert(ctx context.Context, needDomain DomainName, cd Ce
 	return nil, errHaveNoCert
 }
 
-func (m *Manager) handleTLSALPN(logger *zap.Logger, ctx context.Context, needDomain DomainName) (*tls.Certificate, error) {
+func (m *Manager) handleTLSALPN(ctx context.Context, needDomain DomainName) (*tls.Certificate, error) {
+	logger := zc.L(ctx)
 	logger.Debug("It is tls-alpn-01 token request.")
 	certInterface, err := m.certForDomainAuthorize.Get(ctx, needDomain.String())
 	logger.Debug("Got authcert from cache", zap.Error(err))
@@ -732,9 +742,9 @@ func loadCertificateFromCache(ctx context.Context, c cache.Bytes, cd CertDescrip
 		logger.Debug("Checked certificate in cache", log.Cert(cert), zap.Error(err))
 	}()
 
-	certKeyName := cd.KeyStoreName()
+	certCerName := cd.CertStoreName()
 
-	certBytes, err := c.Get(ctx, certKeyName)
+	certBytes, err := c.Get(ctx, certCerName)
 	logLevel := zapcore.ErrorLevel
 	if err == nil || err == cache.ErrCacheMiss {
 		logLevel = zapcore.DebugLevel

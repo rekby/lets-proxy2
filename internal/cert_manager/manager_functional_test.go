@@ -3,7 +3,13 @@ package cert_manager
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
 	"net"
 	"net/http"
 	"strings"
@@ -19,6 +25,8 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/crypto/acme"
 )
+
+const forceRsaDomain = "force-rsa.ru"
 
 func TestManager_GetCertificateHttp01(t *testing.T) {
 	ctx, flush := th.TestContext()
@@ -124,13 +132,45 @@ func TestManager_GetCertificateTls(t *testing.T) {
 	getCertificatesTests(t, manager, ctx, logger)
 }
 
+func fastCreateTestCert(domains []string, now time.Time) (certBytes, keyBytes []byte) {
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(123),
+		Subject:      pkix.Name{CommonName: domains[0]},
+		NotBefore:    now.Add(-time.Hour),
+		NotAfter:     now.Add(time.Hour),
+		DNSNames:     domains,
+	}
+	priv, err := rsa.GenerateKey(rand.Reader, 512)
+	if err != nil {
+		panic(err)
+	}
+	der, err := x509.CreateCertificate(rand.Reader, &template, &template, priv.Public(), priv)
+	if err != nil {
+		panic(err)
+	}
+
+	certBytes = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})
+	keyBytes = pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
+	return certBytes, keyBytes
+}
+
 func newCacheMock(t minimock.Tester) *BytesMock {
 	cacheMock := NewBytesMock(t)
+	forceRSACert, forceRSAKey := fastCreateTestCert([]string{"force-rsa.ru", "www.force-rsa.ru"}, time.Now())
 	cacheMock.GetMock.Set(func(ctx context.Context, key string) (ba1 []byte, err error) {
 		zc.L(ctx).Debug("Cache mock get", zap.String("key", key))
 
-		if key == "locked.ru.lock" {
+		switch key {
+		case "locked.ru.lock":
 			return []byte{}, nil
+
+		// force-rsa locked cert
+		case forceRsaDomain + ".lock":
+			return []byte{}, nil
+		case forceRsaDomain + ".rsa.cer":
+			return forceRSACert, nil
+		case forceRsaDomain + ".rsa.key":
+			return forceRSAKey, nil
 		}
 
 		return nil, cache.ErrCacheMiss
@@ -153,15 +193,15 @@ func getCertificatesTests(t *testing.T, manager *Manager, ctx context.Context, l
 
 func getCertificatesTestsKeyType(t *testing.T, manager *Manager, keyType KeyType, ctx context.Context, logger *zap.Logger) {
 	t.Run("OneCert", func(t *testing.T) {
-		checkOkDomain(ctx, t, manager, keyType, "onecert.ru")
+		checkOkDomain(ctx, t, manager, keyType, keyType, "onecert.ru")
 	})
 
 	t.Run("punycode-domain", func(t *testing.T) {
-		checkOkDomain(ctx, t, manager, keyType, "xn--80adjurfhd.xn--p1ai") // проверка.рф
+		checkOkDomain(ctx, t, manager, keyType, keyType, "xn--80adjurfhd.xn--p1ai") // проверка.рф
 	})
 
 	t.Run("OneCertCamelCase", func(t *testing.T) {
-		checkOkDomain(ctx, t, manager, keyType, "onecertCamelCase.ru")
+		checkOkDomain(ctx, t, manager, keyType, keyType, "onecertCamelCase.ru")
 	})
 
 	t.Run("Locked", func(t *testing.T) {
@@ -250,6 +290,10 @@ func getCertificatesTestsKeyType(t *testing.T, manager *Manager, keyType KeyType
 			t.Errorf("Bad expire time: %v", cert.Leaf.NotAfter)
 		}
 	})
+
+	t.Run("Force-rsa", func(t *testing.T) {
+		checkOkDomain(ctx, t, manager, keyType, KeyRSA, forceRsaDomain)
+	})
 }
 
 func createTlsHello(ctx context.Context, keyType KeyType, domain string) *tls.ClientHelloInfo {
@@ -272,13 +316,13 @@ func createTlsHello(ctx context.Context, keyType KeyType, domain string) *tls.Cl
 	}
 }
 
-func checkOkDomain(ctx context.Context, t *testing.T, manager *Manager, keyType KeyType, domain string) {
-	cert, err := manager.GetCertificate(createTlsHello(ctx, keyType, domain))
+func checkOkDomain(ctx context.Context, t *testing.T, manager *Manager, keyTypeHello KeyType, keyTypeCert KeyType, domain string) {
+	cert, err := manager.GetCertificate(createTlsHello(ctx, keyTypeHello, domain))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if getKeyType(cert) != keyType {
-		t.Errorf("Bad certificate key type")
+	if getKeyType(cert) != keyTypeCert {
+		t.Errorf("Bad certificate key type. Expected: '%v', got: '%v'", keyTypeCert, getKeyType(cert))
 	}
 
 	certDomain := strings.TrimPrefix(strings.ToLower(domain), "www.")
