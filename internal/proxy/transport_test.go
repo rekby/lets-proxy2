@@ -19,7 +19,7 @@ func TestTransport_GetTransport(t *testing.T) {
 	r, _ := http.NewRequest(http.MethodGet, "http://www.ru", nil)
 	r = r.WithContext(ctx)
 	httpTransport := tr.getTransport(r)
-	td.True(httpTransport == defaultHttpTransport) // equal pointers
+	td.True(httpTransport == defaultHTTPTransport) // equal pointers
 
 	tr = Transport{IgnoreHTTPSCertificate: false}
 	r, _ = http.NewRequest(http.MethodGet, "https://www.ru", nil)

@@ -145,7 +145,7 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 	return m.getCertificate(ctx, needDomain, KeyRSA)
 }
 
-//nolint:funlen
+//nolint:funlen,gocognit
 func (m *Manager) getCertificate(ctx context.Context, needDomain DomainName, certType KeyType) (resultCert *tls.Certificate, err error) {
 	certDescription := CertDescriptionFromDomain(needDomain, certType)
 

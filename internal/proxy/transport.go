@@ -12,7 +12,7 @@ import (
 	zc "github.com/rekby/zapcontext"
 )
 
-var defaultHttpTransport = defaultTransport()
+var defaultHTTPTransport = defaultTransport()
 
 type Transport struct {
 	IgnoreHTTPSCertificate bool
@@ -27,7 +27,7 @@ func (t Transport) getTransport(req *http.Request) *http.Transport {
 
 	if req.URL.Scheme == ProtocolHTTP {
 		logger.Debug("Use default http transport")
-		return defaultHttpTransport
+		return defaultHTTPTransport
 	}
 
 	host := req.Host
