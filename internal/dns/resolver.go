@@ -16,6 +16,8 @@ import (
 	mdns "github.com/miekg/dns"
 )
 
+const maxDNSRecursion = 10
+
 var (
 	errTruncatedResponse = errors.New("truncated answer")
 	errPanic             = errors.New("panic")
@@ -41,7 +43,7 @@ func NewResolver(dnsServer string) *Resolver {
 		udp:                 &mdns.Client{Net: "udp"},
 		tcp:                 &mdns.Client{Net: "tcp"},
 		server:              dnsServer,
-		maxDNSRecursionDeep: 10,
+		maxDNSRecursionDeep: maxDNSRecursion,
 		lookupWithClient:    lookupWithClient,
 	}
 }

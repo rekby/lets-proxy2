@@ -21,6 +21,7 @@ import (
 )
 
 const rsaKeyLength = 2048
+const renewAccountInterval = time.Hour * 24
 
 type AcmeManager struct {
 	IgnoreCacheLoad      bool
@@ -41,7 +42,7 @@ func New(ctx context.Context, cache cache.Bytes) *AcmeManager {
 		ctx:                  ctx,
 		cache:                cache,
 		AgreeFunction:        acme.AcceptTOS,
-		RenewAccountInterval: time.Hour * 24,
+		RenewAccountInterval: renewAccountInterval,
 	}
 }
 

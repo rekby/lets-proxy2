@@ -14,6 +14,8 @@ import (
 
 type certLogger x509.Certificate
 
+const addSkipCallers = 2
+
 func (c *certLogger) String() string {
 	cert := (*x509.Certificate)(c)
 	if cert == nil {
@@ -48,7 +50,7 @@ func DebugWarning(logger *zap.Logger, err error, mess string, fields ...zap.Fiel
 }
 
 func debugWarning(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
-	logger = logger.WithOptions(zap.AddCallerSkip(2))
+	logger = logger.WithOptions(zap.AddCallerSkip(addSkipCallers))
 	if err == nil {
 		logger.Debug(mess, fields...)
 	} else {
@@ -69,7 +71,7 @@ func DebugDPanicCtx(ctx context.Context, err error, mess string, fields ...zap.F
 }
 
 func debugDpanic(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
-	logger = logger.WithOptions(zap.AddCallerSkip(2))
+	logger = logger.WithOptions(zap.AddCallerSkip(addSkipCallers))
 
 	if err == nil {
 		logger.Debug(mess, fields...)
@@ -87,7 +89,7 @@ func DebugFatalCtx(ctx context.Context, err error, mess string, fields ...zap.Fi
 }
 
 func debugFatal(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
-	logger = logger.WithOptions(zap.AddCallerSkip(2))
+	logger = logger.WithOptions(zap.AddCallerSkip(addSkipCallers))
 
 	if err == nil {
 		logger.Debug(mess, fields...)
@@ -118,7 +120,7 @@ func InfoFatalCtx(ctx context.Context, err error, mess string, fields ...zap.Fie
 }
 
 func infoFatal(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
-	logger = logger.WithOptions(zap.AddCallerSkip(2))
+	logger = logger.WithOptions(zap.AddCallerSkip(addSkipCallers))
 	if err == nil {
 		logger.Info(mess, fields...)
 	} else {
@@ -143,7 +145,7 @@ func DebugErrorCtx(ctx context.Context, err error, mess string, fields ...zap.Fi
 }
 
 func debugInfo(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
-	logger = logger.WithOptions(zap.AddCallerSkip(2))
+	logger = logger.WithOptions(zap.AddCallerSkip(addSkipCallers))
 	if err == nil {
 		logger.Debug(mess, fields...)
 	} else {
@@ -152,7 +154,7 @@ func debugInfo(logger *zap.Logger, err error, mess string, fields ...zap.Field) 
 }
 
 func debugError(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
-	logger = logger.WithOptions(zap.AddCallerSkip(2))
+	logger = logger.WithOptions(zap.AddCallerSkip(addSkipCallers))
 	if err == nil {
 		logger.Debug(mess, fields...)
 	} else {
@@ -161,7 +163,7 @@ func debugError(logger *zap.Logger, err error, mess string, fields ...zap.Field)
 }
 
 func infoError(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
-	logger = logger.WithOptions(zap.AddCallerSkip(2))
+	logger = logger.WithOptions(zap.AddCallerSkip(addSkipCallers))
 	if err == nil {
 		logger.Info(mess, fields...)
 	} else {
@@ -170,7 +172,7 @@ func infoError(logger *zap.Logger, err error, mess string, fields ...zap.Field) 
 }
 
 func infoDPanic(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
-	logger = logger.WithOptions(zap.AddCallerSkip(2))
+	logger = logger.WithOptions(zap.AddCallerSkip(addSkipCallers))
 	if err == nil {
 		logger.Info(mess, fields...)
 	} else {
@@ -179,7 +181,7 @@ func infoDPanic(logger *zap.Logger, err error, mess string, fields ...zap.Field)
 }
 
 func infoPanic(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
-	logger = logger.WithOptions(zap.AddCallerSkip(2))
+	logger = logger.WithOptions(zap.AddCallerSkip(addSkipCallers))
 	if err == nil {
 		logger.Info(mess, fields...)
 	} else {

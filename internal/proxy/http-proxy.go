@@ -36,11 +36,12 @@ type HTTPProxy struct {
 }
 
 func NewHTTPProxy(ctx context.Context, listener net.Listener) *HTTPProxy {
+	const defaultHTTPPort = 80
 	res := &HTTPProxy{
 		HandleHTTPValidation: func(_ http.ResponseWriter, _ *http.Request) bool {
 			return false
 		},
-		Director:   NewDirectorSameIP(80),
+		Director:   NewDirectorSameIP(defaultHTTPPort),
 		GetContext: getContext,
 		listener:   listener,
 		ctx:        ctx,

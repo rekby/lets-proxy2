@@ -21,6 +21,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/xerrors"
+
 	"github.com/rekby/lets-proxy2/internal/cache"
 	"go.uber.org/zap/zapcore"
 
@@ -38,11 +40,10 @@ const (
 )
 
 const domainKeyRSALength = 2048
+const renewBeforeExpire = time.Hour * 24 * 30
+const revokeAuthorizationTimeout = 5 * time.Minute
 
 var errHaveNoCert = errors.New("have no certificate for domain") // may return for any internal error
-
-//nolint:varcheck,deadcode,unused
-var errNotImplementedError = errors.New("not implemented yet")
 
 type GetContext interface {
 	GetContext() context.Context
@@ -109,7 +110,6 @@ func New(client AcmeClient, c cache.Bytes) *Manager {
 }
 
 // GetCertificate implements the tls.Config.GetCertificate hook.
-// nolint:funlen
 func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Certificate, err error) {
 	ctx := hello.Conn.(GetContext).GetContext()
 
@@ -122,29 +122,53 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 	}
 
 	logger = logger.With(logDomain(needDomain))
-
+	ctx = zc.WithLogger(ctx, logger)
 	defer handlePanic(logger)
 
 	logger.Info("Get certificate", zap.String("original_domain", hello.ServerName))
 	if isTLSALPN01Hello(hello) {
-		return m.handleTLSALPN(logger, ctx, needDomain)
+		return m.handleTLSALPN(ctx, needDomain)
 	}
 
 	certType := KeyRSA
 	if supportsECDSA(hello) {
 		certType = KeyECDSA
 	}
+	cert, err := m.getCertificate(ctx, needDomain, certType)
+	log.DebugInfo(logger, err, "Got certificate", log.Cert(cert))
+	if err == nil || certType == KeyRSA {
+		return cert, err
+	}
 
+	logger.Info("ECDSA certificate was failed, try to get RSA certificate")
+	ctx = zc.WithLogger(ctx, logger.With(zap.String("retry_type", "rsa")))
+	return m.getCertificate(ctx, needDomain, KeyRSA)
+}
+
+//nolint:funlen,gocognit
+func (m *Manager) getCertificate(ctx context.Context, needDomain DomainName, certType KeyType) (resultCert *tls.Certificate, err error) {
 	certDescription := CertDescriptionFromDomain(needDomain, certType)
 
-	logger = logger.With(certDescription.ZapField())
+	logger := zc.L(ctx).With(certDescription.ZapField())
 	ctx = zc.WithLogger(ctx, zc.L(ctx).With(certDescription.ZapField()))
 
 	now := time.Now()
 
+	var locked = false
+	var lockedChecked = false
+
 	defer func() {
 		if isNeedRenew(resultCert, now) {
-			go m.renewCertInBackground(ctx, needDomain, certDescription)
+			if !lockedChecked {
+				locked, err = isCertLocked(ctx, m.Cache, certDescription)
+				log.DebugError(logger, err, "Check locked before renew", zap.Bool("locked", locked))
+				if err != nil {
+					return
+				}
+			}
+			if !locked {
+				go m.renewCertInBackground(ctx, needDomain, certDescription)
+			}
 		}
 	}()
 
@@ -165,9 +189,13 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 			logLevel = zapcore.DebugLevel
 		}
 		log.LevelParam(logger, logLevel, "Can't get certificate from local state", zap.Error(err))
+		if logLevel == zapcore.ErrorLevel {
+			return nil, errHaveNoCert
+		}
 	}
 
-	locked, err := isCertLocked(ctx, m.Cache, certDescription)
+	locked, err = isCertLocked(ctx, m.Cache, certDescription)
+	lockedChecked = true
 	log.DebugDPanic(logger, err, "Check if certificate locked", zap.Bool("locked", locked))
 	if err != nil {
 		return nil, errHaveNoCert
@@ -228,7 +256,8 @@ func (m *Manager) issueNewCert(ctx context.Context, needDomain DomainName, cd Ce
 	return nil, errHaveNoCert
 }
 
-func (m *Manager) handleTLSALPN(logger *zap.Logger, ctx context.Context, needDomain DomainName) (*tls.Certificate, error) {
+func (m *Manager) handleTLSALPN(ctx context.Context, needDomain DomainName) (*tls.Certificate, error) {
+	logger := zc.L(ctx)
 	logger.Debug("It is tls-alpn-01 token request.")
 	certInterface, err := m.certForDomainAuthorize.Get(ctx, needDomain.String())
 	logger.Debug("Got authcert from cache", zap.Error(err))
@@ -342,7 +371,7 @@ func (m *Manager) supportedChallenges() []string {
 
 // createOrderForDomains similar to func (m *Manager) verifyRFC(ctx context.Context, client *acme.Client, domain string) (*acme.Order, error)
 // from acme/autocert
-//nolint:funlen
+//nolint:funlen,gocognit
 func (m *Manager) createOrderForDomains(ctx context.Context, domains ...DomainName) (*acme.Order, error) {
 	client := m.Client
 	logger := zc.L(ctx)
@@ -368,7 +397,7 @@ authorizeOrderLoop:
 			go func() {
 				revokeLogger := logger.Named("background_auth_revoker")
 
-				revokeCtx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
+				revokeCtx, cancel := context.WithTimeout(context.Background(), revokeAuthorizationTimeout)
 				defer cancel()
 
 				revokeCtx = zc.WithLogger(revokeCtx, revokeLogger)
@@ -631,6 +660,7 @@ func storeCertificate(ctx context.Context, cache cache.Bytes, cd CertDescription
 	log.DebugError(logger, err, "Check if cert locked", zap.Bool("key_locked", locked))
 	if locked {
 		logger.DPanic("Logical error - try to save to locked certificate")
+		return xerrors.New("Try save to locked certificate")
 	}
 
 	var keyType = getKeyType(cert)
@@ -638,45 +668,30 @@ func storeCertificate(ctx context.Context, cache cache.Bytes, cd CertDescription
 	var certBuf bytes.Buffer
 
 	for _, block := range cert.Certificate {
-		pemBlock := pem.Block{Type: "CERTIFICATE", Bytes: block}
-		err := pem.Encode(&certBuf, &pemBlock)
+		err := pem.Encode(&certBuf, &pem.Block{Type: "CERTIFICATE", Bytes: block})
 		if err != nil {
 			logger.DPanic("Can't encode pem block of certificate", zap.Error(err), zap.Binary("block", block))
 			return err
 		}
 	}
 
-	var privateKeyBuf bytes.Buffer
+	var privateKeyBytes []byte
 
 	switch keyType {
 	case KeyRSA:
 		privateKey := cert.PrivateKey.(*rsa.PrivateKey)
 		keyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
-		pemBlock := pem.Block{Type: "RSA PRIVATE KEY", Bytes: keyBytes}
-		err := pem.Encode(&privateKeyBuf, &pemBlock)
-		if err != nil {
-			logger.DPanic("Can't marshal rsa private key", zap.Error(err))
-			return err
-		}
+		privateKeyBytes = pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: keyBytes})
 	case KeyECDSA:
 		privateKey := cert.PrivateKey.(*ecdsa.PrivateKey)
 		keyBytes, err := x509.MarshalECPrivateKey(privateKey)
 		if err != nil {
 			return err
 		}
-		pemBlock := pem.Block{Type: "EC PRIVATE KEY", Bytes: keyBytes}
-		err = pem.Encode(&privateKeyBuf, &pemBlock)
-		if err != nil {
-			logger.DPanic("Can't marshal ecdsa private key", zap.Error(err))
-			return err
-		}
+		privateKeyBytes = pem.EncodeToMemory(&pem.Block{Type: "EC PRIVATE KEY", Bytes: keyBytes})
 	default:
 		logger.DPanic("Unknow private key type", zap.String("type", reflect.TypeOf(cert.PrivateKey).String()))
 		return errors.New("unknow private key type")
-	}
-
-	if keyType == "" {
-		logger.DPanic("store cert key type doesn't init")
 	}
 
 	certKeyName := cd.CertStoreName()
@@ -688,7 +703,7 @@ func storeCertificate(ctx context.Context, cache cache.Bytes, cd CertDescription
 		return err
 	}
 
-	err = cache.Put(ctx, keyKeyName, privateKeyBuf.Bytes())
+	err = cache.Put(ctx, keyKeyName, privateKeyBytes)
 	zc.InfoError(logger, err, "Store key file", zap.String("key_key", keyKeyName))
 	if err != nil {
 		_ = cache.Delete(ctx, certKeyName)
@@ -732,9 +747,9 @@ func loadCertificateFromCache(ctx context.Context, c cache.Bytes, cd CertDescrip
 		logger.Debug("Checked certificate in cache", log.Cert(cert), zap.Error(err))
 	}()
 
-	certKeyName := cd.KeyStoreName()
+	certCerName := cd.CertStoreName()
 
-	certBytes, err := c.Get(ctx, certKeyName)
+	certBytes, err := c.Get(ctx, certCerName)
 	logLevel := zapcore.ErrorLevel
 	if err == nil || err == cache.ErrCacheMiss {
 		logLevel = zapcore.DebugLevel
@@ -847,7 +862,7 @@ func isNeedRenew(cert *tls.Certificate, now time.Time) bool {
 	if cert == nil || cert.Leaf == nil {
 		return false
 	}
-	return cert.Leaf.NotAfter.Add(-time.Hour * 24 * 30).Before(now)
+	return cert.Leaf.NotAfter.Add(-renewBeforeExpire).Before(now)
 }
 
 // must called as defer handlepanic(logger)
