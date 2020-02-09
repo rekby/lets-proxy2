@@ -1,5 +1,5 @@
 service:
-  golangci-lint-version: 1.20.0
+  golangci-lint-version: 1.23.3
 run:
   deadline: 5m
   issues-exit-code: 1
@@ -26,8 +26,10 @@ issues:
         - dupl
         - gosec
         - funlen
+        - gomnd
     - linters:
         - stylecheck
+        - golint
       source: "package (acme_client_manager|cert_manager|domain_checker)"
 
 linters:
@@ -35,4 +37,5 @@ linters:
   disable:
     - gochecknoglobals
     - wsl
+    - gomnd
 

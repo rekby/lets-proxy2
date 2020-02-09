@@ -12,6 +12,7 @@ import (
 )
 
 const defaultMemoryLimitSize = 1000
+const defaultLRUCleanCount = 300
 
 type memoryValueLRUItem struct {
 	key   string
@@ -37,7 +38,7 @@ func NewMemoryValueLRU(name string) *MemoryValueLRU {
 		Name:       name,
 		m:          make(map[string]*memoryValueLRUItem, defaultMemoryLimitSize+1),
 		MaxSize:    defaultMemoryLimitSize,
-		CleanCount: 300,
+		CleanCount: defaultLRUCleanCount,
 	}
 }
 
@@ -101,7 +102,7 @@ func (c *MemoryValueLRU) renumberTime() {
 
 	items := c.getSortedItems()
 	for i, item := range items {
-		item.lastUsedTime = uint64(i) + 1
+		item.lastUsedTime = uint64(i)
 	}
 
 	c.mu.Unlock()

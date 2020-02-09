@@ -19,21 +19,21 @@ func TestTransport_GetTransport(t *testing.T) {
 	r, _ := http.NewRequest(http.MethodGet, "http://www.ru", nil)
 	r = r.WithContext(ctx)
 	httpTransport := tr.getTransport(r)
-	td.True(httpTransport == defaultTransport) // equal pointers
+	td.True(httpTransport == defaultHttpTransport) // equal pointers
 
-	tr = Transport{IgnoreHttpsCertificate: false}
+	tr = Transport{IgnoreHTTPSCertificate: false}
 	r, _ = http.NewRequest(http.MethodGet, "https://www.ru", nil)
 	r = r.WithContext(ctx)
 	httpTransport = tr.getTransport(r)
-	td.True(httpTransport != defaultTransport) // different pointers
+	td.True(httpTransport != defaultTransport()) // different pointers
 	td.Cmp(httpTransport.TLSClientConfig.ServerName, "www.ru")
 	td.Cmp(httpTransport.TLSClientConfig.InsecureSkipVerify, false)
 
-	tr = Transport{IgnoreHttpsCertificate: true}
+	tr = Transport{IgnoreHTTPSCertificate: true}
 	r, _ = http.NewRequest(http.MethodGet, "https://www.ru", nil)
 	r = r.WithContext(ctx)
 	httpTransport = tr.getTransport(r)
-	td.True(httpTransport != defaultTransport) // different pointers
+	td.True(httpTransport != defaultTransport()) // different pointers
 	td.Cmp(httpTransport.TLSClientConfig.ServerName, "www.ru")
 	td.Cmp(httpTransport.TLSClientConfig.InsecureSkipVerify, true)
 }

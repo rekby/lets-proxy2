@@ -207,7 +207,7 @@ func getCertificatesTestsKeyType(t *testing.T, manager *Manager, keyType KeyType
 	t.Run("Locked", func(t *testing.T) {
 		domain := "locked.ru"
 
-		cert, err := manager.GetCertificate(createTlsHello(ctx, keyType, domain))
+		cert, err := manager.GetCertificate(createTLSHello(ctx, keyType, domain))
 		td.CmpError(t, err)
 		td.CmpNil(t, cert)
 	})
@@ -232,7 +232,7 @@ func getCertificatesTestsKeyType(t *testing.T, manager *Manager, keyType KeyType
 
 		for i := 0; i < cnt; i++ {
 			go func() {
-				cert, err := manager.GetCertificate(createTlsHello(ctx, keyType, domain))
+				cert, err := manager.GetCertificate(createTLSHello(ctx, keyType, domain))
 				if err != nil {
 					t.Error(err)
 				}
@@ -253,7 +253,7 @@ func getCertificatesTestsKeyType(t *testing.T, manager *Manager, keyType KeyType
 		const domain = "soon-expired.com"
 
 		// issue certificate
-		cert, err := manager.GetCertificate(createTlsHello(ctx, keyType, domain))
+		cert, err := manager.GetCertificate(createTLSHello(ctx, keyType, domain))
 		if err != nil {
 			t.Errorf("cant issue certificate: %v", err)
 			return
@@ -263,7 +263,7 @@ func getCertificatesTestsKeyType(t *testing.T, manager *Manager, keyType KeyType
 		cert.Leaf.NotAfter = newExpire
 
 		// get expired soon certificate and trigger reissue new
-		cert, err = manager.GetCertificate(createTlsHello(ctx, keyType, domain))
+		cert, err = manager.GetCertificate(createTLSHello(ctx, keyType, domain))
 		if err != nil {
 			t.Errorf("cant issue certificate: %v", err)
 			return
@@ -278,7 +278,7 @@ func getCertificatesTestsKeyType(t *testing.T, manager *Manager, keyType KeyType
 		time.Sleep(time.Second * 10)
 
 		// get renewed cert
-		cert, err = manager.GetCertificate(createTlsHello(ctx, keyType, domain))
+		cert, err = manager.GetCertificate(createTLSHello(ctx, keyType, domain))
 		if err != nil {
 			t.Errorf("cant issue certificate: %v", err)
 			return
@@ -296,7 +296,7 @@ func getCertificatesTestsKeyType(t *testing.T, manager *Manager, keyType KeyType
 	})
 }
 
-func createTlsHello(ctx context.Context, keyType KeyType, domain string) *tls.ClientHelloInfo {
+func createTLSHello(ctx context.Context, keyType KeyType, domain string) *tls.ClientHelloInfo {
 	switch keyType {
 	case KeyRSA:
 		return &tls.ClientHelloInfo{
@@ -317,7 +317,7 @@ func createTlsHello(ctx context.Context, keyType KeyType, domain string) *tls.Cl
 }
 
 func checkOkDomain(ctx context.Context, t *testing.T, manager *Manager, keyTypeHello KeyType, keyTypeCert KeyType, domain string) {
-	cert, err := manager.GetCertificate(createTlsHello(ctx, keyTypeHello, domain))
+	cert, err := manager.GetCertificate(createTLSHello(ctx, keyTypeHello, domain))
 	if err != nil {
 		t.Fatal(err)
 	}
