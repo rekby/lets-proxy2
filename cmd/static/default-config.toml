@@ -130,12 +130,38 @@ TLSAddresses = [":443"]
 # Bind addresses without TLS secure (for HTTP reverse proxy and http-01 validation without redirect to https)
 TCPAddresses = []
 
+
+[Metrics]
+Enable = false
+
+# Bind addresses for get by https
+TLSAddresses = []
+
+# Bind addresses without TLS secure (for HTTP reverse proxy and http-01 validation without redirect to https)
+TCPAddresses = [ "[::]:41935" ]
+
+# IP networks for allow to get metrics.
+# Default - allow from all.
+# Example:
+# [ "1.2.3.4/32", "192.168.0.0/24", "::1/128" ]
+AllowedNetworks = []
+
+# Password for get metrics, add as get param ?password=...
+Password        = ""
+
+# Allow set password to empty string
+AllowEmptyPassword  = false
+
+
+
 [Profiler]
 Enable = false
 
 # IP networks for allow to use profiler.
-# Default - deny from all.
+# Default - allow from all.
 # Example:
 # [ "1.2.3.4/32", "192.168.0.0/24", "::1/128" ]
 AllowedNetworks = []
 BindAddress = "localhost:31344"
+Password        = ""
+AllowEmptyPassword  = false

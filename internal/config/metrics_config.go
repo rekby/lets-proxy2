@@ -1,4 +1,4 @@
-package metrics
+package config
 
 import (
 	"github.com/rekby/lets-proxy2/internal/secrethandler"

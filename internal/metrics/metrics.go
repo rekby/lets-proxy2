@@ -3,6 +3,7 @@ package metrics
 import (
 	"net"
 	"net/http"
+	"reflect"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -21,7 +22,7 @@ type Metrics struct {
 }
 
 type ProcessStartFunc func()
-type ProcessFinishFunc func(err)
+type ProcessFinishFunc func(error)
 
 type errorLoggger struct {
 	logger *zap.SugaredLogger
@@ -47,14 +48,14 @@ func New(logger *zap.Logger, gatherer prometheus.Gatherer) *Metrics {
 }
 
 func ToefCounters(r prometheus.Registerer, name, description string) (start ProcessStartFunc, finish ProcessFinishFunc) {
-	if r == nil {
+	if r == nil || reflect.ValueOf(r).IsNil() {
 		return func() {}, func(error) {}
 	}
 
 	total := prometheus.NewCounter(prometheus.CounterOpts{Name: name, Help: "Total count of " + description})
-	ok := prometheus.NewCounter(prometheus.CounterOpts{Name: name + "-ok", Help: "Ok count of " + description})
-	err := prometheus.NewCounter(prometheus.CounterOpts{Name: name + "-err", Help: "Err count of " + description})
-	inflight := prometheus.NewGauge(prometheus.GaugeOpts{Name: name + "-inflight", Help: "Err count of " + description})
+	ok := prometheus.NewCounter(prometheus.CounterOpts{Name: name + "_ok", Help: "Ok count of " + description})
+	err := prometheus.NewCounter(prometheus.CounterOpts{Name: name + "_err", Help: "Err count of " + description})
+	inflight := prometheus.NewGauge(prometheus.GaugeOpts{Name: name + "_inflight", Help: "Err count of " + description})
 
 	r.MustRegister(total, ok, err, inflight)
 

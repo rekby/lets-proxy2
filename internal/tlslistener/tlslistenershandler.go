@@ -66,11 +66,8 @@ func (p *ListenersHandler) Addr() net.Addr {
 	return dummyAddr{}
 }
 
-// Block until finish work (by context or start error)
-// It can stop by cancel context.
-// Now StartAutoRenew return immedantly after cancel context - without wait to finish background processes.
-// It can change in future.
 func (p *ListenersHandler) Start(ctx context.Context, r prometheus.Registerer) error {
+	p.connectionHandleStart, p.connectionHandleFinish = metrics.ToefCounters(r, "listener_conn", "listen connection")
 	p.logger = zc.L(ctx)
 	p.init()
 
@@ -167,10 +164,9 @@ func (p *ListenersHandler) registerConnection(conn net.Conn, tls bool) ContextCo
 	p.connectionHandleStart()
 
 	res := ContextConnextion{
-		Context:               ctxStruct.ctx,
-		Conn:                  conn,
-		okCloseCounter:        p.connectionsHandledOk,
-		finalizerCloseCounter: p.connectionsHandledErr,
+		Context:          ctxStruct.ctx,
+		Conn:             conn,
+		connCloseHandler: p.connectionHandleFinish,
 	}
 
 	res.CloseFunc = func() error {

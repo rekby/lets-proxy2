@@ -29,7 +29,7 @@ import (
 const forceRsaDomain = "force-rsa.ru"
 
 func TestManager_GetCertificateHttp01(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	logger := zc.L(ctx)
@@ -37,7 +37,7 @@ func TestManager_GetCertificateHttp01(t *testing.T) {
 	mc := minimock.NewController(t)
 	defer mc.Finish()
 
-	manager := New(createTestClient(t), newCacheMock(mc))
+	manager := New(createTestClient(t), newCacheMock(mc), nil)
 	manager.EnableTLSValidation = false
 	manager.EnableHTTPValidation = true
 
@@ -77,7 +77,7 @@ func TestManager_GetCertificateHttp01(t *testing.T) {
 }
 
 func TestManager_GetCertificateTls(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	logger := zc.L(ctx)
@@ -85,7 +85,7 @@ func TestManager_GetCertificateTls(t *testing.T) {
 	mc := minimock.NewController(t)
 	defer mc.Finish()
 
-	manager := New(createTestClient(t), newCacheMock(mc))
+	manager := New(createTestClient(t), newCacheMock(mc), nil)
 
 	lisneter, err := net.ListenTCP("tcp", &net.TCPAddr{Port: 5001})
 

@@ -622,8 +622,8 @@ func (m *Manager) fulfill(ctx context.Context, challenge *acme.Challenge, domain
 }
 
 func (m *Manager) initMetrics(r prometheus.Registerer) {
-	m.handleCertStart, m.handleCertFinish = metrics.ToefCounters(r, "handle-cert", "handled certificates")
-	m.certRequestStart, m.certRequestFinish = metrics.ToefCounters(r, "cert-request", "request certificates from lets-encrypt")
+	m.handleCertStart, m.handleCertFinish = metrics.ToefCounters(r, "handle_cert", "handled certificates")
+	m.certRequestStart, m.certRequestFinish = metrics.ToefCounters(r, "cert_request", "request certificates from lets-encrypt")
 }
 
 func (m *Manager) isHTTPValidationRequest(r *http.Request) bool {

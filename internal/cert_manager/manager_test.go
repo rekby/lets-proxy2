@@ -102,7 +102,7 @@ func TestGetKeyType(t *testing.T) {
 }
 
 func TestStoreCertificate(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	//nolint:gosec
@@ -183,7 +183,7 @@ func TestManager_CertForDenied(t *testing.T) {
 }
 
 func createManager(t *testing.T) (res testManagerContext, cancel func()) {
-	ctx, ctxCancel := th.TestContext()
+	ctx, ctxCancel := th.TestContext(t)
 	mc := minimock.NewController(t)
 
 	res.ctx = ctx
@@ -210,6 +210,7 @@ func createManager(t *testing.T) (res testManagerContext, cancel func()) {
 		certState:               res.certState,
 		httpTokens:              res.httpTokens,
 	}
+	res.manager.initMetrics(nil)
 	return res, func() {
 		mc.Finish()
 		ctxCancel()

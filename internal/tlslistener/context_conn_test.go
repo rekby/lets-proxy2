@@ -22,7 +22,7 @@ func TestContextConnextion_Close(t *testing.T) {
 	var connMock *ConnMock
 	var testErr error
 	td := testdeep.NewT(t)
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	testErr = errors.New("asd")

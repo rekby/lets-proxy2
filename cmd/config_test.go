@@ -30,7 +30,7 @@ func TestConfigEmbed(t *testing.T) {
 }
 
 func TestReadConfig(t *testing.T) {
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
 	td := testdeep.NewT(t)
@@ -63,7 +63,7 @@ StorageDir = "storage2"
 }
 
 func TestGetConfig(t *testing.T) {
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
 	testdeep.CmpNotNil(t, getConfig(ctx))

@@ -60,7 +60,7 @@ func TestParseTcpMapPair(t *testing.T) {
 }
 
 func TestConfig_getDefaultTargetDirector(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	td := testdeep.NewT(t)
@@ -112,7 +112,7 @@ func TestConfig_getDefaultTargetDirector(t *testing.T) {
 }
 
 func TestConfig_getHeadersDirector(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	td := testdeep.NewT(t)
@@ -154,7 +154,7 @@ func TestConfig_getHeadersDirector(t *testing.T) {
 }
 
 func TestConfig_getMapDirector(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	td := testdeep.NewT(t)
@@ -202,7 +202,7 @@ func TestConfig_getMapDirector(t *testing.T) {
 }
 
 func TestConfig_getSchemeDirector(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	td := testdeep.NewT(t)
@@ -226,7 +226,7 @@ func TestConfig_getSchemeDirector(t *testing.T) {
 }
 
 func TestConfig_Apply(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	td := testdeep.NewT(t)

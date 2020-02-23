@@ -32,7 +32,7 @@ func TestDirectorChain(t *testing.T) {
 }
 
 func TestDirectorDestMap(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	td := testdeep.NewT(t)
@@ -82,7 +82,7 @@ func TestDirectorHost(t *testing.T) {
 }
 
 func TestDirectorSameIP(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	td := testdeep.NewT(t)
@@ -96,7 +96,7 @@ func TestDirectorSameIP(t *testing.T) {
 }
 
 func TestDirectorSetHeaders(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	td := testdeep.NewT(t)

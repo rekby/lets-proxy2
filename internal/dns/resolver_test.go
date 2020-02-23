@@ -30,7 +30,7 @@ func TestNewResolver(t *testing.T) {
 }
 
 func TestLookupWithClient(t *testing.T) {
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
 	td := testdeep.NewT(t)
@@ -219,7 +219,7 @@ func TestLookupWithClient(t *testing.T) {
 }
 
 func TestResolver_Lookup(t *testing.T) {
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
 	td := testdeep.NewT(t)
@@ -288,7 +288,7 @@ func TestResolver_Lookup(t *testing.T) {
 }
 
 func TestResolver_LookupIPAddr(t *testing.T) {
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
 	td := testdeep.NewT(t)
@@ -376,7 +376,7 @@ func TestResolver_LookupIPAddr(t *testing.T) {
 }
 
 func TestResolverReal(t *testing.T) {
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
 	td := testdeep.NewT(t)

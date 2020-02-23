@@ -11,6 +11,8 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/rekby/lets-proxy2/internal/config"
+
 	"github.com/rekby/lets-proxy2/internal/secrethandler"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -61,7 +63,7 @@ func version() string {
 	return fmt.Sprintf("Version: '%v', Os: '%v', Arch: '%v'", VERSION, runtime.GOOS, runtime.GOARCH)
 }
 
-func startMetrics(ctx context.Context, r *prometheus.Registry, config metrics.Config, getCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)) error {
+func startMetrics(ctx context.Context, r *prometheus.Registry, config config.Config, getCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)) error {
 	if !config.Enable {
 		return nil
 	}
@@ -70,12 +72,23 @@ func startMetrics(ctx context.Context, r *prometheus.Registry, config metrics.Co
 
 	listener := &tlslistener.ListenersHandler{GetCertificate: getCertificate}
 	err := config.GetListenConfig().Apply(ctx, listener)
-	log.DebugError(loggerLocal, err, "Apply listen config")
+	log.DebugFatal(loggerLocal, err, "Apply listen config")
+
+	err = listener.Start(zc.WithLogger(ctx, zc.L(ctx).Named("metrics_listener")), nil)
+	log.DebugFatal(loggerLocal, err, "start metrics listener")
 
 	m := metrics.New(zc.L(ctx).Named("metrics"), r)
 
-	handlePassword := secrethandler.New(zc.L(ctx).Named("metrics_secret"), config.GetSecretHandlerConfig(), m)
-
+	secretMetric := secrethandler.New(zc.L(ctx).Named("metrics_secret"), config.GetSecretHandlerConfig(), m)
+	go func() {
+		err := http.Serve(listener, secretMetric)
+		var effectiveError = err
+		if effectiveError == http.ErrServerClosed {
+			effectiveError = nil
+		}
+		log.DebugDPanic(loggerLocal, effectiveError, "Handle metric stopped")
+	}()
+	return nil
 }
 
 func startProgram(config *configType) {
@@ -115,7 +128,7 @@ func startProgram(config *configType) {
 	err = config.Listen.Apply(ctx, tlsListener)
 	log.DebugFatal(logger, err, "Config listeners")
 
-	err = tlsListener.Start(ctx)
+	err = tlsListener.Start(ctx, registry)
 	log.DebugFatal(logger, err, "StartAutoRenew tls listener")
 
 	p := proxy.NewHTTPProxy(ctx, tlsListener)

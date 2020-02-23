@@ -85,7 +85,7 @@ func TestProxyTLS(t *testing.T) {
 
 	var body []byte
 	var resp *http.Response
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	td := testdeep.NewT(t)
@@ -102,12 +102,14 @@ func TestProxyTLS(t *testing.T) {
 	td.FailureIsFatal(false)
 
 	proxy := ListenersHandler{
-		GetCertificate:        dummyGetCertificate,
-		ListenersForHandleTLS: []net.Listener{listenerForTLS1, listenerForTLS2},
-		Listeners:             []net.Listener{listenerForTCP1, listenerForTCP2},
+		GetCertificate:         dummyGetCertificate,
+		ListenersForHandleTLS:  []net.Listener{listenerForTLS1, listenerForTLS2},
+		Listeners:              []net.Listener{listenerForTCP1, listenerForTCP2},
+		connectionHandleStart:  func() {},
+		connectionHandleFinish: func(err error) {},
 	}
 
-	err = proxy.Start(ctx)
+	err = proxy.Start(ctx, nil)
 	td.CmpNoError(err)
 
 	mux := &http.ServeMux{}

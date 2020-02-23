@@ -14,7 +14,7 @@ type Config struct {
 	TCPAddresses []string
 }
 
-func (c *Config) Apply(ctx context.Context, l *ListenersHandler) error {
+func (c Config) Apply(ctx context.Context, l *ListenersHandler) error {
 	logger := zc.L(ctx)
 
 	var tlsListeners = make([]net.Listener, 0, len(c.TLSAddresses))

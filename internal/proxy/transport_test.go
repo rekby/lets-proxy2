@@ -10,7 +10,7 @@ import (
 )
 
 func TestTransport_GetTransport(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	td := testdeep.NewT(t)
