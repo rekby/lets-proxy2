@@ -132,6 +132,7 @@ TCPAddresses = []
 
 
 [Metrics]
+# Enable metrics in prometheous formath by http.
 Enable = false
 
 # Bind addresses for get by https
