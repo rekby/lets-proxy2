@@ -23,6 +23,7 @@ Features:
 * Self check domain before issue cert (prevent DoS cert issue attack by requests with bad domains)
 * Blacklist/whitelist of domains
 * Lock certificates (force to use manual issued certificate without internal checks)
+* Optional access to internal metrics with prometheous format
 
 It is next generation of https://github.com/rekby/lets-proxy, rewrited from scratch.
 
