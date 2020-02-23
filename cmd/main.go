@@ -11,6 +11,8 @@ import (
 	"runtime"
 	"time"
 
+	"golang.org/x/xerrors"
+
 	"github.com/rekby/lets-proxy2/internal/config"
 
 	"github.com/rekby/lets-proxy2/internal/secrethandler"
@@ -63,7 +65,7 @@ func version() string {
 	return fmt.Sprintf("Version: '%v', Os: '%v', Arch: '%v'", VERSION, runtime.GOOS, runtime.GOARCH)
 }
 
-func startMetrics(ctx context.Context, r *prometheus.Registry, config config.Config, getCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)) error {
+func startMetrics(ctx context.Context, r prometheus.Gatherer, config config.Config, getCertificate func(*tls.ClientHelloInfo) (*tls.Certificate, error)) error {
 	if !config.Enable {
 		return nil
 	}
@@ -73,9 +75,15 @@ func startMetrics(ctx context.Context, r *prometheus.Registry, config config.Con
 	listener := &tlslistener.ListenersHandler{GetCertificate: getCertificate}
 	err := config.GetListenConfig().Apply(ctx, listener)
 	log.DebugFatal(loggerLocal, err, "Apply listen config")
+	if err != nil {
+		return xerrors.Errorf("apply config settings to metrics listener: %w", err)
+	}
 
 	err = listener.Start(zc.WithLogger(ctx, zc.L(ctx).Named("metrics_listener")), nil)
 	log.DebugFatal(loggerLocal, err, "start metrics listener")
+	if err != nil {
+		return xerrors.Errorf("start metrics listener: %w", err)
+	}
 
 	m := metrics.New(zc.L(ctx).Named("metrics"), r)
 
@@ -119,7 +127,8 @@ func startProgram(config *configType) {
 	certManager.DomainChecker, err = config.CheckDomains.CreateDomainChecker(ctx)
 	log.DebugFatal(logger, err, "Config domain checkers.")
 
-	startMetrics(ctx, registry, config.Metrics, certManager.GetCertificate)
+	err = startMetrics(ctx, registry, config.Metrics, certManager.GetCertificate)
+	log.InfoFatalCtx(ctx, err, "start metrics")
 
 	tlsListener := &tlslistener.ListenersHandler{
 		GetCertificate: certManager.GetCertificate,

@@ -41,7 +41,8 @@ func (m SecretHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		networkAllow := false
-		for _, subnet := range m.allowedNetworks {
+		for i := range m.allowedNetworks {
+			subnet := m.allowedNetworks[i]
 			contains := subnet.Contains(remoteIP.IP)
 			logger.Debug("Check contains", zap.Stringer("subnet", &subnet), zap.Bool("contains", contains))
 			if contains {

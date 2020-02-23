@@ -67,9 +67,9 @@ func (p *ListenersHandler) Addr() net.Addr {
 }
 
 func (p *ListenersHandler) Start(ctx context.Context, r prometheus.Registerer) error {
-	p.connectionHandleStart, p.connectionHandleFinish = metrics.ToefCounters(r, "listener_conn", "listen connection")
 	p.logger = zc.L(ctx)
 	p.init()
+	p.initMetrics(r)
 
 	p.ctx, p.ctxCancelFunc = context.WithCancel(ctx)
 

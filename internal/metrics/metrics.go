@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"net"
 	"net/http"
 	"reflect"
 
@@ -14,11 +13,8 @@ import (
 var DefaultMetrics Metrics
 
 type Metrics struct {
-	password           string
-	allowEmptyPassword bool
-	allowSources       []net.IPNet
-	logger             *zap.Logger
-	metricsHandler     http.Handler
+	logger         *zap.Logger
+	metricsHandler http.Handler
 }
 
 type ProcessStartFunc func()
