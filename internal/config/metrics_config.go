@@ -1,3 +1,5 @@
+// need for prevent import loop
+
 package config
 
 import (
