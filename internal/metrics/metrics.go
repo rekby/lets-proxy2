@@ -10,8 +10,6 @@ import (
 	"go.uber.org/zap"
 )
 
-var DefaultMetrics Metrics
-
 type Metrics struct {
 	logger         *zap.Logger
 	metricsHandler http.Handler

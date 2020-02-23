@@ -138,7 +138,7 @@ Enable = false
 TLSAddresses = []
 
 # Bind addresses without TLS secure (for HTTP reverse proxy and http-01 validation without redirect to https)
-TCPAddresses = [ "[::]:41935" ]
+TCPAddresses = [ "[::]:62100" ]
 
 # IP networks for allow to get metrics.
 # Default - allow from all.
