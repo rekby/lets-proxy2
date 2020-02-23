@@ -1,23 +1,23 @@
 package profiler
 
 import (
-	"net"
 	"net/http"
 	"net/http/pprof"
 
-	"go.uber.org/zap"
+	"github.com/rekby/lets-proxy2/internal/secrethandler"
 
-	"github.com/rekby/lets-proxy2/internal/log"
+	"go.uber.org/zap"
 )
 
 type Config struct {
-	Enable          bool
-	AllowedNetworks []string
-	BindAddress     string
+	secrethandler.Config
+
+	Enable      bool
+	BindAddress string
 }
 
 type Profiler struct {
-	secretHandler secretHandler
+	secretHandler secrethandler.SecretHandler
 }
 
 func New(logger *zap.Logger, config Config) *Profiler {
@@ -29,22 +29,8 @@ func New(logger *zap.Logger, config Config) *Profiler {
 	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 
-	var allowedNetworks []net.IPNet
-	for _, network := range config.AllowedNetworks {
-		_, parsedNet, err := net.ParseCIDR(network)
-		log.InfoError(logger, err, "Parse allowed CIDR", zap.Stringer("network", parsedNet))
-		if err == nil {
-			allowedNetworks = append(allowedNetworks, *parsedNet)
-		}
-	}
-
-	handler := secretHandler{
-		logger:          logger,
-		next:            mux,
-		AllowedNetworks: allowedNetworks,
-	}
 	return &Profiler{
-		secretHandler: handler,
+		secretHandler: secrethandler.New(logger, config.Config, mux),
 	}
 }
 

@@ -8,6 +8,10 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/rekby/lets-proxy2/internal/metrics"
+
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/rekby/lets-proxy2/internal/contextlabel"
 
 	"golang.org/x/crypto/acme"
@@ -38,6 +42,9 @@ type ListenersHandler struct {
 
 	connectionsContextMu sync.RWMutex
 	connectionsContext   map[string]contextInfo
+
+	connectionHandleStart  metrics.ProcessStartFunc
+	connectionHandleFinish metrics.ProcessFinishFunc
 }
 
 type contextInfo struct {
@@ -63,7 +70,7 @@ func (p *ListenersHandler) Addr() net.Addr {
 // It can stop by cancel context.
 // Now StartAutoRenew return immedantly after cancel context - without wait to finish background processes.
 // It can change in future.
-func (p *ListenersHandler) Start(ctx context.Context) error {
+func (p *ListenersHandler) Start(ctx context.Context, r prometheus.Registerer) error {
 	p.logger = zc.L(ctx)
 	p.init()
 
@@ -134,6 +141,10 @@ func (p *ListenersHandler) init() {
 	p.connectionsContext = make(map[string]contextInfo)
 }
 
+func (p *ListenersHandler) initMetrics(r prometheus.Registerer) {
+	p.connectionHandleStart, p.connectionHandleFinish = metrics.ToefCounters(r, "registered-conn", "Registered tcp connections")
+}
+
 func (p *ListenersHandler) registerConnection(conn net.Conn, tls bool) ContextConnextion {
 	key := conn.RemoteAddr().String() + "-" + conn.LocalAddr().String()
 
@@ -141,7 +152,9 @@ func (p *ListenersHandler) registerConnection(conn net.Conn, tls bool) ContextCo
 	defer p.connectionsContextMu.Unlock()
 
 	ctxStruct, exist := p.connectionsContext[key]
-	if !exist {
+	if exist {
+		p.logger.DPanic("Connection already exist in map", zap.String("key", key))
+	} else {
 		ctxStruct.ctx, ctxStruct.cancelFunc = context.WithCancel(context.Background())
 		connectionUUID := uuid.NewV4().String()
 		logger := p.logger.With(zap.String("connection_id", connectionUUID))
@@ -151,15 +164,13 @@ func (p *ListenersHandler) registerConnection(conn net.Conn, tls bool) ContextCo
 		p.connectionsContext[key] = ctxStruct
 	}
 
-	res := ContextConnextion{
-		Context: ctxStruct.ctx,
-		Conn:    conn,
-	}
+	p.connectionHandleStart()
 
-	// Set finalizer and deregister only for first registered connection
-	// for subconnection - return same context
-	if exist {
-		return res
+	res := ContextConnextion{
+		Context:               ctxStruct.ctx,
+		Conn:                  conn,
+		okCloseCounter:        p.connectionsHandledOk,
+		finalizerCloseCounter: p.connectionsHandledErr,
 	}
 
 	res.CloseFunc = func() error {
