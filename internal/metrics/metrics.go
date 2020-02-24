@@ -18,8 +18,12 @@ type Metrics struct {
 type ProcessStartFunc func()
 type ProcessFinishFunc func(error)
 
+type loggerError interface {
+	Error(args ...interface{})
+}
+
 type errorLoggger struct {
-	logger *zap.SugaredLogger
+	logger loggerError
 }
 
 func (el errorLoggger) Println(args ...interface{}) {
@@ -63,7 +67,7 @@ func ToefCounters(r prometheus.Registerer, name, description string) (start Proc
 		} else {
 			err.Inc()
 		}
-		inflight.Desc()
+		inflight.Dec()
 	}
 	return start, finish
 }
