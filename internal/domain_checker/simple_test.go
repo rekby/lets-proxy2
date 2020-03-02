@@ -13,7 +13,7 @@ import (
 func TestTrue(t *testing.T) {
 	var _ DomainChecker = True{}
 
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	td := testdeep.NewT(t)
@@ -23,7 +23,7 @@ func TestTrue(t *testing.T) {
 }
 
 func TestFalse(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	var _ DomainChecker = False{}
@@ -35,7 +35,7 @@ func TestFalse(t *testing.T) {
 }
 
 func TestRegexp(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	var _ DomainChecker = &Regexp{}

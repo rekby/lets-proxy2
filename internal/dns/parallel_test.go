@@ -17,7 +17,7 @@ var (
 )
 
 func TestParallel(t *testing.T) {
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
 	td := testdeep.NewT(t)
@@ -76,7 +76,7 @@ func TestParallel(t *testing.T) {
 }
 
 func TestParallelReadl(t *testing.T) {
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
 	td := testdeep.NewT(t)

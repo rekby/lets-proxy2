@@ -17,7 +17,7 @@ import (
 )
 
 func TestCertState(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	s := &certState{}
@@ -42,7 +42,7 @@ func TestCertState(t *testing.T) {
 }
 
 func TestCertStateManyIssuers(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	const cnt = 1000
@@ -143,7 +143,7 @@ func TestCertStateManyIssuers(t *testing.T) {
 }
 
 func TestCertState_WaitFinishIssue(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	s := certState{}
@@ -188,7 +188,7 @@ func TestCertState_WaitFinishIssue(t *testing.T) {
 }
 
 func TestCertState_FinishIssuePanic(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	ctx = th.NoLog(ctx)
@@ -219,7 +219,7 @@ func TestCertState_FinishIssuePanic(t *testing.T) {
 }
 
 func TestCertState_CertSet(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	td := testdeep.NewT(t)

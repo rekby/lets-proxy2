@@ -9,6 +9,8 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/rekby/lets-proxy2/internal/config"
+
 	"github.com/gobuffalo/packr"
 
 	"github.com/rekby/lets-proxy2/internal/profiler"
@@ -42,6 +44,7 @@ type configType struct {
 	CheckDomains domain_checker.Config
 	Listen       tlslistener.Config
 	Profiler     profiler.Config
+	Metrics      config.Config
 }
 
 //nolint:maligned

@@ -49,7 +49,7 @@ func TestIsPublicIp(t *testing.T) {
 }
 
 func TestGetBindedIpAddress(t *testing.T) {
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
 	td := testdeep.NewT(t)
@@ -83,7 +83,7 @@ func TestFilterPublicOnlyIPs(t *testing.T) {
 }
 
 func TestIPList_Update(t *testing.T) {
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
 	td := testdeep.NewT(t)
@@ -130,7 +130,7 @@ func TestIPList_Update(t *testing.T) {
 }
 
 func TestIPList_UpdateByTimer(t *testing.T) {
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
 	td := testdeep.NewT(t)
@@ -198,10 +198,10 @@ func TestSetDefaultResolver(t *testing.T) {
 func TestSelfPublicIP_IsDomainAllowed(t *testing.T) {
 	var _ DomainChecker = &IPList{}
 
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
-	ctx2, ctx2Cancel := th.TestContext()
+	ctx2, ctx2Cancel := th.TestContext(t)
 	defer ctx2Cancel()
 
 	td := testdeep.NewT(t)
@@ -263,7 +263,7 @@ func TestSelfPublicIP_IsDomainAllowed(t *testing.T) {
 }
 
 func TestSelfPublicIP_IsDomainAllowed_CanceledMainContext(t *testing.T) {
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
 	mainCtx, mainCtxCancel := context.WithCancel(context.Background())
@@ -281,7 +281,7 @@ func TestSelfPublicIP_IsDomainAllowed_CanceledMainContext(t *testing.T) {
 }
 
 func TestIPList_DoubleStart(t *testing.T) {
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
 	td := testdeep.NewT(t)
@@ -303,7 +303,7 @@ func TestIPList_DoubleStart(t *testing.T) {
 }
 
 func TestCreateGetSelfPublicBinded(t *testing.T) {
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
 	td := testdeep.NewT(t)

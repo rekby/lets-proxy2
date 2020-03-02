@@ -10,7 +10,7 @@ import (
 )
 
 func TestDiskCache(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	dirPath, err := ioutil.TempDir("", "lets-proxy2-test-")

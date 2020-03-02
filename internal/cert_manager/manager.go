@@ -21,6 +21,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rekby/lets-proxy2/internal/metrics"
+
+	"github.com/prometheus/client_golang/prometheus"
+
 	"golang.org/x/xerrors"
 
 	"github.com/rekby/lets-proxy2/internal/cache"
@@ -94,9 +98,13 @@ type Manager struct {
 	certState   cache.Value
 
 	httpTokens cache.Bytes
+
+	// metrics
+	handleCertStart, certRequestStart   metrics.ProcessStartFunc
+	handleCertFinish, certRequestFinish metrics.ProcessFinishFunc
 }
 
-func New(client AcmeClient, c cache.Bytes) *Manager {
+func New(client AcmeClient, c cache.Bytes, r prometheus.Registerer) *Manager {
 	res := Manager{}
 	res.Client = client
 	res.certForDomainAuthorize = cache.NewMemoryValueLRU("authcert")
@@ -106,11 +114,17 @@ func New(client AcmeClient, c cache.Bytes) *Manager {
 	res.Cache = c
 	res.EnableTLSValidation = true
 	res.DomainChecker = managerDefaults{}
+
+	res.initMetrics(r)
 	return &res
 }
 
 // GetCertificate implements the tls.Config.GetCertificate hook.
 func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Certificate, err error) {
+	m.handleCertStart()
+	defer func() {
+		m.handleCertFinish(err)
+	}()
 	ctx := hello.Conn.(GetContext).GetContext()
 
 	logger := zc.L(ctx)
@@ -227,7 +241,11 @@ func (m *Manager) getCertificate(ctx context.Context, needDomain DomainName, cer
 	return m.issueNewCert(ctx, needDomain, certDescription)
 }
 
-func (m *Manager) issueNewCert(ctx context.Context, needDomain DomainName, cd CertDescription) (*tls.Certificate, error) {
+func (m *Manager) issueNewCert(ctx context.Context, needDomain DomainName, cd CertDescription) (cert *tls.Certificate, err error) {
+	m.certRequestStart()
+	defer func() {
+		m.certRequestFinish(err)
+	}()
 	logger := zc.L(ctx)
 
 	allowed, err := m.DomainChecker.IsDomainAllowed(ctx, needDomain.ASCII())
@@ -601,6 +619,11 @@ func (m *Manager) fulfill(ctx context.Context, challenge *acme.Challenge, domain
 		logger.Error("Unknow challenge type", zap.Reflect("challenge", challenge))
 		return nil, errors.New("unknown challenge type")
 	}
+}
+
+func (m *Manager) initMetrics(r prometheus.Registerer) {
+	m.handleCertStart, m.handleCertFinish = metrics.ToefCounters(r, "handle_cert", "handled certificates")
+	m.certRequestStart, m.certRequestFinish = metrics.ToefCounters(r, "cert_request", "request certificates from lets-encrypt")
 }
 
 func (m *Manager) isHTTPValidationRequest(r *http.Request) bool {

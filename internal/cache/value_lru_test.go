@@ -13,7 +13,7 @@ import (
 func TestValueLRUAsCache(t *testing.T) {
 	td := testdeep.NewT(t)
 
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	c := NewMemoryValueLRU("test")
@@ -43,7 +43,7 @@ func TestValueLRUAsCache(t *testing.T) {
 func TestValueLRULimitAtPut(t *testing.T) {
 	td := testdeep.NewT(t)
 
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	wait := func() { time.Sleep(time.Millisecond * 10) }
@@ -108,7 +108,7 @@ func TestValueLRULimitAtPut(t *testing.T) {
 }
 
 func TestValueLRULimitClean(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	td := testdeep.NewT(t)
@@ -237,7 +237,7 @@ func TestValueLRULimitClean(t *testing.T) {
 }
 
 func TestLimitValueRenumberItems(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	td := testdeep.NewT(t)

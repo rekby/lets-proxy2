@@ -22,7 +22,7 @@ const testACMEServer = "http://localhost:4001/directory"
 
 //go:generate minimock -i github.com/rekby/lets-proxy2/internal/cache.Bytes -o ./cache_bytes_mock_test.go
 func TestClientManagerCreateNew(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	td := testdeep.NewT(t)
@@ -49,7 +49,7 @@ func TestClientManagerCreateNew(t *testing.T) {
 }
 
 func TestClientManagerGetFromCache(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	td := testdeep.NewT(t)

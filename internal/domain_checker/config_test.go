@@ -14,7 +14,7 @@ import (
 )
 
 func TestConfig_CreateDomainCheckerEmpty(t *testing.T) {
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
 	td := testdeep.NewT(t)
@@ -28,7 +28,7 @@ func TestConfig_CreateDomainCheckerEmpty(t *testing.T) {
 }
 
 func TestConfig_CreateDomainCheckerBadBlackList(t *testing.T) {
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
 	td := testdeep.NewT(t)
@@ -41,7 +41,7 @@ func TestConfig_CreateDomainCheckerBadBlackList(t *testing.T) {
 }
 
 func TestConfig_CreateDomainCheckerBadWhiteList(t *testing.T) {
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
 	td := testdeep.NewT(t)
@@ -54,7 +54,7 @@ func TestConfig_CreateDomainCheckerBadWhiteList(t *testing.T) {
 }
 
 func TestConfig_CreateDomainCheckerBlackListOnly(t *testing.T) {
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
 	td := testdeep.NewT(t)
@@ -74,7 +74,7 @@ func TestConfig_CreateDomainCheckerBlackListOnly(t *testing.T) {
 }
 
 func TestConfig_CreateDomainCheckerWhiteListOnly(t *testing.T) {
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
 	td := testdeep.NewT(t)
@@ -94,7 +94,7 @@ func TestConfig_CreateDomainCheckerWhiteListOnly(t *testing.T) {
 }
 
 func TestConfig_CreateDomainCheckerSelfIPOnly(t *testing.T) {
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
 	td := testdeep.NewT(t)
@@ -136,7 +136,7 @@ func TestConfig_CreateDomainCheckerSelfIPOnly(t *testing.T) {
 }
 
 func TestConfig_CreateDomainCheckerWhitelist(t *testing.T) {
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
 	td := testdeep.NewT(t)
@@ -170,7 +170,7 @@ func TestConfig_CreateDomainCheckerWhitelist(t *testing.T) {
 }
 
 func TestConfig_CreateDomainCheckerComplex(t *testing.T) {
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
 	td := testdeep.NewT(t)

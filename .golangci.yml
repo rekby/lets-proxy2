@@ -1,5 +1,6 @@
 service:
   golangci-lint-version: 1.23.x
+
 run:
   deadline: 5m
   issues-exit-code: 1

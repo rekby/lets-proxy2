@@ -20,7 +20,7 @@ import (
 )
 
 func TestHttpProxy_HandleHttpValidationDefault(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	td := testdeep.NewT(t)
@@ -36,7 +36,7 @@ func TestHttpProxy_HandleHttpValidationDefault(t *testing.T) {
 }
 
 func TestHttpProxy_getContextDefault(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	td := testdeep.NewT(t)
@@ -62,7 +62,7 @@ type HTTPProxyTest interface {
 func TestNewHttpProxy(t *testing.T) {
 	var resp *http.Response
 	var res []byte
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	td := testdeep.NewT(t)

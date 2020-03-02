@@ -8,7 +8,7 @@ import (
 )
 
 func TestMemoryCache(t *testing.T) {
-	ctx, flush := th.TestContext()
+	ctx, flush := th.TestContext(t)
 	defer flush()
 
 	c := NewMemoryCache("test")

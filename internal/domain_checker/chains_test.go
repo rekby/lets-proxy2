@@ -15,7 +15,7 @@ import (
 func TestAny(t *testing.T) {
 	var _ DomainChecker = Any{}
 
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
 	td := testdeep.NewT(t)
@@ -71,7 +71,7 @@ func TestAny(t *testing.T) {
 func TestAll(t *testing.T) {
 	var _ DomainChecker = Any{}
 
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
 	td := testdeep.NewT(t)
@@ -121,7 +121,7 @@ func TestAll(t *testing.T) {
 func TestNot(t *testing.T) {
 	var _ DomainChecker = Not{}
 
-	ctx, cancel := th.TestContext()
+	ctx, cancel := th.TestContext(t)
 	defer cancel()
 
 	td := testdeep.NewT(t)

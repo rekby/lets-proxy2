@@ -10,6 +10,8 @@ require (
 	github.com/maxatome/go-testdeep v1.1.0
 	github.com/miekg/dns v1.1.22
 	github.com/pkg/errors v0.8.1
+	github.com/prometheus/client_golang v1.4.1
+	github.com/prometheus/client_model v0.2.0
 	github.com/rekby/zapcontext v0.0.4
 	github.com/satori/go.uuid v1.2.0
 	go.uber.org/zap v1.11.0
