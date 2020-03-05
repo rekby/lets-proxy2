@@ -49,4 +49,7 @@ deploy:
   file: output/*
 
 notifications:
-  webhooks: https://coveralls.io/webhook?repo_token=$COVERALLS_TOKEN
+  webhooks:
+    urls:
+      - https://coveralls.io/webhook?repo_token=$COVERALLS_TOKEN
+    if: tags = ''
