@@ -9,6 +9,10 @@ go:
   - "1.10"
   - "1.14"
 
+env:
+  global:
+    - COVERALLS_PARALLEL=true
+
 services:
   - docker
 
@@ -43,3 +47,6 @@ deploy:
   api_key: $GITHUB_TOKEN
   file_glob: true
   file: output/*
+
+notifications:
+  webhooks: https://coveralls.io/webhook?repo_token=$COVERALLS_TOKEN
