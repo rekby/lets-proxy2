@@ -29,10 +29,11 @@ type HTTPProxy struct {
 	Director             Director // modify requests to backend.
 	HTTPTransport        http.RoundTripper
 
-	ctx              context.Context
+	logger           *zap.Logger
 	listener         net.Listener
 	httpReverseProxy httputil.ReverseProxy
 	IdleTimeout      time.Duration
+	httpServer       http.Server
 }
 
 func NewHTTPProxy(ctx context.Context, listener net.Listener) *HTTPProxy {
@@ -44,11 +45,15 @@ func NewHTTPProxy(ctx context.Context, listener net.Listener) *HTTPProxy {
 		Director:   NewDirectorSameIP(defaultHTTPPort),
 		GetContext: getContext,
 		listener:   listener,
-		ctx:        ctx,
+		logger:     zc.L(ctx),
+		httpServer: http.Server{},
 	}
 	res.httpReverseProxy.Director = res.director
-
 	return res
+}
+
+func (p *HTTPProxy) Close() error {
+	return p.httpServer.Close()
 }
 
 // Start - finish initialization of proxy and start handling request.
@@ -65,18 +70,11 @@ func (p *HTTPProxy) Start() error {
 			p.httpReverseProxy.ServeHTTP(writer, request)
 		}
 	})
-	httpServer := http.Server{}
-	httpServer.Handler = mux
-	httpServer.IdleTimeout = p.IdleTimeout
+	p.httpServer.Handler = mux
+	p.httpServer.IdleTimeout = p.IdleTimeout
 
-	go func() {
-		<-p.ctx.Done()
-		err := httpServer.Close()
-		log.DebugErrorCtx(p.ctx, err, "Http builtin reverse proxy stop because context canceled")
-	}()
-
-	zc.L(p.ctx).Info("Http builtin reverse proxy start")
-	err := httpServer.Serve(p.listener)
+	p.logger.Info("Http builtin reverse proxy start")
+	err := p.httpServer.Serve(p.listener)
 	return err
 }
 
