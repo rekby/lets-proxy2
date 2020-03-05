@@ -99,6 +99,7 @@ func startMetrics(ctx context.Context, r prometheus.Gatherer, config config.Conf
 	return nil
 }
 
+//nolint:funlen
 func startProgram(config *configType) {
 	logger := initLogger(config.Log)
 	ctx := zc.WithLogger(context.Background(), logger)
@@ -147,6 +148,12 @@ func startProgram(config *configType) {
 	}
 	err = config.Proxy.Apply(ctx, p)
 	log.InfoFatal(logger, err, "Apply proxy config")
+
+	go func() {
+		<-ctx.Done()
+		err := p.Close()
+		log.DebugError(logger, err, "Stop proxy")
+	}()
 
 	err = p.Start()
 	var effectiveError = err

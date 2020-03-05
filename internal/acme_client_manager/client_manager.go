@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/xerrors"
+
 	"go.uber.org/zap"
 
 	"github.com/rekby/lets-proxy2/internal/log"
@@ -23,23 +25,30 @@ import (
 const rsaKeyLength = 2048
 const renewAccountInterval = time.Hour * 24
 
+var errClosed = xerrors.Errorf("acmeManager already closed")
+
 type AcmeManager struct {
 	IgnoreCacheLoad      bool
 	DirectoryURL         string
 	AgreeFunction        func(tosurl string) bool
 	RenewAccountInterval time.Duration
 
-	ctx   context.Context
-	cache cache.Bytes
+	ctx                   context.Context
+	ctxCancel             context.CancelFunc
+	ctxAutorenewCompleted context.Context
+	cache                 cache.Bytes
 
 	mu      sync.Mutex
 	client  *acme.Client
 	account *acme.Account
+	closed  bool
 }
 
 func New(ctx context.Context, cache cache.Bytes) *AcmeManager {
+	ctx, ctxCancel := context.WithCancel(ctx)
 	return &AcmeManager{
 		ctx:                  ctx,
+		ctxCancel:            ctxCancel,
 		cache:                cache,
 		AgreeFunction:        acme.AcceptTOS,
 		RenewAccountInterval: renewAccountInterval,
@@ -51,6 +60,23 @@ type acmeManagerState struct {
 	AcmeAccount *acme.Account
 }
 
+func (m *AcmeManager) Close() error {
+	m.mu.Lock()
+	alreadyClosed := m.closed
+	ctxAutorenewCompleted := m.ctxAutorenewCompleted
+	m.closed = true
+	m.mu.Unlock()
+
+	if alreadyClosed {
+		return xerrors.Errorf("close: %w", errClosed)
+	}
+	m.ctxCancel()
+	if ctxAutorenewCompleted != nil {
+		<-ctxAutorenewCompleted.Done()
+	}
+	return nil
+}
+
 func (m *AcmeManager) GetClient(ctx context.Context) (*acme.Client, error) {
 	if ctx.Err() != nil {
 		return nil, errors.New("acme manager context closed")
@@ -58,6 +84,10 @@ func (m *AcmeManager) GetClient(ctx context.Context) (*acme.Client, error) {
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	if m.closed {
+		return nil, xerrors.Errorf("GetClient: %w", errClosed)
+	}
 
 	if m.client != nil {
 		return m.client, nil
@@ -98,6 +128,13 @@ func (m *AcmeManager) GetClient(ctx context.Context) (*acme.Client, error) {
 }
 
 func (m *AcmeManager) accountRenew() {
+	ctx, ctxCancel := context.WithCancel(m.ctx)
+	defer ctxCancel()
+
+	m.mu.Lock()
+	m.ctxAutorenewCompleted = ctx
+	m.mu.Unlock()
+
 	ticker := time.NewTicker(m.RenewAccountInterval)
 	ctxDone := m.ctx.Done()
 

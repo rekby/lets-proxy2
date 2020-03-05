@@ -7,6 +7,11 @@ addons:
 
 go:
   - "1.10"
+  - "1.14"
+
+env:
+  global:
+    - COVERALLS_PARALLEL=true
 
 services:
   - docker
@@ -29,8 +34,10 @@ before_deploy:
   - BUILD_TIME=$(TZ=UTC date --rfc-3339=seconds)
   - go get github.com/mitchellh/gox
   - mkdir -p output
+  - GO_VERSION=$(go version)
+  - echo ${GO_VERSION}
   - OS_ARCH_BUILDS="darwin/amd64 linux/386 linux/amd64 linux/arm freebsd/386 freebsd/amd64 freebsd/arm windows/386 windows/amd64"
-  - GO111MODULE=on CGO_ENABLED=0 gox --mod=vendor -osarch "$OS_ARCH_BUILDS" --ldflags "-X \"main.VERSION=$TRAVIS_TAG+build-$TRAVIS_BUILD_NUMBER, Build time $BUILD_TIME, commit $TRAVIS_COMMIT\"" --output="output/lets-proxy_{{.OS}}_{{.Arch}}" -verbose --rebuild ./cmd/
+  - GO111MODULE=on CGO_ENABLED=0 gox --mod=vendor -osarch "$OS_ARCH_BUILDS" --ldflags "-X \"main.VERSION=$TRAVIS_TAG+build-$TRAVIS_BUILD_NUMBER, Build time $BUILD_TIME, commit $TRAVIS_COMMIT, $GO_VERSION\"" --output="output/lets-proxy_{{.OS}}_{{.Arch}}" -verbose --rebuild ./cmd/
   - bash tests/make_archives.sh
 
 deploy:
@@ -42,3 +49,9 @@ deploy:
   api_key: $GITHUB_TOKEN
   file_glob: true
   file: output/*
+
+notifications:
+  webhooks:
+    urls:
+      - https://coveralls.io/webhook?repo_token=$COVERALLS_TOKEN
+    if: env(tags) IS blank

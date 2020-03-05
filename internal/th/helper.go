@@ -2,6 +2,7 @@ package th
 
 import (
 	"context"
+	"io"
 
 	"go.uber.org/zap/zaptest"
 
@@ -29,4 +30,8 @@ func NoLog(ctx context.Context) context.Context {
 
 func Logger(t zaptest.TestingT) *zap.Logger {
 	return zaptest.NewLogger(t, zaptest.WrapOptions(zap.Development()))
+}
+
+func Close(closer io.Closer) {
+	_ = closer.Close()
 }

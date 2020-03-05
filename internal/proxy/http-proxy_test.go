@@ -71,6 +71,7 @@ func TestNewHttpProxy(t *testing.T) {
 
 	td.FailureIsFatal()
 	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
+	defer th.Close(listener)
 	td.CmpNoError(err)
 
 	prefix := "http://" + listener.Addr().String()
@@ -114,6 +115,8 @@ func TestNewHttpProxy(t *testing.T) {
 	})
 
 	proxy := NewHTTPProxy(ctx, listener)
+	defer th.Close(proxy)
+
 	proxy.GetContext = proxyTest.GetContext
 	proxy.Director = directorMock
 	proxy.HandleHTTPValidation = proxyTest.HandleHTTPValidation

@@ -16,13 +16,13 @@ for FILE in `ls`; do
     if expr match "$FILE" '^lets-proxy_windows' > /dev/null; then
         mv "$FILE" lets-proxy.exe
         unix2dos -n config_default.toml_ config_default.toml
-        zip "${FILE%.exe}.zip" lets-proxy.exe README.txt config_default.toml
+        zip "${FILE%.exe}-go${TRAVIS_GO_VERSION}.zip" lets-proxy.exe README.txt config_default.toml
         rm config_default.toml
         rm lets-proxy.exe
     else
         mv "$FILE" lets-proxy
         cp config_default.toml_ config_default.toml
-        tar -zcvf "${FILE%.exe}.tar.gz" lets-proxy README.md config_default.toml
+        tar -zcvf "${FILE%.exe}-go${TRAVIS_GO_VERSION}.tar.gz" lets-proxy README.md config_default.toml
         rm config_default.toml
         rm lets-proxy
     fi

@@ -62,6 +62,7 @@ func TestClientManagerGetFromCache(t *testing.T) {
 	var err error
 
 	manager := New(ctx, c)
+	defer th.Close(manager)
 
 	state := acmeManagerState{
 		AcmeAccount: &acme.Account{},
