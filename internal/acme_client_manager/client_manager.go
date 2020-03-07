@@ -136,7 +136,7 @@ func (m *AcmeManager) accountRenew() {
 	m.ctxAutorenewCompleted = ctx
 	m.mu.Unlock()
 
-	if ctx.Err() != nil {
+	if m.ctx.Err() != nil {
 		return
 	}
 
