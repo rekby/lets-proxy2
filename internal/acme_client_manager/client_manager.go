@@ -131,13 +131,14 @@ func (m *AcmeManager) GetClient(ctx context.Context) (*acme.Client, error) {
 func (m *AcmeManager) accountRenew() {
 	ctx, ctxCancel := context.WithCancel(m.ctx)
 	defer ctxCancel()
-	if ctx.Err() != nil {
-		return
-	}
 
 	m.mu.Lock()
 	m.ctxAutorenewCompleted = ctx
 	m.mu.Unlock()
+
+	if ctx.Err() != nil {
+		return
+	}
 
 	ticker := time.NewTicker(m.RenewAccountInterval)
 	ctxDone := m.ctx.Done()
