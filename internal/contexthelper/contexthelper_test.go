@@ -143,7 +143,8 @@ func TestCombinedContext_Done(t *testing.T) {
 
 func TestDropCancelContext(t *testing.T) {
 	td := testdeep.NewT(t)
-	const key = "key"
+	type keyType string
+	const key keyType = "key"
 	const val = "val"
 
 	ctx, ctxCancel := context.WithCancel(context.WithValue(context.Background(), key, val))

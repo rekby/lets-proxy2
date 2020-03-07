@@ -403,9 +403,8 @@ func (m *Manager) createOrderForDomains(ctx context.Context, domains ...DomainNa
 	firstLoop := true
 authorizeOrderLoop:
 	for {
-
 		if ctx.Err() != nil {
-			return nil, xerrors.Errorf("context cancelled: %w", ctx.Err())
+			return nil, xerrors.Errorf("context canceled: %w", ctx.Err())
 		}
 
 		if firstLoop {
