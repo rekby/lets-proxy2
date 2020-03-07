@@ -27,6 +27,7 @@ const renewAccountInterval = time.Hour * 24
 
 var errClosed = xerrors.Errorf("acmeManager already closed")
 
+//nolint:maligned
 type AcmeManager struct {
 	IgnoreCacheLoad      bool
 	DirectoryURL         string

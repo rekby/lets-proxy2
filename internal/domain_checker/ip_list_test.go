@@ -302,26 +302,6 @@ func TestIPList_DoubleStart(t *testing.T) {
 	})
 }
 
-func TestCreateGetSelfPublicBinded(t *testing.T) {
-	ctx, cancel := th.TestContext(t)
-	defer cancel()
-
-	td := testdeep.NewT(t)
-
-	var binded InterfacesAddrFunc = func() (addrs []net.Addr, e error) {
-		return []net.Addr{
-			&net.IPNet{IP: net.ParseIP("1.2.3.4"), Mask: net.CIDRMask(32, 32)},
-			&net.IPNet{IP: net.ParseIP("127.0.0.1"), Mask: net.CIDRMask(32, 32)},
-		}, nil
-	}
-
-	f := CreateGetSelfPublicBinded(binded)
-	ips, err := f(ctx)
-	td.CmpDeeply(len(ips), 1)
-	td.True(ips[0].Equal(net.ParseIP("1.2.3.4")))
-	td.CmpNoError(err)
-}
-
 func TestTruncatedCopyIPs(t *testing.T) {
 	td := testdeep.NewT(t)
 	td.Nil(truncatedCopyIPs(nil))
