@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 
+	"golang.org/x/xerrors"
+
 	"github.com/pkg/errors"
 
 	"github.com/rekby/lets-proxy2/internal/dns"
@@ -18,11 +20,13 @@ import (
 )
 
 type Config struct {
-	IPSelf      bool
-	IPWhiteList string
-	BlackList   string
-	WhiteList   string
-	Resolver    string
+	IPSelf                    bool
+	IPSelfDetectMethod        string
+	IPSelfExternalDetectorURL string
+	IPWhiteList               string
+	BlackList                 string
+	WhiteList                 string
+	Resolver                  string
 }
 
 func (c *Config) CreateDomainChecker(ctx context.Context) (DomainChecker, error) {
@@ -58,13 +62,15 @@ func (c *Config) CreateDomainChecker(ctx context.Context) (DomainChecker, error)
 	var ipCheckers Any
 
 	if c.IPSelf {
-		selfPublicIPList := NewIPList(ctx, CreateGetSelfPublicBinded(net.InterfaceAddrs))
-		selfPublicIPList.StartAutoRenew()
-		ipCheckers = append(ipCheckers, selfPublicIPList)
+		selfIPChecker, err := NewSelfIPChecker(ctx, c)
+		if err != nil {
+			return nil, xerrors.Errorf("create self ip checkers: %w", err)
+		}
+		ipCheckers = append(ipCheckers, selfIPChecker)
 	}
 
 	if c.IPWhiteList != "" {
-		ips, err := ParseIPs(ctx, c.IPWhiteList)
+		ips, err := ParseIPList(ctx, c.IPWhiteList, ",")
 		log.DebugError(logger, err, "Parse ip whitelist")
 		if err != nil {
 			return nil, err

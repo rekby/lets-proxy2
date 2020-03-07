@@ -107,12 +107,13 @@ func TestConfig_CreateDomainCheckerSelfIPOnly(t *testing.T) {
 	resolver.LookupIPAddrMock.Return(nil, errors.New("unknown domain"))
 
 	cfg := Config{
-		IPSelf: true,
+		IPSelf:             true,
+		IPSelfDetectMethod: "bind",
 	}
 
 	checker, err := cfg.CreateDomainChecker(ctx)
 	td.CmpNoError(err)
-	ipList := checker.(All)[1].(Any)[0].(*IPList)
+	ipList := checker.(All)[1].(Any)[0].(Any)[0].(*IPList)
 
 	ipList.mu.Lock()
 	ipList.Resolver = resolver
@@ -186,16 +187,17 @@ func TestConfig_CreateDomainCheckerComplex(t *testing.T) {
 	resolver.LookupIPAddrMock.When(ctx, "unknown").Then(nil, errors.New("unknown domain"))
 
 	cfg := Config{
-		BlackList:   `.*\.com`,
-		WhiteList:   `(.*\.)?test\.com`,
-		IPSelf:      true,
-		IPWhiteList: "2.3.4.5,3.3.3.3",
+		BlackList:          `.*\.com`,
+		WhiteList:          `(.*\.)?test\.com`,
+		IPSelf:             true,
+		IPSelfDetectMethod: "bind",
+		IPWhiteList:        "2.3.4.5,3.3.3.3",
 	}
 
 	checker, err := cfg.CreateDomainChecker(ctx)
 	td.CmpNoError(err)
 
-	selfIPList := checker.(All)[1].(Any)[0].(*IPList)
+	selfIPList := checker.(All)[1].(Any)[0].(Any)[0].(*IPList)
 	selfIPList.mu.Lock()
 	selfIPList.Resolver = resolver
 	selfIPList.Addresses = func(ctx context.Context) (ips []net.IP, e error) {

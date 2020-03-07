@@ -167,54 +167,14 @@ func (s *IPList) updateIPsByTimer() {
 
 type InterfacesAddrFunc func() ([]net.Addr, error)
 
-func getBindedIPAddress(ctx context.Context, interfacesAddr InterfacesAddrFunc) []net.IP {
+func ParseIPList(ctx context.Context, s, sep string) ([]net.IP, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil, nil
+	}
+
 	logger := zc.L(ctx)
-	binded, err := interfacesAddr()
-	log.DebugDPanic(logger, err, "Get system addresses", zap.Any("addresses", binded))
-
-	var parsed = make([]net.IP, 0, len(binded))
-
-	for _, addr := range binded {
-		addrS := addr.String()
-		if addrS == "<nil>" {
-			continue
-		}
-		ip, _, err := net.ParseCIDR(addrS)
-		log.DebugDPanic(logger, err, "Parse ip from interface", zap.String("addr", addrS), zap.Any("ip", ip),
-			zap.Stringer("original_ip", addr))
-		if ip == nil {
-			continue
-		}
-
-		logger.Debug("Parse ip", zap.Stringer("ip", ip))
-		parsed = append(parsed, ip)
-	}
-	return parsed
-}
-
-func filterPublicOnlyIPs(ips []net.IP) []net.IP {
-	var public = make([]net.IP, 0, len(ips))
-	for _, ip := range ips { // nolint:wsl
-		if isPublicIP(ip) {
-			public = append(public, ip)
-		}
-	}
-	return public
-}
-
-func CreateGetSelfPublicBinded(binded InterfacesAddrFunc) AllowedIPAddresses {
-	var f AllowedIPAddresses = func(ctx context.Context) ([]net.IP, error) {
-		ips := getBindedIPAddress(ctx, binded)
-		ips = filterPublicOnlyIPs(ips)
-		ips = truncatedCopyIPs(ips)
-		return ips, nil
-	}
-	return f
-}
-
-func ParseIPs(ctx context.Context, s string) ([]net.IP, error) {
-	logger := zc.L(ctx)
-	parts := strings.Split(s, ",")
+	parts := strings.Split(s, sep)
 	var parsed = make([]net.IP, 0, len(parts))
 	for _, stringIP := range parts {
 		stringIP = strings.TrimSpace(stringIP)
@@ -267,4 +227,13 @@ func truncatedCopyIPs(ips []net.IP) []net.IP {
 	copy(res, ips)
 
 	return res
+}
+
+func firstError(errors ...error) error {
+	for _, err := range errors {
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

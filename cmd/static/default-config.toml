@@ -99,6 +99,22 @@ HTTPSBackendIgnoreCert = true
 # Allow domain if it resolver for one of public IPs of this server.
 IPSelf = true
 
+# How detect public ips of the server.
+# it use if IPSelf is true
+# auto | local | aws  | yandex
+# auto - best effort for detect IP. Algoritm may change from time to time.
+#        it good for default.
+# bind - detect public IP binded to local interfaces
+# aws - detect public IPs by query to AWS EC2 metadata
+# external - detect self ip by request to external server IPSelfExternalDetector
+# yandex - detect public IPs by query to Yandex cloud metadata (now alias for aws)
+IPSelfDetectMethod = "auto"
+
+# Server for use as external detector of server IP (need for detect IP behind NAT
+# Server must response as plain text IP address.
+# For every detect lets-proxy make two requests: by ipv4 and ipv6 networks
+IPSelfExternalDetectorURL="http://ifconfig.io/ip"
+
 # Allow domain if it resolver for one of the ips.
 IPWhiteList = ""
 

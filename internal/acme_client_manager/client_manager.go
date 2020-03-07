@@ -27,6 +27,7 @@ const renewAccountInterval = time.Hour * 24
 
 var errClosed = xerrors.Errorf("acmeManager already closed")
 
+//nolint:maligned
 type AcmeManager struct {
 	IgnoreCacheLoad      bool
 	DirectoryURL         string
@@ -65,12 +66,12 @@ func (m *AcmeManager) Close() error {
 	alreadyClosed := m.closed
 	ctxAutorenewCompleted := m.ctxAutorenewCompleted
 	m.closed = true
+	m.ctxCancel()
 	m.mu.Unlock()
 
 	if alreadyClosed {
 		return xerrors.Errorf("close: %w", errClosed)
 	}
-	m.ctxCancel()
 	if ctxAutorenewCompleted != nil {
 		<-ctxAutorenewCompleted.Done()
 	}
@@ -130,6 +131,9 @@ func (m *AcmeManager) GetClient(ctx context.Context) (*acme.Client, error) {
 func (m *AcmeManager) accountRenew() {
 	ctx, ctxCancel := context.WithCancel(m.ctx)
 	defer ctxCancel()
+	if ctx.Err() != nil {
+		return
+	}
 
 	m.mu.Lock()
 	m.ctxAutorenewCompleted = ctx
