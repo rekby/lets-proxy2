@@ -400,9 +400,19 @@ func (m *Manager) createOrderForDomains(ctx context.Context, domains ...DomainNa
 	logger.Debug("Start order authorization.")
 	var order *acme.Order
 
+	firstLoop := true
 authorizeOrderLoop:
 	for {
 
+		if ctx.Err() != nil {
+			return nil, xerrors.Errorf("context cancelled: %w", ctx.Err())
+		}
+
+		if firstLoop {
+			firstLoop = false
+		} else {
+			time.Sleep(time.Second)
+		}
 		authIDs := make([]acme.AuthzID, len(domains))
 		for i := range domains {
 			authIDs[i] = acme.AuthzID{Type: "dns", Value: domains[i].ASCII()}
