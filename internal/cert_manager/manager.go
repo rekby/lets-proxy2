@@ -338,7 +338,7 @@ func (m *Manager) certStateGet(ctx context.Context, cd CertDescription) *certSta
 	if err == cache.ErrCacheMiss {
 		err = nil
 	}
-	log.DebugFatalCtx(ctx, err, "Got cert state from cache", zap.Bool("is_emapty", resInterface == nil))
+	log.DebugFatalCtx(ctx, err, "Got cert state from cache", zap.Bool("is_empty", resInterface == nil))
 	if resInterface == nil {
 		resInterface = &certState{}
 		err = m.certState.Put(ctx, cd.String(), resInterface)
