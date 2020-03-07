@@ -140,3 +140,21 @@ func TestCombinedContext_Done(t *testing.T) {
 	wait()
 	td.True(done)
 }
+
+func TestDropCancelContext(t *testing.T) {
+	td := testdeep.NewT(t)
+	const key = "key"
+	const val = "val"
+
+	ctx, ctxCancel := context.WithCancel(context.WithValue(context.Background(), key, val))
+	dropCancel := DropCancelContext(ctx)
+	ctxCancel()
+
+	deadline, ok := dropCancel.Deadline()
+	td.Cmp(deadline, time.Time{})
+	td.False(ok)
+
+	td.CmpNoError(dropCancel.Err())
+	td.Nil(dropCancel.Done())
+	td.Cmp(dropCancel.Value(key), val)
+}
