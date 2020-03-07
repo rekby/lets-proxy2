@@ -21,6 +21,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rekby/lets-proxy2/internal/contexthelper"
+
 	"github.com/rekby/lets-proxy2/internal/metrics"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -46,6 +48,7 @@ const (
 const domainKeyRSALength = 2048
 const renewBeforeExpire = time.Hour * 24 * 30
 const revokeAuthorizationTimeout = 5 * time.Minute
+const cleanupTimeout = time.Minute
 
 var errHaveNoCert = errors.New("have no certificate for domain") // may return for any internal error
 
@@ -338,7 +341,7 @@ func (m *Manager) certStateGet(ctx context.Context, cd CertDescription) *certSta
 	if err == cache.ErrCacheMiss {
 		err = nil
 	}
-	log.DebugFatalCtx(ctx, err, "Got cert state from cache", zap.Bool("is_emapty", resInterface == nil))
+	log.DebugFatalCtx(ctx, err, "Got cert state from cache", zap.Bool("is_empty", resInterface == nil))
 	if resInterface == nil {
 		resInterface = &certState{}
 		err = m.certState.Put(ctx, cd.String(), resInterface)
@@ -397,8 +400,18 @@ func (m *Manager) createOrderForDomains(ctx context.Context, domains ...DomainNa
 	logger.Debug("Start order authorization.")
 	var order *acme.Order
 
+	firstLoop := true
 authorizeOrderLoop:
 	for {
+		if ctx.Err() != nil {
+			return nil, xerrors.Errorf("context canceled: %w", ctx.Err())
+		}
+
+		if firstLoop {
+			firstLoop = false
+		} else {
+			time.Sleep(time.Second)
+		}
 		authIDs := make([]acme.AuthzID, len(domains))
 		for i := range domains {
 			authIDs[i] = acme.AuthzID{Type: "dns", Value: domains[i].ASCII()}
@@ -467,16 +480,24 @@ authorizeOrderLoop:
 
 				// Respond to the challenge and wait for validation result.
 				cleanup, err := m.fulfill(ctx, chal, DomainName(z.Identifier.Value))
+				log.DebugError(logger, err, "Write respond to challenge")
 				if err != nil {
 					continue authorizeOrderLoop
 				}
+				cleanupContext, cleanupContextCancel := context.WithTimeout(contexthelper.DropCancelContext(ctx), cleanupTimeout)
 				//noinspection GoDeferInLoop
-				defer cleanup(ctx)
+				defer cleanupContextCancel()
+				//noinspection GoDeferInLoop
+				defer cleanup(cleanupContext)
 
-				if _, err := client.Accept(ctx, chal); err != nil {
+				authorizedChallenge, err := client.Accept(ctx, chal)
+				log.DebugError(logger, err, "accept authorization", zap.Reflect("authorized_challenge", authorizedChallenge))
+				if err != nil {
 					continue authorizeOrderLoop
 				}
-				if _, err := client.WaitAuthorization(ctx, z.URI); err != nil {
+				authorization, err := client.WaitAuthorization(ctx, z.URI)
+				log.DebugError(logger, err, "wait authorization", zap.Reflect("authorization", authorization))
+				if err != nil {
 					continue authorizeOrderLoop
 				}
 			}
@@ -614,7 +635,11 @@ func (m *Manager) fulfill(ctx context.Context, challenge *acme.Challenge, domain
 		key := domain.ASCII() + "/" + challenge.Token
 		err = m.httpTokens.Put(ctx, key, []byte(resp))
 		log.DebugError(logger, err, "Put token for http-01", zap.String("key", key))
-		return func(localContext context.Context) { _ = m.httpTokens.Delete(localContext, key) }, err
+		if err == nil {
+			return func(localContext context.Context) { _ = m.httpTokens.Delete(localContext, key) }, nil
+		} else {
+			return nil, err
+		}
 	default:
 		logger.Error("Unknow challenge type", zap.Reflect("challenge", challenge))
 		return nil, errors.New("unknown challenge type")
