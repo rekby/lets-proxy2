@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"strings"
 	"time"
 
 	"golang.org/x/xerrors"
@@ -124,6 +125,11 @@ func startProgram(config *configType) {
 	certManager := cert_manager.New(acmeClient, storage, registry)
 	certManager.CertificateIssueTimeout = time.Duration(config.General.IssueTimeout) * time.Second
 	certManager.SaveJSONMeta = config.General.StoreJSONMetadata
+	for _, subdomain := range config.General.Subdomains {
+		subdomain = strings.TrimSpace(subdomain)
+		subdomain = strings.TrimSuffix(subdomain, ".") + "." // must ends with dot
+		certManager.AutoSubdomains = append(certManager.AutoSubdomains, subdomain)
+	}
 
 	certManager.DomainChecker, err = config.CheckDomains.CreateDomainChecker(ctx)
 	log.DebugFatal(logger, err, "Config domain checkers.")

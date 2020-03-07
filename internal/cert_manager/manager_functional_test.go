@@ -38,6 +38,7 @@ func TestManager_GetCertificateHttp01(t *testing.T) {
 	defer mc.Finish()
 
 	manager := New(createTestClient(t), newCacheMock(mc), nil)
+	manager.AutoSubdomains = []string{"www."}
 	manager.EnableTLSValidation = false
 	manager.EnableHTTPValidation = true
 
@@ -86,6 +87,7 @@ func TestManager_GetCertificateTls(t *testing.T) {
 	defer mc.Finish()
 
 	manager := New(createTestClient(t), newCacheMock(mc), nil)
+	manager.AutoSubdomains = []string{"www."}
 
 	lisneter, err := net.ListenTCP("tcp", &net.TCPAddr{Port: 5001})
 

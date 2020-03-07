@@ -81,6 +81,10 @@ type Manager struct {
 	CertificateIssueTimeout time.Duration
 	Cache                   cache.Bytes
 
+	// Subdomains, auto-issued with main domain.
+	// Every subdomain must have suffix dot. For example: "www."
+	AutoSubdomains []string
+
 	// Client is used to perform low-level operations, such as account registration
 	// and requesting new certificates.
 	//
@@ -164,7 +168,7 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 
 //nolint:funlen,gocognit
 func (m *Manager) getCertificate(ctx context.Context, needDomain DomainName, certType KeyType) (resultCert *tls.Certificate, err error) {
-	certDescription := CertDescriptionFromDomain(needDomain, certType)
+	certDescription := CertDescriptionFromDomain(needDomain, certType, m.AutoSubdomains)
 
 	logger := zc.L(ctx).With(certDescription.ZapField())
 	ctx = zc.WithLogger(ctx, zc.L(ctx).With(certDescription.ZapField()))

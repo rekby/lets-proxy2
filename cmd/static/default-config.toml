@@ -13,6 +13,9 @@ StorageDir = "storage"
 # Store .json info with certificate metadata near certificate.
 StoreJSONMetadata = true
 
+# Subdomains, auto-included within certificate of main domain name
+Subdomains = ["www."]
+
 # Directory url of acme server.
 #Test server: https://acme-staging-v02.api.letsencrypt.org/directory
 AcmeServer = "https://acme-v02.api.letsencrypt.org/directory"
