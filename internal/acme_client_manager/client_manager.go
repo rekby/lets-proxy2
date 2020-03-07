@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	zc "github.com/rekby/zapcontext"
+
 	"golang.org/x/xerrors"
 
 	"go.uber.org/zap"
@@ -62,18 +64,24 @@ type acmeManagerState struct {
 }
 
 func (m *AcmeManager) Close() error {
+	logger := zc.L(m.ctx)
+	logger.Debug("Start close")
 	m.mu.Lock()
 	alreadyClosed := m.closed
 	ctxAutorenewCompleted := m.ctxAutorenewCompleted
 	m.closed = true
 	m.ctxCancel()
 	m.mu.Unlock()
+	logger.Debug("Set closed flag", zap.Any("autorenew_context", ctxAutorenewCompleted))
 
 	if alreadyClosed {
 		return xerrors.Errorf("close: %w", errClosed)
 	}
+
 	if ctxAutorenewCompleted != nil {
+		logger.Debug("Start waiting for complete autorenew")
 		<-ctxAutorenewCompleted.Done()
+		logger.Debug("Autorenew context closed")
 	}
 	return nil
 }
@@ -129,6 +137,7 @@ func (m *AcmeManager) GetClient(ctx context.Context) (*acme.Client, error) {
 }
 
 func (m *AcmeManager) accountRenew() {
+	logger := zc.L(m.ctx)
 	ctx, ctxCancel := context.WithCancel(m.ctx)
 	defer ctxCancel()
 
@@ -139,6 +148,8 @@ func (m *AcmeManager) accountRenew() {
 	if m.ctx.Err() != nil {
 		return
 	}
+
+	logger.Debug("Start account autorenew")
 
 	ticker := time.NewTicker(m.RenewAccountInterval)
 	ctxDone := m.ctx.Done()
