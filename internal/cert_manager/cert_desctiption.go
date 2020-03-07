@@ -10,6 +10,7 @@ import (
 type CertDescription struct {
 	MainDomain string
 	KeyType    KeyType
+	Subdomains []string
 }
 
 func (n CertDescription) CertStoreName() string {
@@ -17,7 +18,12 @@ func (n CertDescription) CertStoreName() string {
 }
 
 func (n CertDescription) DomainNames() []DomainName {
-	return []DomainName{DomainName(n.MainDomain), DomainName("www." + n.MainDomain)}
+	domains := make([]DomainName, 1, len(n.Subdomains)+1)
+	domains[0] = DomainName(n.MainDomain)
+	for _, subdomain := range n.Subdomains {
+		domains = append(domains, DomainName(subdomain+n.MainDomain))
+	}
+	return domains
 }
 
 func (n CertDescription) KeyStoreName() string {
@@ -40,9 +46,17 @@ func (n CertDescription) ZapField() zap.Field {
 	return zap.Stringer("cert_name", n)
 }
 
-func CertDescriptionFromDomain(domain DomainName, keyType KeyType) CertDescription {
+func CertDescriptionFromDomain(domain DomainName, keyType KeyType, autoSubDomains []string) CertDescription {
+	mainDomain := domain.String()
+	for _, subdomain := range autoSubDomains {
+		if strings.HasPrefix(mainDomain, subdomain) {
+			mainDomain = strings.TrimPrefix(mainDomain, subdomain)
+			break
+		}
+	}
 	return CertDescription{
-		MainDomain: strings.TrimPrefix(domain.String(), "www."),
+		MainDomain: mainDomain,
 		KeyType:    keyType,
+		Subdomains: autoSubDomains,
 	}
 }

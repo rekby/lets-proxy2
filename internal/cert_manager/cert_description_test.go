@@ -15,7 +15,7 @@ func TestCertDescription_CertStoreName(t *testing.T) {
 
 func TestCertDescription_DomainNames(t *testing.T) {
 	td := testdeep.NewT(t)
-	td.Cmp(CertDescription{MainDomain: "asd.ru", KeyType: KeyRSA}.DomainNames(), []DomainName{"asd.ru", "www.asd.ru"})
+	td.Cmp(CertDescription{MainDomain: "asd.ru", KeyType: KeyRSA, Subdomains: []string{"www."}}.DomainNames(), []DomainName{"asd.ru", "www.asd.ru"})
 }
 
 func TestCertDescription_KeyStoreName(t *testing.T) {

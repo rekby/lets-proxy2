@@ -30,6 +30,7 @@ import (
 type ConfigGeneral struct {
 	IssueTimeout       int
 	StorageDir         string
+	Subdomains         []string
 	AcmeServer         string
 	StoreJSONMetadata  bool
 	IncludeConfigs     []string
