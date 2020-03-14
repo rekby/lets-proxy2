@@ -8,6 +8,9 @@ import (
 	"math/big"
 	"testing"
 
+	zc "github.com/rekby/zapcontext"
+	"go.uber.org/zap"
+
 	"golang.org/x/crypto/acme"
 
 	"github.com/maxatome/go-testdeep"
@@ -51,6 +54,7 @@ func TestClientManagerCreateNew(t *testing.T) {
 func TestClientManagerGetFromCache(t *testing.T) {
 	ctx, flush := th.TestContext(t)
 	defer flush()
+	ctx = zc.WithLogger(ctx, zap.NewNop().WithOptions(zap.Development()))
 
 	td := testdeep.NewT(t)
 
