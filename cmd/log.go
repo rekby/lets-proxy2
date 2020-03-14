@@ -14,14 +14,12 @@ import (
 	"go.uber.org/zap"
 )
 
-type logWriteSyncer lumberjack.Logger
-
-func (w *logWriteSyncer) Write(p []byte) (n int, err error) {
-	return (*lumberjack.Logger)(w).Write(p)
+type logWriteSyncer struct {
+	*lumberjack.Logger
 }
 
-func (w *logWriteSyncer) Sync() error {
-	return (*lumberjack.Logger)(w).Close()
+func (w logWriteSyncer) Sync() error {
+	return w.Logger.Close()
 }
 
 func initLogger(config logConfig) *zap.Logger {
@@ -38,7 +36,7 @@ func initLogger(config logConfig) *zap.Logger {
 			lr.MaxSize = int(math.MaxInt32) // about 2 Petabytes. Really no reachable in this scenario.
 		}
 
-		writeSyncer := (*logWriteSyncer)(lr)
+		writeSyncer := logWriteSyncer{lr}
 		writers = append(writers, writeSyncer)
 	}
 
@@ -99,7 +97,7 @@ func getLogOptions(config logConfig) (res []zap.Option) {
 		zap.AddCaller(),
 	}
 	if config.DeveloperMode {
-		res = append(res, zap.AddStacktrace(zapcore.WarnLevel))
+		res = append(res, zap.AddStacktrace(zapcore.WarnLevel), zap.Development())
 	} else {
 		res = append(res, zap.AddStacktrace(zapcore.ErrorLevel))
 	}
