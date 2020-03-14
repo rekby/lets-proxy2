@@ -77,5 +77,4 @@ func TestInitLogger(t *testing.T) {
 	td.CmpPanic(func() {
 		logger.DPanic(testError)
 	}, testError)
-
 }
