@@ -139,7 +139,7 @@ func (p *ListenersHandler) init() {
 }
 
 func (p *ListenersHandler) initMetrics(r prometheus.Registerer) {
-	p.connectionHandleStart, p.connectionHandleFinish = metrics.ToefCounters(r, "registered-conn", "Registered tcp connections")
+	p.connectionHandleStart, p.connectionHandleFinish = metrics.ToefCounters(r, "registered_conn", "Registered tcp connections")
 }
 
 func (p *ListenersHandler) registerConnection(conn net.Conn, tls bool) ContextConnextion {
