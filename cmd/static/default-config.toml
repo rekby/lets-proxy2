@@ -155,7 +155,7 @@ TCPAddresses = []
 Enable = false
 
 # Bind addresses for get by https
-TCPAddresses = [ "[::]:62101" ]
+TLSAddresses = [ "[::]:62101" ]
 
 # Bind addresses without TLS secure (for HTTP reverse proxy and http-01 validation without redirect to https)
 TCPAddresses = [ "[::]:62100" ]
