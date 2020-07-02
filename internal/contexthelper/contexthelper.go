@@ -77,6 +77,7 @@ func CombineContext(contexts ...context.Context) *CombinedContext {
 		deadlineMin = deadline
 	}
 	res.deadline, res.deadlineOk = deadlineMin, deadlineOk
+	// handlepanic: no external call
 	go res.waitCloseAny()
 	return res
 }

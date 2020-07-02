@@ -188,12 +188,17 @@ func getIPByExternalRequest(ctx context.Context, url string) ([]net.IP, error) {
 	wg.Add(2)
 	var errTCP4, errTCP6 error
 	go func() {
+		defer wg.Done()
+		defer log.HandlePanic(logger)
+
 		ipsFromDetector[0], errTCP4 = fGetIP("tcp4")
-		wg.Done()
 	}()
+
 	go func() {
+		defer wg.Done()
+		defer log.HandlePanic(logger)
+
 		ipsFromDetector[1], errTCP6 = fGetIP("tcp6")
-		wg.Done()
 	}()
 	wg.Wait()
 

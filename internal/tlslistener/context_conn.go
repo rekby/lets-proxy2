@@ -2,6 +2,7 @@ package tlslistener
 
 import (
 	"context"
+	"github.com/rekby/lets-proxy2/internal/log"
 	"net"
 
 	"golang.org/x/xerrors"
@@ -35,11 +36,14 @@ func (c ContextConnextion) Close() error {
 
 func finalizeContextConnection(conn *ContextConnextion) {
 	go func() {
+		logger := zc.L(conn.Context)
+		defer log.HandlePanic(logger)
+
 		if conn.connCloseHandler != nil {
 			conn.connCloseHandler(xerrors.New("Leak connection"))
 			conn.connCloseHandler = nil
 		}
-		zc.L(conn.Context).Warn("Leaked connection")
+		logger.Warn("Leaked connection")
 		_ = conn.Close()
 	}()
 }

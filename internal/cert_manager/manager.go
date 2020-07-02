@@ -144,7 +144,7 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 
 	logger = logger.With(logDomain(needDomain))
 	ctx = zc.WithLogger(ctx, logger)
-	defer handlePanic(logger)
+	defer log.HandlePanic(logger)
 
 	logger.Info("Get certificate", zap.String("original_domain", hello.ServerName))
 	if isTLSALPN01Hello(hello) {
@@ -188,6 +188,7 @@ func (m *Manager) getCertificate(ctx context.Context, needDomain DomainName, cer
 				}
 			}
 			if !locked {
+				// handlepanic: in renewCertInBackground
 				go m.renewCertInBackground(ctx, needDomain, certDescription)
 			}
 		}
@@ -308,6 +309,7 @@ func filterDomains(ctx context.Context, checker DomainChecker, originalDomains [
 
 		go func() {
 			defer wg.Done()
+			defer log.HandlePanic(logger)
 
 			allow, err := checker.IsDomainAllowed(ctx, domain.ASCII())
 			logger.Debug("Check domain", logDomain(domain), zap.Bool("allowed", allow), zap.Error(err))
@@ -430,6 +432,8 @@ authorizeOrderLoop:
 		//noinspection GoDeferInLoop
 		defer func() {
 			go func() {
+				defer log.HandlePanic(logger)
+
 				revokeLogger := logger.Named("background_auth_revoker")
 
 				revokeCtx, cancel := context.WithTimeout(context.Background(), revokeAuthorizationTimeout)
@@ -575,6 +579,7 @@ func (m *Manager) issueCertificate(ctx context.Context, cd CertDescription, orde
 func (m *Manager) renewCertInBackground(ctx context.Context, needDomain DomainName, cd CertDescription) {
 	// detach from request lifetime, but save log context
 	logger := zc.L(ctx).Named("background")
+	defer log.HandlePanic(logger)
 	ctx, ctxCancel := context.WithTimeout(context.Background(), m.CertificateIssueTimeout)
 	defer ctxCancel()
 
@@ -632,7 +637,10 @@ func (m *Manager) fulfill(ctx context.Context, challenge *acme.Challenge, domain
 			return nil, err
 		}
 		m.putCertToken(ctx, domain, &cert)
-		return func(localContext context.Context) { go m.deleteCertToken(localContext, domain) }, nil
+		return func(localContext context.Context) {
+			// handlepanic: in deleteCertToken
+			go m.deleteCertToken(localContext, domain)
+		}, nil
 	case http01:
 		resp, err := m.Client.HTTP01ChallengeResponse(challenge.Token)
 		if err != nil {
@@ -701,6 +709,8 @@ func (m *Manager) putCertToken(ctx context.Context, key DomainName, certificate 
 }
 
 func (m *Manager) deleteCertToken(ctx context.Context, key DomainName) {
+	defer log.HandlePanicCtx(ctx)
+
 	err := m.certForDomainAuthorize.Delete(ctx, key.String())
 	log.DebugDPanicCtx(ctx, err, "Delete cert token", zap.String("key", key.String()))
 }
@@ -917,14 +927,6 @@ func isNeedRenew(cert *tls.Certificate, now time.Time) bool {
 		return false
 	}
 	return cert.Leaf.NotAfter.Add(-renewBeforeExpire).Before(now)
-}
-
-// must called as defer handlepanic(logger)
-func handlePanic(logger *zap.Logger) {
-	err := recover()
-	if err != nil {
-		logger.DPanic("Panic handled", zap.Any("panic", err))
-	}
 }
 
 func isCertLocked(ctx context.Context, storage cache.Bytes, certName CertDescription) (bool, error) {

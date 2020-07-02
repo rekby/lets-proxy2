@@ -49,7 +49,8 @@ func NewResolver(dnsServer string) *Resolver {
 }
 
 func (r *Resolver) LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error) {
-	ctx = zc.WithLogger(ctx, zc.L(ctx).With(zap.String("dns_server", r.server)))
+	logger := zc.L(ctx).With(zap.String("dns_server", r.server))
+	ctx = zc.WithLogger(ctx, logger)
 	if !strings.HasSuffix(host, ".") {
 		host += "."
 	}
@@ -62,6 +63,8 @@ func (r *Resolver) LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr,
 	wg.Add(1)
 	go func() { //nolint:wsl
 		defer wg.Done()
+		defer log.HandlePanic(logger)
+
 		errA = errPanic
 		ipAddrA, errA = r.lookup(ctx, host, mdns.TypeA)
 	}()
@@ -69,6 +72,8 @@ func (r *Resolver) LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr,
 	wg.Add(1)
 	go func() { //nolint:wsl
 		defer wg.Done()
+		defer log.HandlePanic(logger)
+
 		errAAAA = errPanic
 		ipAddrAAAA, errAAAA = r.lookup(ctx, host, mdns.TypeAAAA)
 	}()
@@ -83,7 +88,7 @@ func (r *Resolver) LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr,
 		resultErr = errA
 	}
 
-	log.DebugErrorCtx(ctx, resultErr, "Host lookup", zap.NamedError("errA", errA),
+	log.DebugError(logger, resultErr, "Host lookup", zap.NamedError("errA", errA),
 		zap.NamedError("errAAAA", errAAAA), zap.Any("ipAddrA", ipAddrA),
 		zap.Any("ipAddrAAAA", ipAddrAAAA))
 
@@ -142,8 +147,10 @@ func lookupWithClient(ctx context.Context, host string, server string, recordTyp
 
 	var dnsAnswer *mdns.Msg
 	go func() { // nolint:wsl
+		defer close(exchangeCompleted)
+		defer log.HandlePanic(logger)
+
 		dnsAnswer, _, err = client.Exchange(&msg, server)
-		close(exchangeCompleted)
 	}()
 
 	select {

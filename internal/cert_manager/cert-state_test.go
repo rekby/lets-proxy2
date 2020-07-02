@@ -94,8 +94,9 @@ func TestCertStateManyIssuers(t *testing.T) {
 
 	for i := 0; i < cnt; i++ {
 		go func() {
+			defer wg.Done()
+
 			lockTimesChan <- lockFunc()
-			wg.Done()
 		}()
 	}
 	wg.Wait()
