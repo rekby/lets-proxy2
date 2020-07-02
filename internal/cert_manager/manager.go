@@ -608,7 +608,7 @@ func (m *Manager) certKeyGetOrCreate(ctx context.Context, cd CertDescription) (c
 	logger := zc.L(ctx)
 
 	key, err := getCertificateKey(ctx, m.Cache, cd)
-	log.DebugError(logger, err, "Got certificate key from cache and reuse old key")
+	logger.Debug("Got certificate key from cache and reuse old key", zap.Error(err))
 	if err == nil {
 		return key, nil
 	}

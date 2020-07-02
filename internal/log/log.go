@@ -190,6 +190,16 @@ func infoPanic(logger *zap.Logger, err error, mess string, fields ...zap.Field) 
 }
 
 func LevelParam(logger *zap.Logger, level zapcore.Level, mess string, fields ...zap.Field) {
+	levelParam(logger, level, mess, fields...)
+}
+
+func LevelParamCtx(ctx context.Context, level zapcore.Level, mess string, fields ...zap.Field) {
+	logger := zc.L(ctx)
+	levelParam(logger, level, mess, fields...)
+}
+
+func levelParam(logger *zap.Logger, level zapcore.Level, mess string, fields ...zap.Field) {
+	logger = logger.WithOptions(zap.AddCallerSkip(addSkipCallers))
 	if ce := logger.Check(level, mess); ce != nil {
 		ce.Write(fields...)
 	}
