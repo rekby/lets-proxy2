@@ -27,6 +27,7 @@ import (
 )
 
 const forceRsaDomain = "force-rsa.ru"
+const testCertIssueTimeout = time.Second * 30
 
 func TestManager_GetCertificateHttp01(t *testing.T) {
 	ctx, flush := th.TestContext(t)
@@ -38,6 +39,7 @@ func TestManager_GetCertificateHttp01(t *testing.T) {
 	defer mc.Finish()
 
 	manager := New(createTestClient(t), newCacheMock(mc), nil)
+	manager.CertificateIssueTimeout = testCertIssueTimeout
 	manager.AutoSubdomains = []string{"www."}
 	manager.EnableTLSValidation = false
 	manager.EnableHTTPValidation = true
@@ -87,7 +89,10 @@ func TestManager_GetCertificateTls(t *testing.T) {
 	defer mc.Finish()
 
 	manager := New(createTestClient(t), newCacheMock(mc), nil)
+	manager.CertificateIssueTimeout = testCertIssueTimeout
 	manager.AutoSubdomains = []string{"www."}
+	manager.EnableTLSValidation = true
+	manager.EnableHTTPValidation = false
 
 	lisneter, err := net.ListenTCP("tcp", &net.TCPAddr{Port: 5001})
 
