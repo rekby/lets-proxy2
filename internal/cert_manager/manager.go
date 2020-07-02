@@ -422,7 +422,7 @@ authorizeOrderLoop:
 		}
 		var err error
 		order, err = m.Client.AuthorizeOrder(ctx, authIDs)
-		log.DebugError(logger, err, "Create authorization order.")
+		log.DebugError(logger, err, "Create authorization order.", zap.Reflect("order", order))
 		if err != nil {
 			return nil, err
 		}
@@ -458,7 +458,8 @@ authorizeOrderLoop:
 	authDomainLoop:
 		for _, zurl := range order.AuthzURLs {
 			z, err := client.GetAuthorization(ctx, zurl)
-			log.DebugError(logger, err, "Get authorization object.", zap.String("domain", z.Identifier.Value))
+
+			log.DebugError(logger, err, "Get authorization object.", zap.Reflect("authorization", z))
 			if err != nil {
 				return nil, err
 			}
@@ -514,7 +515,7 @@ authorizeOrderLoop:
 		// All authorizations are satisfied.
 		// Wait for the CA to update the order status.
 		order, err = client.WaitOrder(ctx, order.URI)
-		log.DebugWarning(logger, err, "Wait order authorization.")
+		log.DebugWarning(logger, err, "Wait order authorization.", zap.Reflect("order", order))
 		if err == nil {
 			break authorizeOrderLoop
 		}
@@ -590,7 +591,7 @@ func (m *Manager) deactivatePendingAuthz(ctx context.Context, uries []string) {
 	for _, uri := range uries {
 		localLogger := logger.With(zap.String("uri", uri))
 		authorization, err := m.Client.GetAuthorization(ctx, uri)
-		log.DebugError(localLogger, err, "Get authorization", zap.Any("authorization", authorization))
+		log.DebugError(localLogger, err, "Get authorization", zap.Reflect("authorization", authorization))
 		if err != nil {
 			continue
 		}
@@ -626,6 +627,7 @@ func (m *Manager) fulfill(ctx context.Context, challenge *acme.Challenge, domain
 	switch challenge.Type {
 	case tlsAlpn01:
 		cert, err := m.Client.TLSALPN01ChallengeCert(challenge.Token, domain.String())
+		log.DebugError(logger, err, "Got TLSALPN01ChallengeCert", log.Cert(&cert))
 		if err != nil {
 			return nil, err
 		}

@@ -11,6 +11,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"golang.org/x/xerrors"
 	"net"
 	"net/http"
 	"testing"
@@ -215,4 +216,30 @@ func createManager(t *testing.T) (res testManagerContext, cancel func()) {
 		mc.Finish()
 		ctxCancel()
 	}
+}
+
+// Test nil in getAuthorized
+func TestIssue_134(t *testing.T) {
+	ctx, ctxCancel := th.TestContext(t)
+	defer ctxCancel()
+
+	mc := minimock.NewController(t)
+	defer mc.Finish()
+
+	td := testdeep.NewT(t)
+
+	testURL := "http://test"
+	client := NewAcmeClientMock(mc)
+	client.AuthorizeOrderMock.Return(&acme.Order{
+		Status:    acme.StatusPending,
+		AuthzURLs: []string{testURL},
+	}, nil)
+
+	testErr := xerrors.New("testErr")
+	client.GetAuthorizationMock.Expect(ctx, testURL).Return(nil, testErr)
+
+	m := &Manager{Client: client}
+	res, err := m.createOrderForDomains(ctx, "test")
+	td.Nil(res)
+	td.True(xerrors.Is(err, testErr))
 }
