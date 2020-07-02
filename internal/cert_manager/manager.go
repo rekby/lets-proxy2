@@ -51,6 +51,9 @@ const revokeAuthorizationTimeout = 5 * time.Minute
 const cleanupTimeout = time.Minute
 
 var errHaveNoCert = errors.New("have no certificate for domain") // may return for any internal error
+var errRSADenied = xerrors.New("RSA certificate denied by config")
+var errECDSADenied = xerrors.New("ECDSA certificate denied by config")
+var errCertTypeUnknown = xerrors.New("unknown cert type")
 
 type GetContext interface {
 	GetContext() context.Context
@@ -98,6 +101,8 @@ type Manager struct {
 	EnableHTTPValidation bool
 	EnableTLSValidation  bool
 	SaveJSONMeta         bool
+	AllowECDSACert       bool
+	AllowRSACert         bool
 
 	certForDomainAuthorize cache.Value
 
@@ -121,6 +126,8 @@ func New(client AcmeClient, c cache.Bytes, r prometheus.Registerer) *Manager {
 	res.Cache = c
 	res.EnableTLSValidation = true
 	res.DomainChecker = managerDefaults{}
+	res.AllowRSACert = true
+	res.AllowECDSACert = true
 
 	res.initMetrics(r)
 	return &res
@@ -168,6 +175,19 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 
 //nolint:funlen,gocognit
 func (m *Manager) getCertificate(ctx context.Context, needDomain DomainName, certType KeyType) (resultCert *tls.Certificate, err error) {
+	switch certType {
+	case KeyRSA:
+		if !m.AllowRSACert {
+			return nil, errRSADenied
+		}
+	case KeyECDSA:
+		if !m.AllowECDSACert {
+			return nil, errECDSADenied
+		}
+	default:
+		return nil, errCertTypeUnknown
+	}
+
 	certDescription := CertDescriptionFromDomain(needDomain, certType, m.AutoSubdomains)
 
 	logger := zc.L(ctx).With(certDescription.ZapField())

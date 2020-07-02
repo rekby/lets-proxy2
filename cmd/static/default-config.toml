@@ -31,6 +31,9 @@ IncludeConfigs = []
 # For prevent infinite loop and consume all memory if cycle in includes
 MaxConfigFilesRead = 10000
 
+AllowRSACert = true
+AllowECDSACert = true
+
 [Log]
 EnableLogToFile = true
 EnableLogToStdErr = true

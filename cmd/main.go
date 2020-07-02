@@ -127,6 +127,10 @@ func startProgram(config *configType) {
 	certManager := cert_manager.New(acmeClient, storage, registry)
 	certManager.CertificateIssueTimeout = time.Duration(config.General.IssueTimeout) * time.Second
 	certManager.SaveJSONMeta = config.General.StoreJSONMetadata
+
+	certManager.AllowECDSACert = config.General.AllowECDSACert
+	certManager.AllowRSACert = config.General.AllowRSACert
+
 	for _, subdomain := range config.General.Subdomains {
 		subdomain = strings.TrimSpace(subdomain)
 		subdomain = strings.TrimSuffix(subdomain, ".") + "." // must ends with dot

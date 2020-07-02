@@ -35,6 +35,8 @@ type ConfigGeneral struct {
 	StoreJSONMetadata  bool
 	IncludeConfigs     []string
 	MaxConfigFilesRead int
+	AllowRSACert       bool
+	AllowECDSACert     bool
 }
 
 //go:generate packr
