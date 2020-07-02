@@ -430,8 +430,8 @@ authorizeOrderLoop:
 		}
 
 		//noinspection GoDeferInLoop
-		defer func() {
-			go func() {
+		defer func(order *acme.Order) {
+			go func(order *acme.Order) {
 				defer log.HandlePanic(logger)
 
 				revokeLogger := logger.Named("background_auth_revoker")
@@ -441,8 +441,8 @@ authorizeOrderLoop:
 
 				revokeCtx = zc.WithLogger(revokeCtx, revokeLogger)
 				m.deactivatePendingAuthz(revokeCtx, order.AuthzURLs)
-			}()
-		}()
+			}(order)
+		}(order)
 
 		switch order.Status {
 		case acme.StatusReady:
