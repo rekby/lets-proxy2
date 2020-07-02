@@ -2,6 +2,8 @@ package dns
 
 import (
 	"context"
+	"github.com/rekby/lets-proxy2/internal/log"
+	zc "github.com/rekby/zapcontext"
 	"net"
 	"sync"
 )
@@ -24,6 +26,8 @@ func NewParallel(resolvers ...ResolverInterface) Parallel {
 // If any of resolvers return ips - return sum array of the ips (may duplicated)
 // If all resolvers return error - return any of they errors
 func (p Parallel) LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error) {
+	logger := zc.L(ctx)
+
 	switch len(p) {
 	case 0:
 		return nil, nil
@@ -40,8 +44,10 @@ func (p Parallel) LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, 
 	wg.Add(len(p))     // nolint:wsl
 	for i := range p { // nolint:wsl
 		go func(i int) {
+			defer wg.Done()
+			defer log.HandlePanic(logger)
+
 			ips[i], errs[i] = p[i].LookupIPAddr(ctx, host)
-			wg.Done()
 		}(i)
 	}
 

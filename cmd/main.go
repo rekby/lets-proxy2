@@ -90,6 +90,8 @@ func startMetrics(ctx context.Context, r prometheus.Gatherer, config config.Conf
 
 	secretMetric := secrethandler.New(zc.L(ctx).Named("metrics_secret"), config.GetSecretHandlerConfig(), m)
 	go func() {
+		defer log.HandlePanic(loggerLocal)
+
 		err := http.Serve(listener, secretMetric)
 		var effectiveError = err
 		if effectiveError == http.ErrServerClosed {
@@ -156,6 +158,8 @@ func startProgram(config *configType) {
 	log.InfoFatal(logger, err, "Apply proxy config")
 
 	go func() {
+		defer log.HandlePanic(logger)
+
 		<-ctx.Done()
 		err := p.Close()
 		log.DebugError(logger, err, "Stop proxy")
@@ -178,6 +182,8 @@ func startProfiler(ctx context.Context, config profiler.Config) {
 	}
 
 	go func() {
+		defer log.HandlePanic(logger)
+
 		httpServer := http.Server{
 			Addr:    config.BindAddress,
 			Handler: profiler.New(logger.Named("profiler"), config),

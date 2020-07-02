@@ -69,6 +69,7 @@ func (c *MemoryValueLRU) Put(ctx context.Context, key string, value interface{})
 	c.mu.Lock()
 	c.m[key] = &memoryValueLRUItem{key: key, value: value, lastUsedTime: c.time()}
 	if len(c.m) > c.MaxSize {
+		// handlepanic: no external call
 		go c.clean()
 	}
 	c.mu.Unlock()
@@ -92,6 +93,7 @@ func (c *MemoryValueLRU) Delete(ctx context.Context, key string) (err error) {
 func (c *MemoryValueLRU) time() uint64 {
 	res := atomic.AddUint64(&c.lastTime, 1)
 	if res == math.MaxUint64/2 {
+		// handlepanic: no external call
 		go c.renumberTime()
 	}
 	return res

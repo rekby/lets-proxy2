@@ -79,14 +79,18 @@ func (p *ListenersHandler) Start(ctx context.Context, r prometheus.Registerer) e
 	logger.Info("StartAutoRenew handleListeners")
 
 	for _, listenerForTLS := range p.ListenersForHandleTLS {
+		// handlepanic: in handleConnections
 		go handleConnections(ctx, listenerForTLS, p.handleTCPTLSConnection, listenerClosed)
 	}
 
 	for _, listener := range p.Listeners {
+		// handlepanic: in handleConnections
 		go handleConnections(ctx, listener, p.handleTCPConnection, listenerClosed)
 	}
 
 	go func() {
+		defer log.HandlePanic(logger)
+
 		listenersCount := len(p.ListenersForHandleTLS) + len(p.Listeners)
 		for i := 0; i < listenersCount; i++ {
 			select {
@@ -106,6 +110,7 @@ func (p *ListenersHandler) Start(ctx context.Context, r prometheus.Registerer) e
 
 func handleConnections(ctx context.Context, l net.Listener, handleFunc func(ctx context.Context, conn net.Conn), listenerClosed chan<- struct{}) {
 	logger := zc.L(ctx)
+	defer log.HandlePanic(logger)
 
 	for {
 		conn, err := l.Accept()
@@ -120,6 +125,7 @@ func handleConnections(ctx context.Context, l net.Listener, handleFunc func(ctx 
 			listenerClosed <- struct{}{}
 			return
 		}
+		// handlepanic: in handleFunc
 		go handleFunc(ctx, conn)
 	}
 }

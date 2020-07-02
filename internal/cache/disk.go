@@ -2,6 +2,8 @@ package cache
 
 import (
 	"context"
+	"github.com/rekby/lets-proxy2/internal/log"
+	"go.uber.org/zap/zapcore"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -28,13 +30,19 @@ func (c *DiskCache) Get(ctx context.Context, key string) ([]byte, error) {
 
 	filePath := c.filepath(key)
 
+	logLevel := zapcore.DebugLevel
 	res, err := ioutil.ReadFile(filePath)
-	if os.IsNotExist(err) {
-		err = ErrCacheMiss
+	if err != nil {
+		if os.IsNotExist(err) {
+			err = ErrCacheMiss
+		} else {
+			logLevel = zapcore.ErrorLevel
+		}
 	}
 
-	zc.L(ctx).Debug("Got from disk cache", zap.String("dir", c.Dir), zap.String("key", key),
+	log.LevelParamCtx(ctx, logLevel, "Got from disk cache", zap.String("dir", c.Dir), zap.String("key", key),
 		zap.String("file", filePath), zap.Error(err))
+
 	return res, err
 }
 

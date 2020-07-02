@@ -130,6 +130,7 @@ func (m *AcmeManager) GetClient(ctx context.Context) (*acme.Client, error) {
 	}
 
 	if m.client != nil {
+		// handlepanic: in accountRenew
 		go m.accountRenew()
 	}
 
@@ -160,7 +161,12 @@ func (m *AcmeManager) accountRenew() {
 			log.InfoCtx(m.ctx, "Stop renew acme account because cancel context", zap.Error(m.ctx.Err()))
 			return
 		case <-ticker.C:
-			newAccount := renewTos(m.ctx, m.client, m.account)
+			var newAccount *acme.Account
+			func() {
+				defer log.HandlePanic(logger)
+
+				newAccount = renewTos(m.ctx, m.client, m.account)
+			}()
 			m.mu.Lock()
 			m.account = newAccount
 			m.mu.Unlock()
@@ -201,6 +207,7 @@ func (m *AcmeManager) loadFromCache(ctx context.Context) (err error) {
 	m.client = &acme.Client{DirectoryURL: m.DirectoryURL, Key: state.PrivateKey}
 	m.account = state.AcmeAccount
 
+	// handlepanic: in accountRenew
 	go m.accountRenew()
 
 	return nil

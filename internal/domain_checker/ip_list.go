@@ -134,6 +134,7 @@ func (s *IPList) StartAutoRenew() {
 	}
 	s.started = true
 	if s.AutoUpdateInterval > 0 {
+		// handlepanic: in updateIPsByTimer
 		go s.updateIPsByTimer()
 	}
 }
@@ -155,12 +156,18 @@ func (s *IPList) updateIPsByTimer() {
 	ticker := time.NewTicker(s.AutoUpdateInterval)
 	defer ticker.Stop()
 
+	logger := zc.L(s.ctx)
+
 	for {
 		select {
 		case <-contextDone:
 			return
 		case <-ticker.C:
-			s.updateIPs()
+			func() {
+				defer log.HandlePanic(logger)
+
+				s.updateIPs()
+			}()
 		}
 	}
 }
