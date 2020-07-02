@@ -39,3 +39,31 @@ func TestContextConnextion_Close(t *testing.T) {
 	}}
 	td.CmpDeeply(c.Close(), testErr)
 }
+
+func TestFinalizeContextConnection(t *testing.T) {
+	var c ContextConnextion
+	var connMock *ConnMock
+	td := testdeep.NewT(t)
+	ctx, flush := th.TestContext(t)
+	defer flush()
+
+	connMock = NewConnMock(td)
+	defer func() { _ = connMock.Close() }()
+
+	connMock.CloseMock.Expect().Return(nil)
+
+	closeHandlerCalledWithError := false
+
+	c = ContextConnextion{
+		Conn:    connMock,
+		Context: ctx,
+		connCloseHandler: func(err error) {
+			if err != nil {
+				closeHandlerCalledWithError = true
+			}
+		},
+	}
+
+	finalizeContextConnection(&c)
+	td.True(closeHandlerCalledWithError)
+}

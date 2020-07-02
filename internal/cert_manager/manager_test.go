@@ -182,6 +182,20 @@ func TestManager_CertForDenied(t *testing.T) {
 	td.CmpError(err)
 }
 
+func TestGetCertificateDenyCertificates(t *testing.T) {
+	td := testdeep.NewT(t)
+	m := Manager{}
+
+	_, err := m.getCertificate(nil, "", KeyRSA)
+	td.Cmp(err, errRSADenied)
+
+	_, err = m.getCertificate(nil, "", KeyECDSA)
+	td.Cmp(err, errECDSADenied)
+
+	_, err = m.getCertificate(nil, "", "")
+	td.Cmp(err, errCertTypeUnknown)
+}
+
 func createManager(t *testing.T) (res testManagerContext, cancel func()) {
 	ctx, ctxCancel := th.TestContext(t)
 	mc := minimock.NewController(t)
@@ -206,6 +220,8 @@ func createManager(t *testing.T) (res testManagerContext, cancel func()) {
 		DomainChecker:           res.domainChecker,
 		EnableHTTPValidation:    true,
 		EnableTLSValidation:     true,
+		AllowRSACert:            true,
+		AllowECDSACert:          true,
 		certForDomainAuthorize:  res.certForDomainAuthorize,
 		certState:               res.certState,
 		httpTokens:              res.httpTokens,
