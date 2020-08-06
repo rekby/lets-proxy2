@@ -34,6 +34,16 @@ MaxConfigFilesRead = 10000
 AllowRSACert = true
 AllowECDSACert = true
 
+# RewriteCertName allow define rule for match domain name -> cert name.
+# for redirect some domains to already existed certificate.
+# Apply after cut Subdomains prefixes
+# Work with https://golang.org/pkg/regexp/#Regexp.ReplaceAllString
+# Match split from replacer by |
+# Example: RewriteCertName = ["^([^.]+\.)?domain.com$|my_cert"]
+# will match asd.domain.com, www.domain.com, domain.com to my_cert.rsa.cer or my_cert.ecdsa.cert
+# the cert must be locked. Issue cert after rewrite cert_name impossible.
+RewriteCertName = []
+
 [Log]
 EnableLogToFile = true
 EnableLogToStdErr = true

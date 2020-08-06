@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -127,6 +128,8 @@ func startProgram(config *configType) {
 	certManager := cert_manager.New(acmeClient, storage, registry)
 	certManager.CertificateIssueTimeout = time.Duration(config.General.IssueTimeout) * time.Second
 	certManager.SaveJSONMeta = config.General.StoreJSONMetadata
+	certManager.RewriteCertName, err = createRewriteRules(config.General.RewriteCertName)
+	log.InfoFatal(logger, err, "Compile cert name rewrite rules")
 
 	certManager.AllowECDSACert = config.General.AllowECDSACert
 	certManager.AllowRSACert = config.General.AllowRSACert
@@ -175,6 +178,31 @@ func startProgram(config *configType) {
 		effectiveError = nil
 	}
 	log.DebugErrorCtx(ctx, effectiveError, "Handle request stopped")
+}
+
+func createRewriteRules(rules []string) ([]cert_manager.CertNameRewriteFunc, error) {
+	var res []cert_manager.CertNameRewriteFunc
+	if len(rules) == 0 {
+		return nil, nil
+	}
+
+	res = make([]cert_manager.CertNameRewriteFunc, 0, len(rules))
+	for _, rule := range rules {
+		parts := strings.Split(rule, "|")
+		if len(parts) != 2 {
+			return nil, xerrors.Errorf("error while parse rule '%s': must be exactly one separator '|'", rule)
+		}
+		pattern, err := regexp.Compile(parts[0])
+		if err != nil {
+			return nil, xerrors.Errorf("rule compile error '%s': %w", rule, err)
+		}
+		replacer := parts[1]
+		var f cert_manager.CertNameRewriteFunc = func(s string) string {
+			return pattern.ReplaceAllString(s, replacer)
+		}
+		res = append(res, f)
+	}
+	return res, nil
 }
 
 func startProfiler(ctx context.Context, config profiler.Config) {

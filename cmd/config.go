@@ -37,6 +37,7 @@ type ConfigGeneral struct {
 	MaxConfigFilesRead int
 	AllowRSACert       bool
 	AllowECDSACert     bool
+	RewriteCertName    []string
 }
 
 //go:generate packr

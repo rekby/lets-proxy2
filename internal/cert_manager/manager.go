@@ -60,6 +60,7 @@ type GetContext interface {
 }
 
 type KeyType string
+type CertNameRewriteFunc func(certname string) string
 
 const KeyRSA KeyType = "rsa"
 const KeyECDSA KeyType = "ecdsa"
@@ -103,6 +104,8 @@ type Manager struct {
 	SaveJSONMeta         bool
 	AllowECDSACert       bool
 	AllowRSACert         bool
+
+	RewriteCertName []CertNameRewriteFunc
 
 	certForDomainAuthorize cache.Value
 
@@ -188,7 +191,8 @@ func (m *Manager) getCertificate(ctx context.Context, needDomain DomainName, cer
 		return nil, errCertTypeUnknown
 	}
 
-	certDescription := CertDescriptionFromDomain(needDomain, certType, m.AutoSubdomains)
+	certName := m.certName(ctx, needDomain)
+	certDescription := CertDescriptionFromDomain(needDomain, certName, certType, m.AutoSubdomains)
 
 	logger := zc.L(ctx).With(certDescription.ZapField())
 	ctx = zc.WithLogger(ctx, zc.L(ctx).With(certDescription.ZapField()))
@@ -646,6 +650,22 @@ func (m *Manager) certKeyGetOrCreate(ctx context.Context, cd CertDescription) (c
 	return key, err
 }
 
+func (m *Manager) certName(ctx context.Context, domain DomainName) string {
+	if len(m.RewriteCertName) == 0 {
+		return domain.ASCII()
+	}
+
+	certName := domain.ASCII()
+	oldCertName := certName
+	for _, rule := range m.RewriteCertName {
+		certName = rule(certName)
+	}
+	if oldCertName != certName {
+		zc.L(ctx).Debug("certname changed", zap.String("old_cert_name", oldCertName), zap.String("new_cert_name", certName))
+	}
+	return certName
+}
+
 func (m *Manager) fulfill(ctx context.Context, challenge *acme.Challenge, domain DomainName) (func(context.Context), error) {
 	logger := zc.L(ctx)
 
@@ -950,6 +970,9 @@ func isNeedRenew(cert *tls.Certificate, now time.Time) bool {
 }
 
 func isCertLocked(ctx context.Context, storage cache.Bytes, certName CertDescription) (bool, error) {
+	if certName.MainDomain == "" {
+		return true, nil
+	}
 	lockName := certName.LockName()
 
 	_, err := storage.Get(ctx, lockName)

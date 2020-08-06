@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -53,7 +54,7 @@ func createTestClient(t *testing.T) *acme.Client {
 	if err != nil {
 		t.Fatalf("Can't connect to buoulder server: %q", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	client := acme.Client{}
 	client.HTTPClient = &http.Client{
@@ -75,6 +76,42 @@ func createTestClient(t *testing.T) *acme.Client {
 		t.Fatal("Can't initialize acme client.")
 	}
 	return &client
+}
+
+func TestCertName(t *testing.T) {
+	td := testdeep.NewT(t)
+	ctx, ctxClose := th.TestContext(t)
+	defer ctxClose()
+
+	m := &Manager{}
+
+	// empty rewrite
+	const domain = "domain.com"
+	td.Cmp(m.certName(ctx, domain), domain)
+
+	// rule without effect
+	m.RewriteCertName = []CertNameRewriteFunc{func(certname string) string {
+		return certname
+	}}
+	td.Cmp(m.certName(ctx, domain), domain)
+
+	// one rule with effect
+	m.RewriteCertName = []CertNameRewriteFunc{func(certName string) string {
+		return strings.ReplaceAll(certName, ".com", ".ru")
+	}}
+	td.Cmp(m.certName(ctx, domain), strings.ReplaceAll(domain, ".com", ".ru"))
+
+	// many rule with effect
+	m.RewriteCertName = []CertNameRewriteFunc{
+		func(certName string) string {
+			return strings.ReplaceAll(certName, ".com", ".ru")
+		},
+		func(certName string) string {
+			return strings.ReplaceAll(certName, ".ru", ".org")
+		},
+	}
+	td.Cmp(m.certName(ctx, domain), strings.ReplaceAll(domain, ".com", ".org"))
+
 }
 
 func TestGetKeyType(t *testing.T) {
@@ -102,6 +139,7 @@ func TestGetKeyType(t *testing.T) {
 }
 
 func TestStoreCertificate(t *testing.T) {
+	td := testdeep.NewT(t)
 	ctx, flush := th.TestContext(t)
 	defer flush()
 
@@ -123,7 +161,8 @@ func TestStoreCertificate(t *testing.T) {
 	})
 	cacheMock.GetMock.Return(nil, cache.ErrCacheMiss)
 
-	storeCertificate(ctx, cacheMock, CertDescription{MainDomain: "asd", KeyType: KeyRSA}, cert)
+	err := storeCertificate(ctx, cacheMock, CertDescription{MainDomain: "asd", KeyType: KeyRSA}, cert)
+	td.CmpNoError(err)
 }
 
 func TestIsNeedRenew(t *testing.T) {

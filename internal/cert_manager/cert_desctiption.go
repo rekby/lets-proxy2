@@ -8,13 +8,14 @@ import (
 )
 
 type CertDescription struct {
+	CertName   string
 	MainDomain string
 	KeyType    KeyType
 	Subdomains []string
 }
 
 func (n CertDescription) CertStoreName() string {
-	return n.MainDomain + "." + n.KeyType.String() + ".cer"
+	return n.CertName + "." + n.KeyType.String() + ".cer"
 }
 
 func (n CertDescription) DomainNames() []DomainName {
@@ -27,26 +28,26 @@ func (n CertDescription) DomainNames() []DomainName {
 }
 
 func (n CertDescription) KeyStoreName() string {
-	return n.MainDomain + "." + n.KeyType.String() + ".key"
+	return n.CertName + "." + n.KeyType.String() + ".key"
 }
 
 func (n CertDescription) LockName() string {
-	return n.MainDomain + ".lock"
+	return n.CertName + ".lock"
 }
 
 func (n CertDescription) MetaStoreName() string {
-	return n.MainDomain + "." + n.KeyType.String() + ".json"
+	return n.CertName + "." + n.KeyType.String() + ".json"
 }
 
 func (n CertDescription) String() string {
-	return n.MainDomain + "." + n.KeyType.String()
+	return n.CertName + "." + n.KeyType.String()
 }
 
 func (n CertDescription) ZapField() zap.Field {
 	return zap.Stringer("cert_name", n)
 }
 
-func CertDescriptionFromDomain(domain DomainName, keyType KeyType, autoSubDomains []string) CertDescription {
+func CertDescriptionFromDomain(domain DomainName, certName string, keyType KeyType, autoSubDomains []string) CertDescription {
 	mainDomain := domain.String()
 	for _, subdomain := range autoSubDomains {
 		if strings.HasPrefix(mainDomain, subdomain) {
@@ -55,6 +56,7 @@ func CertDescriptionFromDomain(domain DomainName, keyType KeyType, autoSubDomain
 		}
 	}
 	return CertDescription{
+		CertName:   certName,
 		MainDomain: mainDomain,
 		KeyType:    keyType,
 		Subdomains: autoSubDomains,
