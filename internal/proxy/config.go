@@ -45,7 +45,7 @@ func (c *Config) Apply(ctx context.Context, p *HTTPProxy) error {
 	appendDirector(c.getMapDirector)
 	appendDirector(c.getHeadersDirector)
 	appendDirector(c.getSchemaDirector)
-	p.httpReverseProxy.Transport = Transport{c.HTTPSBackendIgnoreCert}
+	p.HTTPTransport = Transport{c.HTTPSBackendIgnoreCert}
 
 	if resErr != nil {
 		zc.L(ctx).Error("Can't parse proxy config", zap.Error(resErr))
