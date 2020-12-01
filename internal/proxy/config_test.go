@@ -281,12 +281,12 @@ func TestConfig_Apply(t *testing.T) {
 	c = Config{HTTPSBackendIgnoreCert: false}
 	p = &HTTPProxy{}
 	_ = c.Apply(ctx, p)
-	transport := p.httpReverseProxy.Transport.(Transport)
+	transport := p.HTTPTransport.(Transport)
 	transport.IgnoreHTTPSCertificate = false
 
 	c = Config{HTTPSBackendIgnoreCert: true}
 	p = &HTTPProxy{}
 	_ = c.Apply(ctx, p)
-	transport = p.httpReverseProxy.Transport.(Transport)
+	transport = p.HTTPTransport.(Transport)
 	transport.IgnoreHTTPSCertificate = true
 }
