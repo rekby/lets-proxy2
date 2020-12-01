@@ -153,6 +153,7 @@ func startProgram(config *configType) {
 	err = tlsListener.Start(ctx, registry)
 	log.DebugFatal(logger, err, "StartAutoRenew tls listener")
 
+	config.Proxy.DisableAccessLog = config.Log.DisableAccessLog
 	p := proxy.NewHTTPProxy(ctx, tlsListener)
 	p.GetContext = func(req *http.Request) (i context.Context, e error) {
 		localAddr := req.Context().Value(http.LocalAddrContextKey).(net.Addr)

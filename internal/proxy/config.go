@@ -25,6 +25,7 @@ type Config struct {
 	KeepAliveTimeoutSeconds int
 	HTTPSBackend            bool
 	HTTPSBackendIgnoreCert  bool
+	DisableAccessLog        bool
 }
 
 func (c *Config) Apply(ctx context.Context, p *HTTPProxy) error {
@@ -46,6 +47,7 @@ func (c *Config) Apply(ctx context.Context, p *HTTPProxy) error {
 	appendDirector(c.getHeadersDirector)
 	appendDirector(c.getSchemaDirector)
 	p.HTTPTransport = Transport{c.HTTPSBackendIgnoreCert}
+	p.EnableAccessLog = !c.DisableAccessLog
 
 	if resErr != nil {
 		zc.L(ctx).Error("Can't parse proxy config", zap.Error(resErr))
