@@ -41,8 +41,8 @@ EnableLogToStdErr = true
 # verbose level of log, one of: debug, info, warning, error, fatal
 LogLevel = "info"
 
-# Disable write info about every http request (but write info about connections if need by level)
-DisableAccessLog = false
+# Enable write info about every http request (but write info about connections if need by level)
+EnableAccessLog = true
 
 # Enable self log rotating
 EnableRotate = true

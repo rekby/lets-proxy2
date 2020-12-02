@@ -17,11 +17,11 @@ func (t TransportLogger) RoundTrip(request *http.Request) (resp *http.Response, 
 	start := time.Now()
 
 	defer func() {
-		log.DebugErrorCtx(request.Context(), err, "Request",
+		log.InfoErrorCtx(request.Context(), err, "Request",
 			zap.Duration("duration_without_body", time.Since(start)),
 			zap.String("initiator_addr", request.RemoteAddr),
 			zap.String("metod", request.Method),
-			zap.String("host", request.Header.Get("Host")),
+			zap.String("host", request.Host),
 			zap.String("path", request.URL.Path),
 			zap.String("query", request.URL.RawQuery),
 			zap.Int("status_code", resp.StatusCode),
