@@ -28,6 +28,7 @@ type HTTPProxy struct {
 	HandleHTTPValidation func(w http.ResponseWriter, r *http.Request) bool
 	Director             Director // modify requests to backend.
 	HTTPTransport        http.RoundTripper
+	EnableAccessLog      bool
 
 	logger           *zap.Logger
 	listener         net.Listener
@@ -61,8 +62,14 @@ func (p *HTTPProxy) Close() error {
 // Any public fields must not change after Start called
 func (p *HTTPProxy) Start() error {
 	if p.HTTPTransport != nil {
+		p.logger.Info("Set transport to reverse proxy")
 		p.httpReverseProxy.Transport = p.HTTPTransport
 	}
+
+	if p.EnableAccessLog {
+		p.httpReverseProxy.Transport = NewTransportLogger(p.httpReverseProxy.Transport)
+	}
+	p.logger.Info("Access log", zap.Bool("enabled", p.EnableAccessLog))
 
 	mux := &http.ServeMux{}
 	mux.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {

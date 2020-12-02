@@ -55,6 +55,7 @@ type logConfig struct {
 	EnableLogToFile   bool
 	EnableLogToStdErr bool
 	LogLevel          string
+	EnableAccessLog   bool
 	EnableRotate      bool
 	DeveloperMode     bool
 	File              string
