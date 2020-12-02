@@ -29,6 +29,7 @@ func (t TransportLogger) RoundTrip(request *http.Request) (resp *http.Response, 
 			zap.Int64("resp_content_length", resp.ContentLength),
 		)
 	}()
+
 	return t.Transport.RoundTrip(request)
 }
 
