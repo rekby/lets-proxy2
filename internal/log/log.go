@@ -80,6 +80,11 @@ func debugDpanic(logger *zap.Logger, err error, mess string, fields ...zap.Field
 	}
 }
 
+func DebugCtx(ctx context.Context, mess string, fields ...zap.Field) {
+	logger := zc.L(ctx)
+	logger.WithOptions(zap.AddCallerSkip(1)).Debug(mess, fields...)
+}
+
 func DebugFatal(logger *zap.Logger, err error, mess string, fields ...zap.Field) {
 	debugFatal(logger, err, mess, fields...)
 }
