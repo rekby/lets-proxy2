@@ -116,7 +116,7 @@ hostIP:
 			}
 		}
 		ip := ip
-		logger.Debug("Non self or private ip", zap.Stringer("checked_ip", &ip))
+		logger.Debug("Domain has not allowed IP address", zap.Stringer("checked_ip", &ip))
 		return false, nil
 	}
 	return true, nil
