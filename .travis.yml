@@ -5,13 +5,16 @@ addons:
 
 env:
   jobs:
-#    - GO_VERSION=1.10
+    - GO_VERSION=1.10
     - GO_VERSION=1.16
   global:
     - COVERALLS_PARALLEL=true
 
 services:
   - docker
+
+install:
+  - eval "$(curl -sL https://raw.githubusercontent.com/travis-ci/gimme/master/gimme | GIMME_GO_VERSION=$GO_VERSION bash)"
 
 script:
   - test -n "$TRAVIS_TAG" || bash ./tests/test.sh
@@ -26,7 +29,6 @@ before_deploy:
   - git config --local user.name "$GIT_NAME"
   - git config --local user.email "$GIT_EMAIL"
   - BUILD_TIME=$(TZ=UTC date --rfc-3339=seconds)
-  - eval "$(curl -sL https://raw.githubusercontent.com/travis-ci/gimme/master/gimme | GIMME_GO_VERSION=$GO_VERSION bash)"
   - go get github.com/mitchellh/gox
   - mkdir -p output
   - echo ${GO_VERSION}
