@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -95,6 +96,7 @@ func applyFlags(ctx context.Context, config *configType) {
 func defaultConfig(ctx context.Context) []byte {
 	box := packr.NewBox("static")
 	configBytes, err := box.Find("default-config.toml")
+	configBytes = bytes.Replace(configBytes, []byte("\r\n"), []byte("\n"), -1)
 	log.DebugFatalCtx(ctx, err, "Got builtin default config")
 	return configBytes
 }

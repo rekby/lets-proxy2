@@ -21,7 +21,7 @@ import (
 	"github.com/rekby/lets-proxy2/internal/th"
 )
 
-const testACMEServer = "http://localhost:4001/directory"
+const testACMEServer = "https://acme-server:4001/dir"
 
 //go:generate minimock -i github.com/rekby/lets-proxy2/internal/cache.Bytes -o ./cache_bytes_mock_test.go
 func TestClientManagerCreateNew(t *testing.T) {
@@ -39,6 +39,8 @@ func TestClientManagerCreateNew(t *testing.T) {
 
 	//register account
 	manager := New(ctx, c)
+	manager.httpClient = th.GetHttpClient()
+
 	c.PutMock.Return(nil)
 	c.GetMock.Return(nil, cache.ErrCacheMiss)
 	manager.DirectoryURL = testACMEServer

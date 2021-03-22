@@ -31,7 +31,7 @@ import (
 	"golang.org/x/crypto/acme"
 )
 
-const testACMEServer = "http://localhost:4001/directory"
+const testACMEServer = "https://acme-server:4001/dir"
 const rsaKeyLength = 2048
 
 type contextConnection struct {
@@ -46,6 +46,9 @@ func (c contextConnection) GetContext() context.Context {
 //nolint:gochecknoinits
 func init() {
 	zc.SetDefaultLogger(zap.NewNop())
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{
+		InsecureSkipVerify: true,
+	}
 }
 
 func createTestClient(t *testing.T) *acme.Client {
@@ -72,7 +75,7 @@ func createTestClient(t *testing.T) *acme.Client {
 	})
 
 	if err != nil {
-		t.Fatal("Can't initialize acme client.")
+		t.Fatalf("Can't initialize acme client: %v", err)
 	}
 	return &client
 }

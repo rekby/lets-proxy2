@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
@@ -40,6 +41,7 @@ type AcmeManager struct {
 	ctxCancel             context.CancelFunc
 	ctxAutorenewCompleted context.Context
 	cache                 cache.Bytes
+	httpClient            *http.Client
 
 	mu      sync.Mutex
 	client  *acme.Client
@@ -55,6 +57,7 @@ func New(ctx context.Context, cache cache.Bytes) *AcmeManager {
 		cache:                cache,
 		AgreeFunction:        acme.AcceptTOS,
 		RenewAccountInterval: renewAccountInterval,
+		httpClient:           http.DefaultClient,
 	}
 }
 
@@ -109,7 +112,7 @@ func (m *AcmeManager) GetClient(ctx context.Context) (*acme.Client, error) {
 		}
 	}
 
-	client := &acme.Client{DirectoryURL: m.DirectoryURL}
+	client := &acme.Client{DirectoryURL: m.DirectoryURL, HTTPClient: m.httpClient}
 
 	key, account, err := createAccount(ctx, client, m.AgreeFunction)
 	if err != nil {

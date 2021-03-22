@@ -1,6 +1,7 @@
 *.exe
 *.pid
 
+.cache/
 .idea/
 .vscode/
 lets-proxy.iml
@@ -10,7 +11,7 @@ lets-proxy2.log
 storage/
 output/
 config.toml
-
+coverage.out
 
 lets-proxy
 lets-proxy2

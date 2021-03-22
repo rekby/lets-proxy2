@@ -1,0 +1,36 @@
+version: "3"
+services:
+  acme-server:
+    image: letsencrypt/pebble:${PEBBLE_VERSION:-v2.3.1}
+    command: pebble --config=/go/src/github.com/rekby/lets-proxy2/tests/pebble-config.json --strict --dnsserver=fake-dns:4003
+    environment:
+      PEBBLE_VA_NOSLEEP: 1
+    volumes:
+      - ./:/go/src/github.com/rekby/lets-proxy2
+    networks:
+      - acmenet
+  fake-dns:
+    image: letsencrypt/pebble-challtestsrv:${PEBBLE_VERSION:-v2.3.1}
+    command: pebble-challtestsrv --dns01=:4003 --defaultIPv4=10.40.50.4 --defaultIPv6=""
+    networks:
+      - acmenet
+  lets-proxy:
+    image: golang:${GO_VERSION:-1.16}
+    working_dir: /go/src/github.com/rekby/lets-proxy2
+    command: go test -covermode=count -coverprofile=coverage.out ./...
+    environment:
+      GOCACHE: "/go/src/github.com/rekby/lets-proxy2/.cache"
+      GOFLAGS: "-mod=vendor"
+      GO111MODULE: "on"
+    volumes:
+      - ./:/go/src/github.com/rekby/lets-proxy2
+    networks:
+      acmenet:
+        ipv4_address: 10.40.50.4
+networks:
+  acmenet:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.40.50.0/24

@@ -2,7 +2,9 @@ package th
 
 import (
 	"context"
+	"crypto/tls"
 	"io"
+	"net/http"
 
 	"go.uber.org/zap/zaptest"
 
@@ -34,4 +36,14 @@ func Logger(t zaptest.TestingT) *zap.Logger {
 
 func Close(closer io.Closer) {
 	_ = closer.Close()
+}
+
+func GetHttpClient() *http.Client {
+	client := &http.Client{}
+	client.Transport = &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
+	}
+	return client
 }

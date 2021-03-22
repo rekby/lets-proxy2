@@ -1,15 +1,12 @@
-language: go
-
 addons:
   apt:
     packages:
       - dos2unix
 
-go:
-  - "1.10"
-  - "1.16"
-
 env:
+  jobs:
+    - GO_VERSION=1.10
+    - GO_VERSION=1.16
   global:
     - COVERALLS_PARALLEL=true
 
@@ -17,10 +14,11 @@ services:
   - docker
 
 install:
-  - test -n "$TRAVIS_TAG" || bash tests/prepare.sh
+  - eval "$(curl -sL https://raw.githubusercontent.com/travis-ci/gimme/master/gimme | GIMME_GO_VERSION=$GO_VERSION bash)"
+  - go version
 
 script:
-  - test -n "$TRAVIS_TAG" || go test -v -covermode=count -coverprofile=coverage.out ./...
+  - test -n "$TRAVIS_TAG" || bash ./tests/test.sh
 
 after_script:
   # Install and upload test coverage must not failure for test build
@@ -34,10 +32,12 @@ before_deploy:
   - BUILD_TIME=$(TZ=UTC date --rfc-3339=seconds)
   - go get github.com/mitchellh/gox
   - mkdir -p output
-  - GO_VERSION=$(go version)
-  - echo ${GO_VERSION}
+  - OUTPUT="$PWD/output"
+  - mkdir -p $GOPATH/src/github.com/rekby
+  - ln -s "$PWD" "$GOPATH/src/github.com/rekby/lets-proxy2"
+  - cd "$GOPATH/src/github.com/rekby/lets-proxy2"
   - OS_ARCH_BUILDS="darwin/amd64 linux/386 linux/amd64 linux/arm freebsd/386 freebsd/amd64 freebsd/arm windows/386 windows/amd64"
-  - GO111MODULE=on CGO_ENABLED=0 gox --mod=vendor -osarch "$OS_ARCH_BUILDS" --ldflags "-X \"main.VERSION=$TRAVIS_TAG+build-$TRAVIS_BUILD_NUMBER, Build time $BUILD_TIME, commit $TRAVIS_COMMIT, $GO_VERSION\"" --output="output/lets-proxy_{{.OS}}_{{.Arch}}" -verbose --rebuild ./cmd/
+  - GO111MODULE=on CGO_ENABLED=0 gox --mod=vendor -osarch "$OS_ARCH_BUILDS" --ldflags "-X \"main.VERSION=$TRAVIS_TAG+build-$TRAVIS_BUILD_NUMBER, Build time $BUILD_TIME, commit $TRAVIS_COMMIT, $GO_VERSION\"" --output="$OUTPUT/lets-proxy_{{.OS}}_{{.Arch}}" -verbose --rebuild ./cmd/
   - bash tests/make_archives.sh
 
 deploy:

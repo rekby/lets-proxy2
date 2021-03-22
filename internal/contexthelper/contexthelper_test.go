@@ -124,9 +124,9 @@ func TestCombinedContext_Done(t *testing.T) {
 	var ctx *CombinedContext
 	var done bool
 
-	wait := func() { time.Sleep(10 * time.Millisecond) }
+	wait := func() { time.Sleep(100 * time.Millisecond) }
 
-	ctx1, ctx1Cancel := context.WithTimeout(context.Background(), time.Millisecond)
+	ctx1, ctx1Cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 	defer ctx1Cancel()
 
 	done = false
