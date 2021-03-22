@@ -1,7 +1,7 @@
 version: "3"
 services:
   acme-server:
-    image: letsencrypt/pebble:v2.3.1
+    image: letsencrypt/pebble:${PEBBLE_VERSION:-v2.3.1}
     command: pebble --config=/go/src/github.com/rekby/lets-proxy2/tests/pebble-config.json --strict --dnsserver=fake-dns:4003
     environment:
       PEBBLE_VA_NOSLEEP: 1
@@ -10,7 +10,7 @@ services:
     networks:
       - acmenet
   fake-dns:
-    image: letsencrypt/pebble-challtestsrv:latest
+    image: letsencrypt/pebble-challtestsrv:${PEBBLE_VERSION:-v2.3.1}
     command: pebble-challtestsrv --dns01=:4003 --defaultIPv4=10.40.50.4 --defaultIPv6=""
     networks:
       - acmenet
