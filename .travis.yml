@@ -15,6 +15,7 @@ services:
 
 install:
   - eval "$(curl -sL https://raw.githubusercontent.com/travis-ci/gimme/master/gimme | GIMME_GO_VERSION=$GO_VERSION bash)"
+  - go version
 
 script:
   - test -n "$TRAVIS_TAG" || bash ./tests/test.sh
