@@ -48,8 +48,8 @@ deploy:
   provider: releases
   on:
     repo: rekby/lets-proxy2
-#    tags: true
-#  api_key: $GITHUB_TOKEN
+    tags: true
+  api_key: $GITHUB_TOKEN
   file_glob: true
   file: output/*
 
