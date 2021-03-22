@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/rekby/lets-proxy2/internal/th"
@@ -26,7 +27,14 @@ func TestConfigEmbed(t *testing.T) {
 	box := packr.NewBox("static")
 	boxBytes, err := box.Find("default-config.toml")
 	td.CmpNoError(err)
-	td.CmpDeeply(string(boxBytes), string(sourceConfig))
+
+	toUnixString := func(source []byte) string {
+		s := string(source)
+		s = strings.Replace(s, "\r\n", "\n", -1)
+		return s
+	}
+
+	td.CmpDeeply(toUnixString(boxBytes), toUnixString(sourceConfig))
 }
 
 func TestReadConfig(t *testing.T) {

@@ -149,7 +149,7 @@ func TestCertState_WaitFinishIssue(t *testing.T) {
 
 	s := certState{}
 
-	const timeout = time.Millisecond * 10
+	const timeout = time.Millisecond * 100
 
 	//nolint:govet
 	ctxTimeout, _ := context.WithTimeout(ctx, timeout)

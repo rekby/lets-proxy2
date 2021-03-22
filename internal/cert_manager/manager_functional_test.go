@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"fmt"
 	"math/big"
 	"net"
 	"net/http"
@@ -62,7 +63,8 @@ func TestManager_GetCertificateHttp01(t *testing.T) {
 		mux.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 			request = request.WithContext(ctx)
 			if manager.isHTTPValidationRequest(request) {
-				logger.Info("Handle validation request", zap.Reflect("request", request))
+				requestStr := fmt.Sprintf("%v %v", request.Method, request.URL)
+				logger.Info("Handle validation request", zap.String("request", requestStr))
 				manager.HandleHTTPValidation(writer, request)
 			} else {
 				logger.Warn("Handle non validation request")

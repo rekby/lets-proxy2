@@ -16,11 +16,9 @@ env:
 services:
   - docker
 
-install:
-  - test -n "$TRAVIS_TAG" || bash tests/prepare.sh
-
 script:
-  - test -n "$TRAVIS_TAG" || go test -v -covermode=count -coverprofile=coverage.out ./...
+  - export GO_VERSION=$(go version)
+  - test -n "$TRAVIS_TAG" || bash ./tests/test.sh
 
 after_script:
   # Install and upload test coverage must not failure for test build

@@ -2,7 +2,10 @@
 package cert_manager
 
 import (
+	"net"
 	"strings"
+
+	"golang.org/x/xerrors"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -55,6 +58,13 @@ func logDomainsNamed(name string, domains []DomainName) zap.Field {
 var domainNormalizationProfile = idna.New(idna.ValidateForRegistration(), idna.MapForLookup())
 
 func normalizeDomain(domain string) (DomainName, error) {
+	if strings.Contains(domain, ":") {
+		host, _, err := net.SplitHostPort(domain)
+		if err != nil {
+			return "", xerrors.Errorf("split domain host, port: %w", err)
+		}
+		domain = host
+	}
 	domain, err := domainNormalizationProfile.ToASCII(domain)
 	domain = strings.TrimSuffix(domain, ".")
 	return DomainName(domain), err
