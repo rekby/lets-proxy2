@@ -9,8 +9,6 @@ env:
     - GO_VERSION=1.16
   global:
     - COVERALLS_PARALLEL=true
-    - GOFLAGS=-mod=vendor
-    - GO111MODULE=on
 
 services:
   - docker
