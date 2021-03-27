@@ -91,6 +91,13 @@ func getConfig(ctx context.Context) *configType {
 		applyFlags(ctx, _config)
 		logger.Info("Parse configs finished", zap.Int("readed_files", parsedConfigFiles),
 			zap.Int("max_read_files", _config.General.MaxConfigFilesRead))
+
+		if *debugLog {
+			_config.Log.LogLevel = "debug"
+		}
+		if *enableDockerRouter {
+			_config.DockerRouter.Enable = true
+		}
 	}
 	return _config
 }

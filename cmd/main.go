@@ -142,7 +142,7 @@ func startProgram(config *configType) {
 	var dockerClient docker.Interface
 	if config.DockerRouter.Enable {
 		dockerClient, err = docker.New(config.DockerRouter.Config)
-		log.InfoFatal(logger, err, "Create docker client")
+		log.InfoFatal(logger, err, "Enable docker router")
 	}
 
 	certManager.DomainChecker, err = config.CheckDomains.CreateDomainChecker(ctx, dockerClient)
@@ -167,7 +167,8 @@ func startProgram(config *configType) {
 		localAddr := req.Context().Value(http.LocalAddrContextKey).(net.Addr)
 		return tlsListener.GetConnectionContext(req.RemoteAddr, localAddr.String())
 	}
-	err = config.Proxy.Apply(ctx, p, nil)
+
+	err = config.Proxy.Apply(ctx, p, dockerClient)
 	log.InfoFatal(logger, err, "Apply proxy config")
 
 	go func() {

@@ -98,10 +98,12 @@ func (c *Config) getDefaultTargetDirector(ctx context.Context) (Director, error)
 }
 
 func (c *Config) getDockerDirector(ctx context.Context) (Director, error) {
+	logger := zc.L(ctx)
 	if c.dockerClient == nil {
-		zc.L(ctx).Debug("Skip docker director")
+		logger.Debug("Skip docker director")
 		return nil, nil
 	}
+	logger.Info("Create docker director")
 	return NewDirectorDocker(c.dockerClient), nil
 }
 

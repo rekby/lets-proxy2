@@ -2,7 +2,6 @@ package proxy
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -100,9 +99,6 @@ func (p *HTTPProxy) director(request *http.Request) {
 	if request.URL == nil {
 		request.URL = &url.URL{}
 	}
-	logger.Debug("Before director")
-	println("rekby-3")
 	err = p.Director.Director(request)
-	fmt.Printf("%+v\n", request.URL)
 	log.DebugPanic(logger, err, "Apply directors")
 }
