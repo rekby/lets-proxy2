@@ -10,13 +10,11 @@ import (
 	"github.com/docker/docker/api/types/swarm"
 )
 
-// ServiceUpdate updates a Service. The version number is required to avoid conflicting writes.
-// It should be the value as set *before* the update. You can find this value in the Meta field
-// of swarm.Service, which can be found using ServiceInspectWithRaw.
+// ServiceUpdate updates a Service.
 func (cli *Client) ServiceUpdate(ctx context.Context, serviceID string, version swarm.Version, service swarm.ServiceSpec, options types.ServiceUpdateOptions) (types.ServiceUpdateResponse, error) {
 	var (
-		query    = url.Values{}
-		response = types.ServiceUpdateResponse{}
+		query   = url.Values{}
+		distErr error
 	)
 
 	headers := map[string][]string{
@@ -38,38 +36,57 @@ func (cli *Client) ServiceUpdate(ctx context.Context, serviceID string, version 
 	query.Set("version", strconv.FormatUint(version.Index, 10))
 
 	if err := validateServiceSpec(service); err != nil {
-		return response, err
+		return types.ServiceUpdateResponse{}, err
 	}
 
+	var imgPlatforms []swarm.Platform
 	// ensure that the image is tagged
-	var resolveWarning string
-	switch {
-	case service.TaskTemplate.ContainerSpec != nil:
+	if service.TaskTemplate.ContainerSpec != nil {
 		if taggedImg := imageWithTagString(service.TaskTemplate.ContainerSpec.Image); taggedImg != "" {
 			service.TaskTemplate.ContainerSpec.Image = taggedImg
 		}
 		if options.QueryRegistry {
-			resolveWarning = resolveContainerSpecImage(ctx, cli, &service.TaskTemplate, options.EncodedRegistryAuth)
+			var img string
+			img, imgPlatforms, distErr = imageDigestAndPlatforms(ctx, cli, service.TaskTemplate.ContainerSpec.Image, options.EncodedRegistryAuth)
+			if img != "" {
+				service.TaskTemplate.ContainerSpec.Image = img
+			}
 		}
-	case service.TaskTemplate.PluginSpec != nil:
+	}
+
+	// ensure that the image is tagged
+	if service.TaskTemplate.PluginSpec != nil {
 		if taggedImg := imageWithTagString(service.TaskTemplate.PluginSpec.Remote); taggedImg != "" {
 			service.TaskTemplate.PluginSpec.Remote = taggedImg
 		}
 		if options.QueryRegistry {
-			resolveWarning = resolvePluginSpecRemote(ctx, cli, &service.TaskTemplate, options.EncodedRegistryAuth)
+			var img string
+			img, imgPlatforms, distErr = imageDigestAndPlatforms(ctx, cli, service.TaskTemplate.PluginSpec.Remote, options.EncodedRegistryAuth)
+			if img != "" {
+				service.TaskTemplate.PluginSpec.Remote = img
+			}
 		}
 	}
 
+	if service.TaskTemplate.Placement == nil && len(imgPlatforms) > 0 {
+		service.TaskTemplate.Placement = &swarm.Placement{}
+	}
+	if len(imgPlatforms) > 0 {
+		service.TaskTemplate.Placement.Platforms = imgPlatforms
+	}
+
+	var response types.ServiceUpdateResponse
 	resp, err := cli.post(ctx, "/services/"+serviceID+"/update", query, service, headers)
-	defer ensureReaderClosed(resp)
 	if err != nil {
 		return response, err
 	}
 
 	err = json.NewDecoder(resp.body).Decode(&response)
-	if resolveWarning != "" {
-		response.Warnings = append(response.Warnings, resolveWarning)
+
+	if distErr != nil {
+		response.Warnings = append(response.Warnings, digestWarning(service.TaskTemplate.ContainerSpec.Image))
 	}
 
+	ensureReaderClosed(resp)
 	return response, err
 }

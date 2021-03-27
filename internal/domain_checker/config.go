@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/rekby/lets-proxy2/internal/docker"
+
 	"golang.org/x/xerrors"
 
 	"github.com/pkg/errors"
@@ -29,10 +31,14 @@ type Config struct {
 	Resolver                  string
 }
 
-func (c *Config) CreateDomainChecker(ctx context.Context) (DomainChecker, error) {
+func (c *Config) CreateDomainChecker(ctx context.Context, dockerClient docker.Interface) (DomainChecker, error) {
 	logger := zc.L(ctx)
 
 	var listCheckers DomainChecker = True{}
+
+	if dockerClient != nil {
+		listCheckers = NewAll(NewDockerChecker(dockerClient), listCheckers)
+	}
 
 	if c.BlackList != "" {
 		r, err := regexp.Compile(c.BlackList)

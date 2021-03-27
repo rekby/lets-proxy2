@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"math"
+	"strconv"
 	"strings"
 
 	"github.com/docker/docker/api/types"
@@ -16,10 +17,13 @@ import (
 	"golang.org/x/xerrors"
 )
 
+const containerListLimit = math.MaxInt32
+
 var ErrNotFound = errors.New("target not found")
 
 type Config struct {
-	DomainLabel string
+	DefaultHttpPort int
+	LabelDomain     string
 }
 
 type dockerClientInterface interface {
@@ -29,6 +33,7 @@ type dockerClientInterface interface {
 type Docker struct {
 	client      dockerClientInterface
 	domainLabel string
+	portSuffix  string
 }
 
 func New(cfg Config) (*Docker, error) {
@@ -36,17 +41,21 @@ func New(cfg Config) (*Docker, error) {
 	if err != nil {
 		return nil, xerrors.Errorf("create docker client: %w", err)
 	}
+	return newDocker(cfg, dockerClient), nil
+}
 
+func newDocker(cfg Config, dockerClient dockerClientInterface) *Docker {
 	return &Docker{
 		client:      dockerClient,
-		domainLabel: cfg.DomainLabel,
-	}, nil
+		domainLabel: cfg.LabelDomain,
+		portSuffix:  ":" + strconv.Itoa(cfg.DefaultHttpPort),
+	}
 }
 
 func (d *Docker) GetTarget(ctx context.Context, dn domain.DomainName) (*DomainInfo, error) {
 	logger := zc.L(ctx)
 	list, err := d.client.ContainerList(ctx, types.ContainerListOptions{
-		Limit:   math.MaxInt32,
+		Limit:   containerListLimit,
 		Filters: filters.NewArgs(filters.KeyValuePair{Key: "label", Value: d.domainLabel}),
 	})
 
@@ -72,7 +81,7 @@ func (d *Docker) GetTarget(ctx context.Context, dn domain.DomainName) (*DomainIn
 
 	// it has exactly one network now
 	for _, net := range container.NetworkSettings.Networks {
-		return &DomainInfo{TargetAddress: net.IPAddress}, nil
+		return &DomainInfo{TargetAddress: net.IPAddress + d.portSuffix}, nil
 	}
 	logger.DPanic("Impossible situation for detect docker container")
 	return nil, xerrors.Errorf("impossible situation for detect docker container")
@@ -91,6 +100,7 @@ func findContainer(ctx context.Context, containers []types.Container, label stri
 				continue
 			}
 			if dn == need {
+				logger.Debug("Found container", zap.String("id", container.ID), zap.Strings("names", container.Names))
 				return container
 			}
 		}

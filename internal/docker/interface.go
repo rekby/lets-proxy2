@@ -1,11 +1,15 @@
 package docker
 
-import "context"
+import (
+	"context"
+
+	"github.com/rekby/lets-proxy2/internal/domain"
+)
 
 type DomainInfo struct {
 	TargetAddress string
 }
 
 type Interface interface {
-	GetTarget(ctx context.Context, domain string) (*DomainInfo, error)
+	GetTarget(ctx context.Context, domain domain.DomainName) (*DomainInfo, error)
 }

@@ -10,6 +10,8 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/rekby/lets-proxy2/internal/docker"
+
 	"github.com/rekby/lets-proxy2/internal/config"
 
 	"github.com/gobuffalo/packr"
@@ -28,7 +30,26 @@ import (
 	"go.uber.org/zap"
 )
 
-type ConfigGeneral struct {
+//go:generate packr
+type configType struct {
+	General      configGeneral
+	Log          logConfig
+	Proxy        proxy.Config
+	CheckDomains domain_checker.Config
+	Listen       tlslistener.Config
+
+	DockerRouter configDocker
+
+	Profiler profiler.Config
+	Metrics  config.Config
+}
+
+type configDocker struct {
+	Enable bool
+	docker.Config
+}
+
+type configGeneral struct {
 	IssueTimeout       int
 	StorageDir         string
 	Subdomains         []string
@@ -38,17 +59,6 @@ type ConfigGeneral struct {
 	MaxConfigFilesRead int
 	AllowRSACert       bool
 	AllowECDSACert     bool
-}
-
-//go:generate packr
-type configType struct {
-	General      ConfigGeneral
-	Log          logConfig
-	Proxy        proxy.Config
-	CheckDomains domain_checker.Config
-	Listen       tlslistener.Config
-	Profiler     profiler.Config
-	Metrics      config.Config
 }
 
 //nolint:maligned

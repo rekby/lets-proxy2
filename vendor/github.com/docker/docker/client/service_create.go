@@ -9,13 +9,14 @@ import (
 	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/swarm"
-	digest "github.com/opencontainers/go-digest"
+	"github.com/opencontainers/go-digest"
 	"github.com/pkg/errors"
 )
 
 // ServiceCreate creates a new Service.
 func (cli *Client) ServiceCreate(ctx context.Context, service swarm.ServiceSpec, options types.ServiceCreateOptions) (types.ServiceCreateResponse, error) {
-	var response types.ServiceCreateResponse
+	var distErr error
+
 	headers := map[string][]string{
 		"version": {cli.version},
 	}
@@ -30,72 +31,59 @@ func (cli *Client) ServiceCreate(ctx context.Context, service swarm.ServiceSpec,
 	}
 
 	if err := validateServiceSpec(service); err != nil {
-		return response, err
+		return types.ServiceCreateResponse{}, err
 	}
 
 	// ensure that the image is tagged
-	var resolveWarning string
-	switch {
-	case service.TaskTemplate.ContainerSpec != nil:
+	var imgPlatforms []swarm.Platform
+	if service.TaskTemplate.ContainerSpec != nil {
 		if taggedImg := imageWithTagString(service.TaskTemplate.ContainerSpec.Image); taggedImg != "" {
 			service.TaskTemplate.ContainerSpec.Image = taggedImg
 		}
 		if options.QueryRegistry {
-			resolveWarning = resolveContainerSpecImage(ctx, cli, &service.TaskTemplate, options.EncodedRegistryAuth)
+			var img string
+			img, imgPlatforms, distErr = imageDigestAndPlatforms(ctx, cli, service.TaskTemplate.ContainerSpec.Image, options.EncodedRegistryAuth)
+			if img != "" {
+				service.TaskTemplate.ContainerSpec.Image = img
+			}
 		}
-	case service.TaskTemplate.PluginSpec != nil:
+	}
+
+	// ensure that the image is tagged
+	if service.TaskTemplate.PluginSpec != nil {
 		if taggedImg := imageWithTagString(service.TaskTemplate.PluginSpec.Remote); taggedImg != "" {
 			service.TaskTemplate.PluginSpec.Remote = taggedImg
 		}
 		if options.QueryRegistry {
-			resolveWarning = resolvePluginSpecRemote(ctx, cli, &service.TaskTemplate, options.EncodedRegistryAuth)
+			var img string
+			img, imgPlatforms, distErr = imageDigestAndPlatforms(ctx, cli, service.TaskTemplate.PluginSpec.Remote, options.EncodedRegistryAuth)
+			if img != "" {
+				service.TaskTemplate.PluginSpec.Remote = img
+			}
 		}
 	}
 
+	if service.TaskTemplate.Placement == nil && len(imgPlatforms) > 0 {
+		service.TaskTemplate.Placement = &swarm.Placement{}
+	}
+	if len(imgPlatforms) > 0 {
+		service.TaskTemplate.Placement.Platforms = imgPlatforms
+	}
+
+	var response types.ServiceCreateResponse
 	resp, err := cli.post(ctx, "/services/create", nil, service, headers)
-	defer ensureReaderClosed(resp)
 	if err != nil {
 		return response, err
 	}
 
 	err = json.NewDecoder(resp.body).Decode(&response)
-	if resolveWarning != "" {
-		response.Warnings = append(response.Warnings, resolveWarning)
+
+	if distErr != nil {
+		response.Warnings = append(response.Warnings, digestWarning(service.TaskTemplate.ContainerSpec.Image))
 	}
 
+	ensureReaderClosed(resp)
 	return response, err
-}
-
-func resolveContainerSpecImage(ctx context.Context, cli DistributionAPIClient, taskSpec *swarm.TaskSpec, encodedAuth string) string {
-	var warning string
-	if img, imgPlatforms, err := imageDigestAndPlatforms(ctx, cli, taskSpec.ContainerSpec.Image, encodedAuth); err != nil {
-		warning = digestWarning(taskSpec.ContainerSpec.Image)
-	} else {
-		taskSpec.ContainerSpec.Image = img
-		if len(imgPlatforms) > 0 {
-			if taskSpec.Placement == nil {
-				taskSpec.Placement = &swarm.Placement{}
-			}
-			taskSpec.Placement.Platforms = imgPlatforms
-		}
-	}
-	return warning
-}
-
-func resolvePluginSpecRemote(ctx context.Context, cli DistributionAPIClient, taskSpec *swarm.TaskSpec, encodedAuth string) string {
-	var warning string
-	if img, imgPlatforms, err := imageDigestAndPlatforms(ctx, cli, taskSpec.PluginSpec.Remote, encodedAuth); err != nil {
-		warning = digestWarning(taskSpec.PluginSpec.Remote)
-	} else {
-		taskSpec.PluginSpec.Remote = img
-		if len(imgPlatforms) > 0 {
-			if taskSpec.Placement == nil {
-				taskSpec.Placement = &swarm.Placement{}
-			}
-			taskSpec.Placement.Platforms = imgPlatforms
-		}
-	}
-	return warning
 }
 
 func imageDigestAndPlatforms(ctx context.Context, cli DistributionAPIClient, image, encodedAuth string) (string, []swarm.Platform, error) {
@@ -131,7 +119,7 @@ func imageDigestAndPlatforms(ctx context.Context, cli DistributionAPIClient, ima
 
 // imageWithDigestString takes an image string and a digest, and updates
 // the image string if it didn't originally contain a digest. It returns
-// image unmodified in other situations.
+// an empty string if there are no updates.
 func imageWithDigestString(image string, dgst digest.Digest) string {
 	namedRef, err := reference.ParseNormalizedNamed(image)
 	if err == nil {
@@ -143,7 +131,7 @@ func imageWithDigestString(image string, dgst digest.Digest) string {
 			}
 		}
 	}
-	return image
+	return ""
 }
 
 // imageWithTagString takes an image string, and returns a tagged image

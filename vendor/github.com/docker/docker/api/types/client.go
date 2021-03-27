@@ -50,7 +50,7 @@ type ContainerCommitOptions struct {
 
 // ContainerExecInspect holds information returned by exec inspect.
 type ContainerExecInspect struct {
-	ExecID      string `json:"ID"`
+	ExecID      string
 	ContainerID string
 	Running     bool
 	ExitCode    int
@@ -187,15 +187,6 @@ type ImageBuildOptions struct {
 	// build request. The same identifier can be used to gracefully cancel the
 	// build with the cancel request.
 	BuildID string
-	// Outputs defines configurations for exporting build results. Only supported
-	// in BuildKit mode
-	Outputs []ImageBuildOutput
-}
-
-// ImageBuildOutput defines configuration for exporting a build result
-type ImageBuildOutput struct {
-	Type  string
-	Attrs map[string]string
 }
 
 // BuilderVersion sets the version of underlying builder to use
@@ -205,7 +196,7 @@ const (
 	// BuilderV1 is the first generation builder in docker daemon
 	BuilderV1 BuilderVersion = "1"
 	// BuilderBuildKit is builder based on moby/buildkit project
-	BuilderBuildKit BuilderVersion = "2"
+	BuilderBuildKit = "2"
 )
 
 // ImageBuildResponse holds information
@@ -265,7 +256,7 @@ type ImagePullOptions struct {
 // if the privilege request fails.
 type RequestPrivilegeFunc func() (string, error)
 
-// ImagePushOptions holds information to push images.
+//ImagePushOptions holds information to push images.
 type ImagePushOptions ImagePullOptions
 
 // ImageRemoveOptions holds parameters to remove images.
@@ -363,10 +354,6 @@ type ServiceUpdateOptions struct {
 // ServiceListOptions holds parameters to list services with.
 type ServiceListOptions struct {
 	Filters filters.Args
-
-	// Status indicates whether the server should include the service task
-	// count of running and desired tasks.
-	Status bool
 }
 
 // ServiceInspectOptions holds parameters related to the "service inspect"

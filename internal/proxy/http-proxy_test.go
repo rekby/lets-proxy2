@@ -106,12 +106,13 @@ func TestNewHttpProxy(t *testing.T) {
 	})
 
 	directorMock := NewDirectorMock(mc)
-	directorMock.DirectorMock.Set(func(request *http.Request) {
+	directorMock.DirectorMock.Set(func(request *http.Request) error {
 		if request.URL == nil {
 			request.URL = &url.URL{}
 		}
 		request.URL.Scheme = ProtocolHTTP
 		request.URL.Host = listener.Addr().String()
+		return nil
 	})
 
 	proxy := NewHTTPProxy(ctx, listener)
