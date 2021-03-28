@@ -8,8 +8,6 @@ env:
   jobs:
     - GO_VERSION=1.10
     - GO_VERSION=1.16
-  global:
-    - COVERALLS_PARALLEL=true
 
 services:
   - docker
@@ -25,7 +23,7 @@ after_script:
   # Install and upload test coverage must not failure for test build
   - test -n "$TRAVIS_TAG" || go get golang.org/x/tools/cmd/cover
   - test -n "$TRAVIS_TAG" || go get github.com/mattn/goveralls
-  - test -n "$TRAVIS_TAG" || goveralls -coverprofile=coverage.out -service=travis-ci -repotoken $COVERALLS_TOKEN
+  - test -n "$TRAVIS_TAG" || COVERALLS_PARALLEL=true goveralls -coverprofile=coverage.out -service=travis-ci -repotoken $COVERALLS_TOKEN
 
 before_deploy:
   - git config --local user.name "$GIT_NAME"

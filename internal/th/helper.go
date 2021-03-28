@@ -3,8 +3,10 @@ package th
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"go.uber.org/zap/zaptest"
 
@@ -46,4 +48,20 @@ func GetHttpClient() *http.Client {
 		},
 	}
 	return client
+}
+
+func ErrorSubstringCmp(gotErr error, expect string) string {
+	if expect == "" && gotErr == nil {
+		return ""
+	}
+
+	var gotString string
+	if gotErr != nil {
+		gotString = gotErr.Error()
+	}
+
+	if expect == "" || !strings.Contains(gotString, expect) {
+		return fmt.Sprintf("got string: '%v', expected: '%v'", gotString, expect)
+	}
+	return ""
 }

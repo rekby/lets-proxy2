@@ -26,7 +26,7 @@ services:
   test:
     image: golang:${GO_VERSION:-1.16}
     working_dir: /go/src/github.com/rekby/lets-proxy2
-    command: go test -covermode=count -coverprofile=coverage.out ${LETS_PROXY_TEST_OPTIONS:-} ./internal/cert_manager/...
+    command: go test -covermode=count -coverprofile=coverage.out ${LETS_PROXY_TEST_OPTIONS:-} ./...
     environment:
       GOCACHE: "/go/src/github.com/rekby/lets-proxy2/.cache"
       GOFLAGS: "-mod=vendor"
@@ -37,6 +37,10 @@ services:
     networks:
       acmenet:
         ipv4_address: 10.40.50.4
+    depends_on:
+      - acme-server
+      - fake-dns
+      - nginx
 networks:
   acmenet:
     driver: bridge
