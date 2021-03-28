@@ -118,11 +118,6 @@ type Flock_t struct {
 	Pid    int32
 }
 
-type DmNameList struct {
-	Dev  uint64
-	Next uint32
-}
-
 const (
 	FADV_DONTNEED = 0x4
 	FADV_NOREUSE  = 0x5
