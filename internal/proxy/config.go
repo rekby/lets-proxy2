@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rekby/lets-proxy2/internal/docker"
+
 	"github.com/rekby/lets-proxy2/internal/log"
 
 	"go.uber.org/zap"
@@ -26,9 +28,13 @@ type Config struct {
 	HTTPSBackend            bool
 	HTTPSBackendIgnoreCert  bool
 	EnableAccessLog         bool
+
+	dockerClient docker.Interface
 }
 
-func (c *Config) Apply(ctx context.Context, p *HTTPProxy) error {
+func (c *Config) Apply(ctx context.Context, p *HTTPProxy, dockerClient docker.Interface) error {
+	c.dockerClient = dockerClient
+
 	var resErr error
 
 	var chain []Director
@@ -43,6 +49,7 @@ func (c *Config) Apply(ctx context.Context, p *HTTPProxy) error {
 	}
 
 	appendDirector(c.getDefaultTargetDirector)
+	appendDirector(c.getDockerDirector)
 	appendDirector(c.getMapDirector)
 	appendDirector(c.getHeadersDirector)
 	appendDirector(c.getSchemaDirector)
@@ -88,6 +95,16 @@ func (c *Config) getDefaultTargetDirector(ctx context.Context) (Director, error)
 
 	logger.Info("Create host ip director", zap.Int("port", defaultTarget.Port))
 	return NewDirectorHost(defaultTarget.String()), nil
+}
+
+func (c *Config) getDockerDirector(ctx context.Context) (Director, error) {
+	logger := zc.L(ctx)
+	if c.dockerClient == nil {
+		logger.Debug("Skip docker director")
+		return nil, nil
+	}
+	logger.Info("Create docker director")
+	return NewDirectorDocker(c.dockerClient), nil
 }
 
 //can return nil,nil

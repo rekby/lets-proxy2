@@ -6,6 +6,12 @@ import (
 	"net/url"
 	"strconv"
 
+	"golang.org/x/xerrors"
+
+	"github.com/rekby/lets-proxy2/internal/domain"
+
+	"github.com/rekby/lets-proxy2/internal/docker"
+
 	"github.com/rekby/lets-proxy2/internal/contextlabel"
 
 	"github.com/rekby/lets-proxy2/internal/log"
@@ -30,10 +36,14 @@ const (
 
 type DirectorChain []Director
 
-func (c DirectorChain) Director(request *http.Request) {
+func (c DirectorChain) Director(request *http.Request) error {
 	for _, d := range c {
-		d.Director(request)
+		err := d.Director(request)
+		if err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // skip nil directors
@@ -65,7 +75,7 @@ func NewDirectorSameIP(port int) DirectorSameIP {
 	return DirectorSameIP{strconv.Itoa(port)}
 }
 
-func (s DirectorSameIP) Director(request *http.Request) {
+func (s DirectorSameIP) Director(request *http.Request) error {
 	localAddr := request.Context().Value(http.LocalAddrContextKey).(*net.TCPAddr)
 	if request.URL == nil {
 		request.URL = &url.URL{}
@@ -73,11 +83,12 @@ func (s DirectorSameIP) Director(request *http.Request) {
 	request.URL.Host = localAddr.IP.String() + ":" + s.Port
 	zc.L(request.Context()).Debug("Set target as same ip",
 		zap.Stringer("local_addr", localAddr), zap.String("dest_host", request.Host))
+	return nil
 }
 
 type DirectorDestMap map[string]string
 
-func (d DirectorDestMap) Director(request *http.Request) {
+func (d DirectorDestMap) Director(request *http.Request) error {
 	ctx := request.Context()
 
 	type Stringer interface {
@@ -89,7 +100,7 @@ func (d DirectorDestMap) Director(request *http.Request) {
 	var ok bool
 	if dest, ok = d[localAddr]; !ok {
 		zc.L(ctx).Debug("Map director no matches, skip.")
-		return
+		return nil
 	}
 
 	if request.URL == nil {
@@ -97,6 +108,7 @@ func (d DirectorDestMap) Director(request *http.Request) {
 	}
 	request.URL.Host = dest
 	zc.L(ctx).Debug("Map director set dest", zap.String("host", request.URL.Host))
+	return nil
 }
 
 func NewDirectorDestMap(m map[string]string) DirectorDestMap {
@@ -107,13 +119,48 @@ func NewDirectorDestMap(m map[string]string) DirectorDestMap {
 	return res
 }
 
+type DirectorDocker struct {
+	client docker.Interface
+}
+
+func (d DirectorDocker) Director(request *http.Request) error {
+	ctx := request.Context()
+	logger := zc.L(ctx)
+
+	destDomain, err := domain.NormalizeDomain(request.Host)
+	if err != nil {
+		logger.Warn("Can't normalize incoming domain name", zap.String("domain", request.Host), zap.Error(err))
+		return xerrors.Errorf("normalize domain name: %w", err)
+	}
+	logger = logger.With(domain.LogDomain(destDomain))
+	ctx = zc.WithLogger(ctx, logger)
+
+	target, err := d.client.GetTarget(ctx, destDomain)
+	if err != nil {
+		logger.Warn("Can't get target from docker", zap.Error(err))
+		return xerrors.Errorf("get docker target: %w", err)
+	}
+
+	logger.Debug("Set docker target url", zap.String("target", target.TargetAddress))
+	if request.URL == nil {
+		request.URL = &url.URL{}
+	}
+	request.URL.Host = target.TargetAddress
+	return nil
+}
+
+func NewDirectorDocker(dockerClient docker.Interface) DirectorDocker {
+	return DirectorDocker{dockerClient}
+}
+
 type DirectorHost string
 
-func (d DirectorHost) Director(request *http.Request) {
+func (d DirectorHost) Director(request *http.Request) error {
 	if request.URL == nil {
 		request.URL = &url.URL{}
 	}
 	request.URL.Host = string(d)
+	return nil
 }
 
 func NewDirectorHost(host string) DirectorHost {
@@ -130,7 +177,7 @@ func NewDirectorSetHeaders(m map[string]string) DirectorSetHeaders {
 	return res
 }
 
-func (h DirectorSetHeaders) Director(request *http.Request) {
+func (h DirectorSetHeaders) Director(request *http.Request) error {
 	ctx := request.Context()
 	host, port, errHostPort := net.SplitHostPort(request.RemoteAddr)
 	log.DebugDPanicCtx(ctx, errHostPort, "Parse remote addr for headers", zap.String("host", host), zap.String("port", port))
@@ -167,15 +214,17 @@ func (h DirectorSetHeaders) Director(request *http.Request) {
 
 		request.Header.Set(name, value)
 	}
+	return nil
 }
 
 type DirectorSetScheme string
 
-func (d DirectorSetScheme) Director(req *http.Request) {
+func (d DirectorSetScheme) Director(req *http.Request) error {
 	if req.URL == nil {
 		req.URL = &url.URL{}
 	}
 	req.URL.Scheme = string(d)
+	return nil
 }
 
 func NewSetSchemeDirector(scheme string) DirectorSetScheme {

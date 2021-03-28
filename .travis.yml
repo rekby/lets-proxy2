@@ -1,3 +1,4 @@
+dist: focal
 addons:
   apt:
     packages:
