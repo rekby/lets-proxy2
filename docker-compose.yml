@@ -8,21 +8,31 @@ services:
     volumes:
       - ./:/go/src/github.com/rekby/lets-proxy2
     networks:
-      - acmenet
+      acmenet:
+        ipv4_address: 10.40.50.10
   fake-dns:
     image: letsencrypt/pebble-challtestsrv:${PEBBLE_VERSION:-v2.3.1}
     command: pebble-challtestsrv --dns01=:4003 --defaultIPv4=10.40.50.4 --defaultIPv6=""
     networks:
-      - acmenet
-  lets-proxy:
+      acmenet:
+        ipv4_address: 10.40.50.11
+  nginx:
+    image: nginx:1.19.8-alpine
+    labels:
+      lets-proxy.domain: "docker-test.internal"
+    networks:
+      acmenet:
+        ipv4_address: 10.40.50.12
+  test:
     image: golang:${GO_VERSION:-1.16}
     working_dir: /go/src/github.com/rekby/lets-proxy2
-    command: go test -covermode=count -coverprofile=coverage.out ./...
+    command: go test -covermode=count -coverprofile=coverage.out ${LETS_PROXY_TEST_OPTIONS:-} ./internal/cert_manager/...
     environment:
       GOCACHE: "/go/src/github.com/rekby/lets-proxy2/.cache"
       GOFLAGS: "-mod=vendor"
       GO111MODULE: "on"
     volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
       - ./:/go/src/github.com/rekby/lets-proxy2
     networks:
       acmenet:

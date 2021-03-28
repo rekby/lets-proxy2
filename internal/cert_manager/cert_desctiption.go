@@ -4,6 +4,8 @@ package cert_manager
 import (
 	"strings"
 
+	"github.com/rekby/lets-proxy2/internal/domain"
+
 	"go.uber.org/zap"
 )
 
@@ -17,11 +19,11 @@ func (n CertDescription) CertStoreName() string {
 	return n.MainDomain + "." + n.KeyType.String() + ".cer"
 }
 
-func (n CertDescription) DomainNames() []DomainName {
-	domains := make([]DomainName, 1, len(n.Subdomains)+1)
-	domains[0] = DomainName(n.MainDomain)
+func (n CertDescription) DomainNames() []domain.DomainName {
+	domains := make([]domain.DomainName, 1, len(n.Subdomains)+1)
+	domains[0] = domain.DomainName(n.MainDomain)
 	for _, subdomain := range n.Subdomains {
-		domains = append(domains, DomainName(subdomain+n.MainDomain))
+		domains = append(domains, domain.DomainName(subdomain+n.MainDomain))
 	}
 	return domains
 }
@@ -46,7 +48,7 @@ func (n CertDescription) ZapField() zap.Field {
 	return zap.Stringer("cert_name", n)
 }
 
-func CertDescriptionFromDomain(domain DomainName, keyType KeyType, autoSubDomains []string) CertDescription {
+func CertDescriptionFromDomain(domain domain.DomainName, keyType KeyType, autoSubDomains []string) CertDescription {
 	mainDomain := domain.String()
 	for _, subdomain := range autoSubDomains {
 		if strings.HasPrefix(mainDomain, subdomain) {

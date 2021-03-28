@@ -12,6 +12,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/rekby/lets-proxy2/internal/domain"
+
 	"golang.org/x/crypto/acme"
 )
 
@@ -30,7 +32,7 @@ func pickChallenge(typ string, chal []*acme.Challenge) *acme.Challenge {
 	return nil
 }
 
-func createCertRequest(key crypto.Signer, commonName DomainName, domains ...DomainName) ([]byte, error) {
+func createCertRequest(key crypto.Signer, commonName domain.DomainName, domains ...domain.DomainName) ([]byte, error) {
 	dnsNames := make([]string, len(domains))
 	for i, v := range domains {
 		dnsNames[i] = v.String()
@@ -56,7 +58,7 @@ func flatByteSlices(in [][]byte) []byte {
 }
 
 // Return valid parced certificate or error
-func validCertDer(domains []DomainName, der [][]byte, key crypto.PrivateKey, useAsIs bool, now time.Time) (cert *tls.Certificate, err error) {
+func validCertDer(domains []domain.DomainName, der [][]byte, key crypto.PrivateKey, useAsIs bool, now time.Time) (cert *tls.Certificate, err error) {
 	// parse public part(s)
 	x509Cert, err := x509.ParseCertificates(flatByteSlices(der))
 	if err != nil || len(x509Cert) == 0 {
@@ -74,7 +76,7 @@ func validCertDer(domains []DomainName, der [][]byte, key crypto.PrivateKey, use
 	return validCertTLS(cert, domains, useAsIs, now)
 }
 
-func validCertTLS(cert *tls.Certificate, domains []DomainName, useAsIs bool, now time.Time) (validCert *tls.Certificate, err error) {
+func validCertTLS(cert *tls.Certificate, domains []domain.DomainName, useAsIs bool, now time.Time) (validCert *tls.Certificate, err error) {
 	if cert == nil {
 		return nil, errors.New("certificate is nil")
 	}

@@ -17,7 +17,7 @@ import (
 type DirectorMock struct {
 	t minimock.Tester
 
-	funcDirector          func(request *http.Request)
+	funcDirector          func(request *http.Request) (err error)
 	inspectFuncDirector   func(request *http.Request)
 	afterDirectorCounter  uint64
 	beforeDirectorCounter uint64
@@ -48,15 +48,20 @@ type mDirectorMockDirector struct {
 
 // DirectorMockDirectorExpectation specifies expectation struct of the Director.Director
 type DirectorMockDirectorExpectation struct {
-	mock   *DirectorMock
-	params *DirectorMockDirectorParams
-
+	mock    *DirectorMock
+	params  *DirectorMockDirectorParams
+	results *DirectorMockDirectorResults
 	Counter uint64
 }
 
 // DirectorMockDirectorParams contains parameters of the Director.Director
 type DirectorMockDirectorParams struct {
 	request *http.Request
+}
+
+// DirectorMockDirectorResults contains results of the Director.Director
+type DirectorMockDirectorResults struct {
+	err error
 }
 
 // Expect sets up expected params for Director.Director
@@ -91,7 +96,7 @@ func (mmDirector *mDirectorMockDirector) Inspect(f func(request *http.Request)) 
 }
 
 // Return sets up results that will be returned by Director.Director
-func (mmDirector *mDirectorMockDirector) Return() *DirectorMock {
+func (mmDirector *mDirectorMockDirector) Return(err error) *DirectorMock {
 	if mmDirector.mock.funcDirector != nil {
 		mmDirector.mock.t.Fatalf("DirectorMock.Director mock is already set by Set")
 	}
@@ -99,12 +104,12 @@ func (mmDirector *mDirectorMockDirector) Return() *DirectorMock {
 	if mmDirector.defaultExpectation == nil {
 		mmDirector.defaultExpectation = &DirectorMockDirectorExpectation{mock: mmDirector.mock}
 	}
-
+	mmDirector.defaultExpectation.results = &DirectorMockDirectorResults{err}
 	return mmDirector.mock
 }
 
 //Set uses given function f to mock the Director.Director method
-func (mmDirector *mDirectorMockDirector) Set(f func(request *http.Request)) *DirectorMock {
+func (mmDirector *mDirectorMockDirector) Set(f func(request *http.Request) (err error)) *DirectorMock {
 	if mmDirector.defaultExpectation != nil {
 		mmDirector.mock.t.Fatalf("Default expectation is already set for the Director.Director method")
 	}
@@ -117,8 +122,29 @@ func (mmDirector *mDirectorMockDirector) Set(f func(request *http.Request)) *Dir
 	return mmDirector.mock
 }
 
+// When sets expectation for the Director.Director which will trigger the result defined by the following
+// Then helper
+func (mmDirector *mDirectorMockDirector) When(request *http.Request) *DirectorMockDirectorExpectation {
+	if mmDirector.mock.funcDirector != nil {
+		mmDirector.mock.t.Fatalf("DirectorMock.Director mock is already set by Set")
+	}
+
+	expectation := &DirectorMockDirectorExpectation{
+		mock:   mmDirector.mock,
+		params: &DirectorMockDirectorParams{request},
+	}
+	mmDirector.expectations = append(mmDirector.expectations, expectation)
+	return expectation
+}
+
+// Then sets up Director.Director return parameters for the expectation previously defined by the When method
+func (e *DirectorMockDirectorExpectation) Then(err error) *DirectorMock {
+	e.results = &DirectorMockDirectorResults{err}
+	return e.mock
+}
+
 // Director implements Director
-func (mmDirector *DirectorMock) Director(request *http.Request) {
+func (mmDirector *DirectorMock) Director(request *http.Request) (err error) {
 	mm_atomic.AddUint64(&mmDirector.beforeDirectorCounter, 1)
 	defer mm_atomic.AddUint64(&mmDirector.afterDirectorCounter, 1)
 
@@ -136,7 +162,7 @@ func (mmDirector *DirectorMock) Director(request *http.Request) {
 	for _, e := range mmDirector.DirectorMock.expectations {
 		if minimock.Equal(e.params, mm_params) {
 			mm_atomic.AddUint64(&e.Counter, 1)
-			return
+			return e.results.err
 		}
 	}
 
@@ -148,15 +174,17 @@ func (mmDirector *DirectorMock) Director(request *http.Request) {
 			mmDirector.t.Errorf("DirectorMock.Director got unexpected parameters, want: %#v, got: %#v%s\n", *mm_want, mm_got, minimock.Diff(*mm_want, mm_got))
 		}
 
-		return
-
+		mm_results := mmDirector.DirectorMock.defaultExpectation.results
+		if mm_results == nil {
+			mmDirector.t.Fatal("No results are set for the DirectorMock.Director")
+		}
+		return (*mm_results).err
 	}
 	if mmDirector.funcDirector != nil {
-		mmDirector.funcDirector(request)
-		return
+		return mmDirector.funcDirector(request)
 	}
 	mmDirector.t.Fatalf("Unexpected call to DirectorMock.Director. %v", request)
-
+	return
 }
 
 // DirectorAfterCounter returns a count of finished DirectorMock.Director invocations

@@ -20,7 +20,7 @@ import (
 )
 
 type Director interface {
-	Director(request *http.Request)
+	Director(request *http.Request) error
 }
 
 type HTTPProxy struct {
@@ -91,10 +91,14 @@ func getContext(_ *http.Request) (context.Context, error) {
 
 func (p *HTTPProxy) director(request *http.Request) {
 	ctx, err := p.GetContext(request)
-	log.DebugDPanicCtx(ctx, err, "Get connection context for request")
+
+	logger := zc.L(ctx)
+	log.DebugDPanic(logger, err, "Get connection context for request")
 	*request = *request.WithContext(contexthelper.CombineContext(ctx, request.Context()))
+
 	if request.URL == nil {
 		request.URL = &url.URL{}
 	}
-	p.Director.Director(request)
+	err = p.Director.Director(request)
+	log.DebugPanic(logger, err, "Apply directors")
 }
