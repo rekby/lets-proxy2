@@ -1,0 +1,7 @@
+[General]
+StorageDir = "/storage"
+IncludeConfigs = ["/etc/lets-proxy.tom[l]"]
+
+[Log]
+EnableLogToFile = false
+EnableLogToStdErr = true
