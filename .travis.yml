@@ -36,7 +36,7 @@ before_deploy:
   - ln -s "$PWD" "$GOPATH/src/github.com/rekby/lets-proxy2"
   - cd "$GOPATH/src/github.com/rekby/lets-proxy2"
   - OS_ARCH_BUILDS="linux/386 linux/amd64 linux/arm freebsd/386 freebsd/amd64 freebsd/arm windows/386 windows/amd64"
-  - test "$GO_VERSION" -eq "1.10" || OS_ARCH_BUILDS="$OS_ARCH_BUILDS darwin/amd64"
+  - test "$GO_VERSION" = "1.10" || OS_ARCH_BUILDS="$OS_ARCH_BUILDS darwin/amd64"
   - GO111MODULE=on CGO_ENABLED=0 gox --mod=vendor -osarch "$OS_ARCH_BUILDS" --ldflags "-X \"main.VERSION=$TRAVIS_TAG+build-$TRAVIS_BUILD_NUMBER, Build time $BUILD_TIME, commit $TRAVIS_COMMIT, $GO_VERSION\"" --output="$OUTPUT/lets-proxy_{{.OS}}_{{.Arch}}" -verbose --rebuild ./cmd/
   - bash tests/make_archives.sh
 
