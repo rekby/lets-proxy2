@@ -8,7 +8,6 @@
 package unix
 
 import (
-	"syscall"
 	"unsafe"
 )
 
@@ -49,10 +48,6 @@ func Pipe2(p []int, flags int) (err error) {
 	p[1] = int(pp[1])
 	return
 }
-
-// Underlying system call writes to newoffset via pointer.
-// Implemented in assembly to avoid allocation.
-func seek(fd int, offset int64, whence int) (newoffset int64, err syscall.Errno)
 
 func Seek(fd int, offset int64, whence int) (newoffset int64, err error) {
 	newoffset, errno := seek(fd, offset, whence)
