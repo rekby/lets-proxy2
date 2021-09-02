@@ -2,23 +2,16 @@ package cache
 
 import (
 	"bytes"
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/rekby/lets-proxy2/internal/th"
 )
 
 func TestDiskCache(t *testing.T) {
-	ctx, flush := th.TestContext(t)
+	e, ctx, flush := th.NewEnv(t)
 	defer flush()
 
-	dirPath, err := ioutil.TempDir("", "lets-proxy2-test-")
-	defer os.RemoveAll(dirPath)
-
-	if err != nil {
-		t.Fatal(err)
-	}
+	dirPath := th.TmpDir(e)
 
 	c := &DiskCache{Dir: dirPath}
 	res, err := c.Get(ctx, "asd")

@@ -2,10 +2,11 @@ package main
 
 import (
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/rekby/lets-proxy2/internal/th"
 
 	"github.com/maxatome/go-testdeep"
 	"go.uber.org/zap/zapcore"
@@ -40,13 +41,10 @@ func TestParseLogLever(t *testing.T) {
 }
 
 func TestInitLogger(t *testing.T) {
-	td := testdeep.NewT(t)
+	e, _, flush := th.NewEnv(t)
+	defer flush()
 
-	tmpDir, err := ioutil.TempDir("", "")
-	if err != nil {
-		td.Fatal(err)
-	}
-	defer os.RemoveAll(tmpDir)
+	tmpDir := th.TmpDir(e)
 
 	// LogToFile, logLevel
 	logFile := filepath.Join(tmpDir, "log.txt")
@@ -63,9 +61,9 @@ func TestInitLogger(t *testing.T) {
 	logger.Sync()
 
 	fileBytes, err := ioutil.ReadFile(logFile)
-	td.CmpNoError(err)
-	td.True(strings.Contains(string(fileBytes), testError))
-	td.False(strings.Contains(string(fileBytes), testInfo))
+	e.CmpNoError(err)
+	e.True(strings.Contains(string(fileBytes), testError))
+	e.False(strings.Contains(string(fileBytes), testInfo))
 
 	// DevelMode
 	config = logConfig{DeveloperMode: false, LogLevel: "info", EnableLogToStdErr: true}
@@ -74,7 +72,7 @@ func TestInitLogger(t *testing.T) {
 
 	config = logConfig{DeveloperMode: true, LogLevel: "info"}
 	logger = initLogger(config)
-	td.CmpPanic(func() {
+	e.CmpPanic(func() {
 		logger.DPanic(testError)
 	}, testError)
 }

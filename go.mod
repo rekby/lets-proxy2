@@ -26,11 +26,11 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.4.1
 	github.com/prometheus/client_model v0.2.0
+	github.com/rekby/fixenv v0.0.0-20210828185014-c79c816ca0c9
 	github.com/rekby/zapcontext v0.0.4
 	github.com/rogpeppe/go-internal v1.6.0 // indirect
 	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.6.0
-	github.com/stretchr/testify v1.5.1 // indirect
 	go.uber.org/atomic v1.4.0 // indirect
 	go.uber.org/zap v1.11.0
 	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5

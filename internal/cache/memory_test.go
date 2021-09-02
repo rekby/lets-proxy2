@@ -8,7 +8,7 @@ import (
 )
 
 func TestMemoryCache(t *testing.T) {
-	ctx, flush := th.TestContext(t)
+	e, ctx, flush := th.NewEnv(t)
 	defer flush()
 
 	c := NewMemoryCache("test")
@@ -22,27 +22,19 @@ func TestMemoryCache(t *testing.T) {
 
 	data := []byte("aaa")
 	err = c.Put(ctx, "asd", data)
-	if err != nil {
-		t.Error(err)
-	}
+	e.CmpNoError(err)
 
 	res, err = c.Get(ctx, "asd")
 	if !bytes.Equal(res, data) {
 		t.Error(res)
 	}
-	if err != nil {
-		t.Error(err)
-	}
+	e.CmpNoError(err)
 
 	err = c.Delete(ctx, "asd")
-	if err != nil {
-		t.Error(err)
-	}
+	e.CmpNoError(err)
 
 	err = c.Delete(ctx, "non-existed-key")
-	if err != nil {
-		t.Error(err)
-	}
+	e.CmpNoError(err)
 
 	res, err = c.Get(ctx, "asd")
 	if len(res) != 0 {

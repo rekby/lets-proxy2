@@ -38,17 +38,11 @@ func TestConfigEmbed(t *testing.T) {
 }
 
 func TestReadConfig(t *testing.T) {
-	ctx, cancel := th.TestContext(t)
+	e, ctx, cancel := th.NewEnv(t)
 	defer cancel()
 
 	td := testdeep.NewT(t)
-	tmpDir, err := ioutil.TempDir("", "")
-	if err != nil {
-		td.Fatal(err)
-	}
-	defer func() {
-		_ = os.RemoveAll(tmpDir)
-	}()
+	tmpDir := th.TmpDir(e)
 
 	_ = ioutil.WriteFile(filepath.Join(tmpDir, "config.toml"), []byte(`
 [General]
@@ -71,8 +65,8 @@ StorageDir = "storage2"
 }
 
 func TestGetConfig(t *testing.T) {
-	ctx, cancel := th.TestContext(t)
+	e, ctx, cancel := th.NewEnv(t)
 	defer cancel()
 
-	testdeep.CmpNotNil(t, getConfig(ctx))
+	e.NotNil(getConfig(ctx))
 }

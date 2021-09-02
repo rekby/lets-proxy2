@@ -11,33 +11,31 @@ import (
 )
 
 func TestValueLRUAsCache(t *testing.T) {
-	td := testdeep.NewT(t)
-
-	ctx, flush := th.TestContext(t)
+	e, ctx, flush := th.NewEnv(t)
 	defer flush()
 
 	c := NewMemoryValueLRU("test")
 	res, err := c.Get(ctx, "asd")
-	td.Nil(res)
-	td.CmpDeeply(err, ErrCacheMiss)
+	e.Nil(res)
+	e.CmpDeeply(err, ErrCacheMiss)
 
 	data := []byte("aaa")
 	err = c.Put(ctx, "asd", data)
-	td.CmpNoError(err)
+	e.CmpNoError(err)
 
 	res, err = c.Get(ctx, "asd")
-	td.CmpDeeply(res, data)
-	td.CmpNoError(err)
+	e.CmpDeeply(res, data)
+	e.CmpNoError(err)
 
 	err = c.Delete(ctx, "asd")
-	td.CmpNoError(err)
+	e.CmpNoError(err)
 
 	err = c.Delete(ctx, "non-existed-key")
-	td.CmpNoError(err)
+	e.CmpNoError(err)
 
 	res, err = c.Get(ctx, "asd")
-	td.Nil(res)
-	td.CmpDeeply(err, ErrCacheMiss)
+	e.Nil(res)
+	e.CmpDeeply(err, ErrCacheMiss)
 }
 
 func TestValueLRULimitAtPut(t *testing.T) {
