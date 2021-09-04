@@ -11,8 +11,11 @@ OUTPUT="$ROOT/output"
 rm -rf "$TESTBUILD_DIR"
 
 export PATH="$GOROOT/bin:$PATH"
-go get github.com/mitchellh/gox
-
+(
+  # prevent modify project's go.mod
+  cd /tmp
+  go get github.com/mitchellh/gox
+)
 export GOPATH="$TESTBUILD_DIR"
 DEST="$GOPATH/src/github.com/rekby/lets-proxy2"
 mkdir -p "$TESTBUILD_DIR/src/github.com/rekby"
