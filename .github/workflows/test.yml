@@ -16,6 +16,7 @@ jobs:
         run: bash ./tests/test-build.sh
 
   run-test:
+    needs: test-build
     runs-on: ubuntu-20.04
     strategy:
       matrix:
@@ -38,7 +39,7 @@ jobs:
 
   # notifies that all test jobs are finished.
   finish:
-    needs: test
+    needs: run-test
     runs-on: ubuntu-20.04
     steps:
       - uses: shogo82148/actions-goveralls@v1
