@@ -10,7 +10,7 @@ OUTPUT="$ROOT/output"
 
 rm -rf "$TESTBUILD_DIR"
 
-export PATH="$GOPATH/bin:$PATH"
+export PATH="$GOROOT/bin:$PATH"
 go install github.com/mitchellh/gox
 
 export GOPATH="$TESTBUILD_DIR"
