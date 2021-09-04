@@ -9,5 +9,8 @@ jobs:
     env:
       GO_VERSION: ${{ matrix.goVersion }}
     steps:
+      - name: checkout
+        uses: actions/checkout@v2
+
       - name: build release binaries
         run: bash ./tests/build-release.sh
