@@ -11,6 +11,7 @@ OUTPUT="$ROOT/output"
 rm -rf "$TESTBUILD_DIR"
 
 export GOPATH="$TESTBUILD_DIR"
+export PATH="$GOPATH/bin:$PATH"
 DEST="$GOPATH/src/github.com/rekby/lets-proxy2"
 mkdir -p "$TESTBUILD_DIR/src/github.com/rekby"
 ln -Ts "$ROOT" "$DEST"
