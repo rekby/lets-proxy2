@@ -20,7 +20,7 @@ cd "$DEST"
 go version
 go env
 
-go get github.com/mitchellh/gox
+go install github.com/mitchellh/gox
 
 if [ "$GO_VERSION" = "1.10" ]; then
   OS_ARCH_BUILDS="linux/386 linux/amd64 linux/arm freebsd/386 freebsd/amd64 freebsd/arm windows/386 windows/amd64"
@@ -30,4 +30,4 @@ fi
 
 GITHUB_TAG="${GITHUB_REF/refs\/tags\//}"
 BUILD_TIME=$(TZ=UTC date --rfc-3339=seconds)
-CGO_ENABLED=0 gox --mod=vendor -osarch "$OS_ARCH_BUILDS" --ldflags "-X \"main.VERSION=$GITHUB_TAG+build-$GITHUB_RUN_ID, Build time $BUILD_TIME, commit $GITHUB_SHA, $GO_VERSION\"" --output="$OUTPUT/lets-proxy_{{.OS}}_{{.Arch}}" -verbose --rebuild ./cmd/
+CGO_ENABLED=0 gox -osarch "$OS_ARCH_BUILDS" --ldflags "-X \"main.VERSION=$GITHUB_TAG+build-$GITHUB_RUN_ID, Build time $BUILD_TIME, commit $GITHUB_SHA, $GO_VERSION\"" --output="$OUTPUT/lets-proxy_{{.OS}}_{{.Arch}}" -verbose --rebuild ./cmd/
