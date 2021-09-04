@@ -1,5 +1,6 @@
 name: publish
 on:
+  push: null
   release:
     types:
       - published
@@ -23,10 +24,15 @@ jobs:
       - name: build release binaries
         run: bash ./tests/build-release.sh
 
+      - name: install dos2unix
+        run: sudo apt-get install dos2unix
+
       - name: make archives
         run: bash ./tests/make-archives.sh
 
-      - name: upload binaries to release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: output/*
+      - name: ls
+        run: ls output/
+#      - name: upload binaries to release
+#        uses: softprops/action-gh-release@v1
+#        with:
+#          files: output/*
