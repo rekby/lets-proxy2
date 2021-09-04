@@ -35,3 +35,12 @@ jobs:
           path-to-profile: coverage.out
           flag-name: Go-${{ matrix.go }}
           parallel: true
+
+  # notifies that all test jobs are finished.
+  finish:
+    needs: test
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: shogo82148/actions-goveralls@v1
+        with:
+          parallel-finished: true
