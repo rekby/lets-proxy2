@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-20.04
     strategy:
       matrix:
-        goVersion: ["1.10", "1.16"]
+        goVersion: ["1.10", "1.17"]
     env:
       GO_VERSION: ${{ matrix.goVersion }}
     steps:
