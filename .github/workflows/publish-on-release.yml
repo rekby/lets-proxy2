@@ -1,5 +1,8 @@
 name: publish
-on: push
+on:
+  release:
+    types:
+      - created
 jobs:
   publish:
     runs-on: ubuntu-20.04

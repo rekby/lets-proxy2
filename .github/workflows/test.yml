@@ -1,5 +1,5 @@
 name: Test
-on: [release]
+on: [push, pull_request]
 jobs:
   test-build:
     runs-on: ubuntu-20.04
