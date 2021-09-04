@@ -15,7 +15,7 @@ jobs:
           go-version: ${{ matrix.goVersion }}
 
       - name: mkdir
-        run: mkdir ~/go/src/github.com/rekby
+        run: mkdir -p ~/go/src/github.com/rekby
 
       - name: link to the source
         run: ln -s $PWD ~/go/src/github.com/rekby
