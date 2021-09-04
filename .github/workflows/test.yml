@@ -17,11 +17,13 @@ jobs:
   run-test:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v2
+      - name: checkout
+        uses: actions/checkout@v2
 
       - name: Test
         run: bash ./tests/test.sh
 
-  - uses: shogo82148/actions-goveralls@v1
-    with:
-      path-to-profile: coverage.out
+      - name: push coverage
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: coverage.out
