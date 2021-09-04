@@ -3,8 +3,6 @@ on: [push]
 jobs:
   test-build:
     runs-on: ubuntu-20.04
-    env:
-      GOPATH: "$HOME/go"
 
     strategy:
       matrix:
