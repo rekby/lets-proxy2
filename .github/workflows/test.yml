@@ -21,6 +21,6 @@ jobs:
         run: go get github.com/mattn/goveralls
 
       - name: Coveralls push
-        run: goveralls -coverprofile=covprofile.out -service=github
+        run: goveralls -coverprofile=coverage.out -service=github
         env:
           COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
