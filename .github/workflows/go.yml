@@ -15,13 +15,5 @@ jobs:
         run: go build -v ./...
 
       - name: Test
-        run: go test -race -covermode atomic -coverprofile=covprofile.out  ./...
-
-      - name: Coveralls install goveralls
-        run: go get github.com/mattn/goveralls
-
-      - name: Coveralls push
-        run: goveralls -coverprofile=covprofile.out -service=github
-        env:
-          COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash ./tests/test.sh
 
