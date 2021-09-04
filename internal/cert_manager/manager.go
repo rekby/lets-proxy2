@@ -47,6 +47,21 @@ const (
 	httpWellKnown = "/.well-known/acme-challenge/"
 )
 
+var (
+	// copy from go 1.17 insecure chipers
+	// https://github.com/golang/go/blob/ba66d62b688d50f4e89b724d1c5b48bb05f8b117/src/crypto/tls/cipher_suites.go#L84
+	insecureChipers = map[uint16]struct{}{
+		tls.TLS_RSA_WITH_RC4_128_SHA:                {},
+		tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA:           {},
+		tls.TLS_RSA_WITH_AES_128_CBC_SHA256:         {},
+		tls.TLS_ECDHE_ECDSA_WITH_RC4_128_SHA:        {},
+		tls.TLS_ECDHE_RSA_WITH_RC4_128_SHA:          {},
+		tls.TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA:     {},
+		tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256: {},
+		tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256:   {},
+	}
+)
+
 const domainKeyRSALength = 2048
 const renewBeforeExpire = time.Hour * 24 * 30
 const revokeAuthorizationTimeout = 5 * time.Minute
@@ -98,13 +113,14 @@ type Manager struct {
 	// generated and, if Cache is not nil, stored in cache.
 	//
 	// Mutating the field after the first call of GetCertificate method will have no effect.
-	Client               AcmeClient
-	DomainChecker        DomainChecker
-	EnableHTTPValidation bool
-	EnableTLSValidation  bool
-	SaveJSONMeta         bool
-	AllowECDSACert       bool
-	AllowRSACert         bool
+	Client                  AcmeClient
+	DomainChecker           DomainChecker
+	EnableHTTPValidation    bool
+	EnableTLSValidation     bool
+	SaveJSONMeta            bool
+	AllowECDSACert          bool
+	AllowRSACert            bool
+	AllowInsecureTLSChipers bool
 
 	certForDomainAuthorize cache.Value
 
@@ -144,6 +160,8 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 	ctx := hello.Conn.(GetContext).GetContext()
 
 	logger := zc.L(ctx)
+
+	m.filterTlsHello(ctx, hello)
 
 	needDomain, err := domain.NormalizeDomain(hello.ServerName)
 	log.DebugInfo(logger, err, "Domain name normalization", zap.String("original", hello.ServerName), domain.LogDomain(needDomain))
@@ -646,6 +664,23 @@ func (m *Manager) certKeyGetOrCreate(ctx context.Context, cd CertDescription) (c
 	key, err = cd.KeyType.Generate()
 	log.InfoError(logger, err, "Generate new key")
 	return key, err
+}
+
+func (m *Manager) filterTlsHello(ctx context.Context, hello *tls.ClientHelloInfo) {
+	if m.AllowInsecureTLSChipers {
+		log.DebugCtx(ctx, "Disable filter chiper suites")
+		return
+	}
+
+	newChipers := make([]uint16, 0, len(hello.CipherSuites))
+	for _, chiper := range hello.CipherSuites {
+		if _, insecure := insecureChipers[chiper]; insecure {
+			log.DebugCtx(ctx, "Exclude insecure chiper from tls hello: %v", zap.Uint16("chiper_code", chiper))
+			continue
+		}
+		newChipers = append(newChipers, chiper)
+	}
+	hello.CipherSuites = newChipers
 }
 
 func (m *Manager) fulfill(ctx context.Context, challenge *acme.Challenge, domain domain.DomainName) (func(context.Context), error) {

@@ -56,7 +56,7 @@ func createTestClient(t *testing.T) *acme.Client {
 	if err != nil {
 		t.Fatalf("Can't connect to buoulder server: %q", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	client := acme.Client{}
 	client.HTTPClient = &http.Client{
@@ -183,6 +183,43 @@ func TestManager_CertForDenied(t *testing.T) {
 	res, err := c.manager.GetCertificate(&tls.ClientHelloInfo{Conn: c.connContext, ServerName: "test.ru"})
 	td.Nil(res)
 	td.CmpError(err)
+}
+
+func TestManagerFilterTlsHello(t *testing.T) {
+	t.Run("AllowInsecureChipers_True", func(t *testing.T) {
+		e, ctx, flush := th.NewEnv(t)
+		defer flush()
+
+		m := Manager{}
+		m.AllowInsecureTLSChipers = true
+
+		hello := tls.ClientHelloInfo{
+			CipherSuites: []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, tls.TLS_ECDHE_ECDSA_WITH_RC4_128_SHA, tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384},
+		}
+		m.filterTlsHello(ctx, &hello)
+
+		expectedHello := tls.ClientHelloInfo{
+			CipherSuites: []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, tls.TLS_ECDHE_ECDSA_WITH_RC4_128_SHA, tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384},
+		}
+		e.Cmp(hello, expectedHello)
+	})
+	t.Run("AllowInsecureChipers_False", func(t *testing.T) {
+		e, ctx, flush := th.NewEnv(t)
+		defer flush()
+
+		m := Manager{}
+		m.AllowInsecureTLSChipers = false
+
+		hello := tls.ClientHelloInfo{
+			CipherSuites: []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, tls.TLS_ECDHE_ECDSA_WITH_RC4_128_SHA, tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384},
+		}
+		m.filterTlsHello(ctx, &hello)
+
+		expectedHello := tls.ClientHelloInfo{
+			CipherSuites: []uint16{tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384},
+		}
+		e.Cmp(hello, expectedHello)
+	})
 }
 
 func TestGetCertificateDenyCertificates(t *testing.T) {

@@ -8,10 +8,9 @@ import (
 	mm_atomic "sync/atomic"
 	mm_time "time"
 
-	"github.com/rekby/lets-proxy2/internal/domain"
-
 	"github.com/gojuno/minimock/v3"
 	"github.com/rekby/lets-proxy2/internal/docker"
+	"github.com/rekby/lets-proxy2/internal/domain"
 )
 
 // InternalDockerMock implements internalDocker
