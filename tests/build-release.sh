@@ -11,7 +11,7 @@ OUTPUT="$ROOT/output"
 rm -rf "$TESTBUILD_DIR"
 
 export PATH="$GOROOT/bin:$PATH"
-go install github.com/mitchellh/gox
+go get github.com/mitchellh/gox
 
 export GOPATH="$TESTBUILD_DIR"
 DEST="$GOPATH/src/github.com/rekby/lets-proxy2"
