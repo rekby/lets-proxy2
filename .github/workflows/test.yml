@@ -3,6 +3,9 @@ on: [push]
 jobs:
   test-build:
     runs-on: ubuntu-20.04
+    env:
+      GOPATH: "$HOME/go"
+
     strategy:
       matrix:
         goVersion: ["1.10", "1.16"]
@@ -14,14 +17,8 @@ jobs:
         with:
           go-version: ${{ matrix.goVersion }}
 
-      - name: mkdir
-        run: mkdir -p ~/go/src/github.com/rekby
-
-      - name: link to the source
-        run: ln -s $PWD ~/go/src/github.com/rekby
-
-      - name: Build
-        run: cd ~/go/src/github.com/rekby && GOPATH=~/go go build -v ./...
+      - name: test-build
+        run: bash ./tests/test-build.sh
 
   run-test:
     runs-on: ubuntu-20.04
