@@ -1,4 +1,4 @@
-name: Go
+name: Test
 on: [push]
 jobs:
   test:
@@ -12,8 +12,15 @@ jobs:
           go-version: 1.17
 
       - name: Build
-        run: go build -v ./...
+        run: go build --mod=vendor -v ./...
 
       - name: Test
         run: bash ./tests/test.sh
 
+      - name: Coveralls install goveralls
+        run: go get github.com/mattn/goveralls
+
+      - name: Coveralls push
+        run: goveralls -coverprofile=covprofile.out -service=github
+        env:
+          COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
