@@ -22,10 +22,6 @@ jobs:
       - name: Test
         run: bash ./tests/test.sh
 
-      - name: Coveralls install goveralls
-        run: go get github.com/mattn/goveralls
-
-      - name: Coveralls push
-        run: goveralls -coverprofile=coverage.out -service=github
-        env:
-          COVERALLS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  - uses: shogo82148/actions-goveralls@v1
+    with:
+      path-to-profile: coverage.out
