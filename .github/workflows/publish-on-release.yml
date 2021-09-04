@@ -1,6 +1,5 @@
 name: publish
 on:
-  push: null
   release:
     types:
       - published
