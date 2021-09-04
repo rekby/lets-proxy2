@@ -1,0 +1,38 @@
+name: publish
+on:
+  release:
+    types:
+      - published
+jobs:
+  publish:
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        goVersion: ["1.10", "1.16"]
+    env:
+      GO_VERSION: ${{ matrix.goVersion }}
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: ${{ matrix.goVersion }}
+
+      - name: install dos2unix
+        run: sudo apt-get install dos2unix
+
+      - name: checkout
+        uses: actions/checkout@v2
+
+      - name: build release binaries
+        run: bash ./tests/build-release.sh
+
+      - name: make archives
+        run: bash ./tests/make-archives.sh
+
+      - name: ls
+        run: ls output/
+      - name: upload binaries to release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: output/*
