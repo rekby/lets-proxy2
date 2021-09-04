@@ -11,7 +11,7 @@ cp ../README.md ./README.md
 unix2dos -n README.md README.txt
 
 SUFFIX=""
-if [ "GO_VERSION" == "1.10" ]; then
+if [ "$GO_VERSION" == "1.10" ]; then
   SUFFIX="-go1.10"
 fi
 
