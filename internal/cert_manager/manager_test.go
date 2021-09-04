@@ -10,7 +10,6 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
 	"net"
 	"net/http"
 	"testing"
@@ -104,29 +103,40 @@ func TestGetKeyType(t *testing.T) {
 	}, "cert is nil")
 }
 
-func TestStoreCertificate(t *testing.T) {
-	ctx, flush := th.TestContext(t)
+func TestStoreLoadCertificate(t *testing.T) {
+	e, ctx, flush := th.NewEnv(t)
 	defer flush()
 
-	//nolint:gosec
-	key, _ := rsa.GenerateKey(rand.Reader, 512)
-
-	cert := &tls.Certificate{Certificate: [][]byte{
-		{1, 2, 3},
-		{4, 5, 6},
-	},
-		PrivateKey: key,
-	}
+	certBytes, keyBytes := fastCreateTestCert([]string{"domain.com"}, time.Now())
+	cert, err := tls.X509KeyPair(certBytes, keyBytes)
+	e.CmpNoError(err)
+	cert.Leaf, err = x509.ParseCertificate(cert.Certificate[0])
+	e.CmpNoError(err)
 
 	mc := minimock.NewController(t)
-	cacheMock := NewBytesMock(mc).PutMock.Set(func(ctx context.Context, key string, data []byte) (err error) {
-		fmt.Println(key)
-		fmt.Println(string(data))
+	c := make(map[string][]byte)
+	cacheMock := NewBytesMock(mc)
+	cacheMock.PutMock.Set(func(ctx context.Context, key string, data []byte) (err error) {
+		c[key] = data
 		return nil
 	})
-	cacheMock.GetMock.Return(nil, cache.ErrCacheMiss)
+	cacheMock.GetMock.Set(func(ctx context.Context, key string) (ba1 []byte, err error) {
+		data, ok := c[key]
+		if ok {
+			return data, nil
+		}
+		return nil, cache.ErrCacheMiss
+	})
 
-	storeCertificate(ctx, cacheMock, CertDescription{MainDomain: "asd", KeyType: KeyRSA}, cert)
+	cd := CertDescription{MainDomain: "asd", KeyType: KeyRSA}
+	err = storeCertificate(ctx, cacheMock, cd, &cert)
+	e.CmpNoError(err)
+
+	resCert, err := loadCertificateFromCache(ctx, cacheMock, cd)
+	e.CmpNoError(err)
+
+	e.CmpNoError(err)
+	e.Cmp(resCert, &cert)
 }
 
 func TestIsNeedRenew(t *testing.T) {

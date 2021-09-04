@@ -34,7 +34,7 @@ jobs:
         uses: shogo82148/actions-goveralls@v1
         with:
           path-to-profile: coverage.out
-          flag-name: Go-${{ matrix.go }}
+          flag-name: Go-${{ matrix.goVersion }}
           parallel: true
 
   # notifies that all test jobs are finished.
