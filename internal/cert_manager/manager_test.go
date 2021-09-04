@@ -103,7 +103,7 @@ func TestGetKeyType(t *testing.T) {
 	}, "cert is nil")
 }
 
-func TestStoreCertificate(t *testing.T) {
+func TestStoreLoadCertificate(t *testing.T) {
 	e, ctx, flush := th.NewEnv(t)
 	defer flush()
 
