@@ -1,0 +1,47 @@
+name: Test
+on: [push, pull_request]
+jobs:
+  test-build:
+    runs-on: ubuntu-20.04
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: "1.10"
+
+      - name: test-build
+        run: bash ./tests/build-test.sh
+
+  run-test:
+    needs: test-build
+    runs-on: ubuntu-20.04
+    strategy:
+      matrix:
+        goVersion: ["1.10", "1.16"]
+    env:
+      GO_VERSION: ${{ matrix.goVersion }}
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+
+      - name: Test
+        run: bash ./tests/test.sh
+
+      - name: push coverage
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: coverage.out
+          flag-name: Go-${{ matrix.go }}
+          parallel: true
+
+  # notifies that all test jobs are finished.
+  finish:
+    needs: run-test
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: shogo82148/actions-goveralls@v1
+        with:
+          parallel-finished: true
