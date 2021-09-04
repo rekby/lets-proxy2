@@ -18,9 +18,6 @@ jobs:
         with:
           go-version: ${{ matrix.goVersion }}
 
-      - name: apt update
-        run: sudo apt-get update
-
       - name: install dos2unix
         run: sudo apt-get install dos2unix
 
