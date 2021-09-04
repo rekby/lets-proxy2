@@ -18,14 +18,14 @@ jobs:
         with:
           go-version: ${{ matrix.goVersion }}
 
+      - name: install dos2unix
+        run: sudo apt-get install dos2unix
+
       - name: checkout
         uses: actions/checkout@v2
 
       - name: build release binaries
         run: bash ./tests/build-release.sh
-
-      - name: install dos2unix
-        run: sudo apt-get install dos2unix
 
       - name: make archives
         run: bash ./tests/make-archives.sh
