@@ -33,6 +33,7 @@ MaxConfigFilesRead = 10000
 
 AllowRSACert = true
 AllowECDSACert = true
+AllowInsecureTLSChipers = false
 
 [Log]
 EnableLogToFile = true

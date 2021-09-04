@@ -50,15 +50,16 @@ type configDocker struct {
 }
 
 type configGeneral struct {
-	IssueTimeout       int
-	StorageDir         string
-	Subdomains         []string
-	AcmeServer         string
-	StoreJSONMetadata  bool
-	IncludeConfigs     []string
-	MaxConfigFilesRead int
-	AllowRSACert       bool
-	AllowECDSACert     bool
+	IssueTimeout            int
+	StorageDir              string
+	Subdomains              []string
+	AcmeServer              string
+	StoreJSONMetadata       bool
+	IncludeConfigs          []string
+	MaxConfigFilesRead      int
+	AllowRSACert            bool
+	AllowECDSACert          bool
+	AllowInsecureTLSChipers bool
 }
 
 //nolint:maligned

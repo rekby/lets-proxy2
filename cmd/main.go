@@ -132,6 +132,7 @@ func startProgram(config *configType) {
 
 	certManager.AllowECDSACert = config.General.AllowECDSACert
 	certManager.AllowRSACert = config.General.AllowRSACert
+	certManager.AllowInsecureTLSChipers = config.General.AllowInsecureTLSChipers
 
 	for _, subdomain := range config.General.Subdomains {
 		subdomain = strings.TrimSpace(subdomain)
