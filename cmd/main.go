@@ -123,10 +123,8 @@ func startProgram(config *configType) {
 	storage := &cache.DiskCache{Dir: config.General.StorageDir}
 	clientManager := acme_client_manager.New(ctx, storage)
 	clientManager.DirectoryURL = config.General.AcmeServer
-	acmeClient, err := clientManager.GetClient(ctx)
-	log.DebugFatal(logger, err, "Get acme client")
 
-	certManager := cert_manager.New(acmeClient, storage, registry)
+	certManager := cert_manager.New(clientManager, storage, registry)
 	certManager.CertificateIssueTimeout = time.Duration(config.General.IssueTimeout) * time.Second
 	certManager.SaveJSONMeta = config.General.StoreJSONMetadata
 

@@ -105,15 +105,7 @@ type Manager struct {
 	// Every subdomain must have suffix dot. For example: "www."
 	AutoSubdomains []string
 
-	// acmeClient is used to perform low-level operations, such as account registration
-	// and requesting new certificates.
-	//
-	// If acmeClient is nil, a zero-value acme.Client is used with acme.LetsEncryptURL
-	// as directory endpoint. If the acmeClient.Key is nil, a new ECDSA P-256 key is
-	// generated and, if Cache is not nil, stored in cache.
-	//
-	// Mutating the field after the first call of GetCertificate method will have no effect.
-	acmeClient              AcmeClient
+	acmeClientManager       AcmeClientManager
 	DomainChecker           DomainChecker
 	EnableHTTPValidation    bool
 	EnableTLSValidation     bool
@@ -134,9 +126,9 @@ type Manager struct {
 	handleCertFinish, certRequestFinish metrics.ProcessFinishFunc
 }
 
-func New(client AcmeClient, c cache.Bytes, r prometheus.Registerer) *Manager {
+func New(acmeClientManager AcmeClientManager, c cache.Bytes, r prometheus.Registerer) *Manager {
 	res := Manager{}
-	res.acmeClient = client
+	res.acmeClientManager = acmeClientManager
 	res.certForDomainAuthorize = cache.NewMemoryValueLRU("authcert")
 	res.certState = cache.NewMemoryValueLRU("certstate")
 	res.CertificateIssueTimeout = time.Minute
@@ -193,8 +185,8 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 	return m.getCertificate(ctx, needDomain, KeyRSA)
 }
 
-func (m *Manager) GetAcmeClient() (AcmeClient, error) {
-	return m.acmeClient, nil
+func (m *Manager) GetAcmeClient(ctx context.Context) (AcmeClient, error) {
+	return m.acmeClientManager.GetClient(ctx)
 }
 
 //nolint:funlen,gocognit
@@ -418,7 +410,7 @@ func (m *Manager) createCertificateForDomains(ctx context.Context, cd CertDescri
 
 	logger.Debug("Start issue process")
 
-	acmeClient, err := m.GetAcmeClient()
+	acmeClient, err := m.GetAcmeClient(ctx)
 	log.DebugError(logger, err, "Get acme client")
 	if err != nil {
 		return nil, xerrors.Errorf("failed to get acme client: %w", err)

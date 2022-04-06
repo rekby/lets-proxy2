@@ -27,6 +27,11 @@ type AcmeClient interface {
 	WaitOrder(ctx context.Context, url string) (*acme.Order, error)
 }
 
+type AcmeClientManager interface {
+	Close() error
+	GetClient(ctx context.Context) (*acme.Client, error)
+}
+
 type managerDefaults struct{}
 
 func (managerDefaults) IsDomainAllowed(ctx context.Context, domain string) (bool, error) {
