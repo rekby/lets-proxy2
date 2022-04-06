@@ -50,7 +50,7 @@ func init() {
 	}
 }
 
-func createTestClient(t *testing.T) *acme.Client {
+func createTestClientManager(t *testing.T) *AcmeClientManagerMock {
 	resp, err := http.Get(testACMEServer)
 	if err != nil {
 		t.Fatalf("Can't connect to buoulder server: %q", err)
@@ -76,7 +76,11 @@ func createTestClient(t *testing.T) *acme.Client {
 	if err != nil {
 		t.Fatalf("Can't initialize acme client: %v", err)
 	}
-	return &client
+
+	clientManager := NewAcmeClientManagerMock(t)
+	clientManager.CloseMock.Return(nil)
+	clientManager.GetClientMock.Return(&client, nil)
+	return clientManager
 }
 
 func TestGetKeyType(t *testing.T) {
@@ -158,7 +162,7 @@ type testManagerContext struct {
 	cache                  *BytesMock
 	certForDomainAuthorize *ValueMock
 	certState              *ValueMock
-	client                 *AcmeClientMock
+	clientManager          *AcmeClientManagerMock
 	domainChecker          *DomainCheckerMock
 	httpTokens             *BytesMock
 }
@@ -257,7 +261,7 @@ func createManager(t *testing.T) (res testManagerContext, cancel func()) {
 		Context: zc.WithLogger(context.Background(), zap.NewNop()),
 	}
 	res.cache = NewBytesMock(mc)
-	res.client = NewAcmeClientMock(mc)
+	res.clientManager = NewAcmeClientManagerMock(mc)
 	res.certForDomainAuthorize = NewValueMock(mc)
 	res.certState = NewValueMock(mc)
 	res.domainChecker = NewDomainCheckerMock(mc)
@@ -266,7 +270,7 @@ func createManager(t *testing.T) (res testManagerContext, cancel func()) {
 	res.manager = &Manager{
 		CertificateIssueTimeout: time.Second,
 		Cache:                   res.cache,
-		acmeClient:              res.client,
+		acmeClientManager:       res.clientManager,
 		DomainChecker:           res.domainChecker,
 		EnableHTTPValidation:    true,
 		EnableTLSValidation:     true,

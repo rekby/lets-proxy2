@@ -49,7 +49,7 @@ func TestManager_GetCertificateHttp01(t *testing.T) {
 	mc := minimock.NewController(t)
 	defer mc.Finish()
 
-	manager := New(createTestClient(t), newCacheMock(mc), nil)
+	manager := New(createTestClientManager(t), newCacheMock(mc), nil)
 	manager.CertificateIssueTimeout = testCertIssueTimeout
 	manager.AutoSubdomains = []string{"www."}
 	manager.EnableTLSValidation = false
@@ -102,7 +102,7 @@ func TestManager_GetCertificateTls(t *testing.T) {
 	mc := minimock.NewController(t)
 	defer mc.Finish()
 
-	manager := New(createTestClient(t), newCacheMock(mc), nil)
+	manager := New(createTestClientManager(t), newCacheMock(mc), nil)
 	manager.CertificateIssueTimeout = testCertIssueTimeout
 	manager.AutoSubdomains = []string{"www."}
 	manager.EnableTLSValidation = true
