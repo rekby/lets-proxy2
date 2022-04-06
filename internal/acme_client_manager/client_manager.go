@@ -61,11 +61,6 @@ func New(ctx context.Context, cache cache.Bytes) *AcmeManager {
 	}
 }
 
-type acmeManagerState struct {
-	PrivateKey  *rsa.PrivateKey
-	AcmeAccount *acme.Account
-}
-
 func (m *AcmeManager) Close() error {
 	logger := zc.L(m.ctx)
 	logger.Debug("Start close")
@@ -112,7 +107,7 @@ func (m *AcmeManager) GetClient(ctx context.Context) (*acme.Client, error) {
 		}
 	}
 
-	client := &acme.Client{DirectoryURL: m.DirectoryURL, HTTPClient: m.httpClient}
+	client := m.createClient()
 
 	key, account, err := createAccount(ctx, client, m.AgreeFunction)
 	if err != nil {
@@ -121,7 +116,7 @@ func (m *AcmeManager) GetClient(ctx context.Context) (*acme.Client, error) {
 
 	m.account = account
 	m.client = client
-	state := acmeManagerState{PrivateKey: key, AcmeAccount: account}
+	state := acmeManagerState{Accounts: []acmeAccountState{{PrivateKey: key, AcmeAccount: account}}}
 	stateBytes, err := json.Marshal(state)
 	log.InfoPanicCtx(ctx, err, "Marshal account state to json")
 
@@ -177,6 +172,10 @@ func (m *AcmeManager) accountRenew() {
 	}
 }
 
+func (m *AcmeManager) createClient() *acme.Client {
+	return &acme.Client{DirectoryURL: m.DirectoryURL, HTTPClient: m.httpClient}
+}
+
 func (m *AcmeManager) loadFromCache(ctx context.Context) (err error) {
 	defer func() {
 		var effectiveError error
@@ -194,21 +193,18 @@ func (m *AcmeManager) loadFromCache(ctx context.Context) (err error) {
 	}
 
 	var state acmeManagerState
-	err = json.Unmarshal(content, &state)
+	_, err = state.Load(content)
 	if err != nil { // nolint:wsl
 		return err
 	}
 
-	if state.PrivateKey == nil {
-		return errors.New("empty private key")
+	if len(state.Accounts) == 0 {
+		return xerrors.Errorf("no accounts in state")
 	}
 
-	if state.AcmeAccount == nil {
-		return errors.New("empty account info")
-	}
-
-	m.client = &acme.Client{DirectoryURL: m.DirectoryURL, Key: state.PrivateKey}
-	m.account = state.AcmeAccount
+	m.account = state.Accounts[0].AcmeAccount
+	m.client = m.createClient()
+	m.client.Key = state.Accounts[0].PrivateKey
 
 	// handlepanic: in accountRenew
 	go m.accountRenew()
