@@ -395,7 +395,7 @@ func TestResolverReal(t *testing.T) {
 	)
 
 	r = NewResolver("1.1.1.1:53")
-	ips, err = r.LookupIPAddr(ctx, "qwe.l.rekby.ru")
+	ips, err = r.LookupIPAddr(ctx, "test.l.rekby.ru")
 	td.CmpNoError(err)
 	td.Contains(ips,
 		testdeep.Any(

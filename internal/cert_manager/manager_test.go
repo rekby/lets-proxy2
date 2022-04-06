@@ -266,7 +266,7 @@ func createManager(t *testing.T) (res testManagerContext, cancel func()) {
 	res.manager = &Manager{
 		CertificateIssueTimeout: time.Second,
 		Cache:                   res.cache,
-		Client:                  res.client,
+		acmeClient:              res.client,
 		DomainChecker:           res.domainChecker,
 		EnableHTTPValidation:    true,
 		EnableTLSValidation:     true,

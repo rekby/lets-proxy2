@@ -3,12 +3,13 @@ package cert_manager
 import (
 	"context"
 	"errors"
+	"testing"
+
 	"github.com/gojuno/minimock/v3"
 	"github.com/maxatome/go-testdeep"
 	"github.com/rekby/lets-proxy2/internal/th"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/xerrors"
-	"testing"
 )
 
 // Test nil in getAuthorized
@@ -45,8 +46,8 @@ func TestIssue_134(t *testing.T) {
 		return nil, testErr
 	})
 
-	m := &Manager{Client: client}
-	res, err := m.createOrderForDomains(ctx, testDomain)
+	m := &Manager{}
+	res, err := m.createOrderForDomains(ctx, client, testDomain)
 	td.Nil(res)
 	td.True(xerrors.Is(err, testErr))
 }
