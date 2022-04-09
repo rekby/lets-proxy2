@@ -36,17 +36,27 @@ func TestClientManagerCreateNew(t *testing.T) {
 	//register account
 	manager := New(ctx, c)
 	manager.httpClient = th.GetHttpClient()
+	manager.DirectoryURL = testACMEServer
 
 	c.PutMock.Return(nil)
 	c.GetMock.Return(nil, cache.ErrCacheMiss)
 	manager.DirectoryURL = testACMEServer
-	client, err := manager.GetClient(ctx)
+
+	// create first client
+	client, clientDisableFunc, err := manager.GetClient(ctx)
 	e.CmpNoError(err)
 	e.NotNil(client)
 
-	client2, err := manager.GetClient(ctx)
+	client2, _, err := manager.GetClient(ctx)
 	e.CmpNoError(err)
-	e.True(client == client2)
+	e.True(client2 == client)
+
+	// create client if all prev clients disabled
+	clientDisableFunc()
+	client3, _, err := manager.GetClient(ctx)
+	e.CmpNoError(err)
+	e.True(client3 != client)
+
 }
 
 func TestClientManagerGetFromCache(t *testing.T) {
@@ -65,31 +75,143 @@ func TestClientManagerGetFromCache(t *testing.T) {
 	defer func() { _ = manager.Close() }()
 
 	state := acmeManagerState{
-		Accounts: []acmeAccountState{{
-			AcmeAccount: &acme.Account{},
-			PrivateKey: &rsa.PrivateKey{
-				D: big.NewInt(123),
+		Accounts: []acmeAccountState{
+			{
+				AcmeAccount: &acme.Account{},
+				PrivateKey: &rsa.PrivateKey{
+					D: big.NewInt(123),
+				},
 			},
-		}},
+			{
+				AcmeAccount: &acme.Account{},
+				PrivateKey: &rsa.PrivateKey{
+					D: big.NewInt(222),
+				},
+			},
+		},
 	}
 	stateBytes, _ := json.Marshal(state)
 
 	c.GetMock.Return(stateBytes, nil)
-	client, err := manager.GetClient(ctx)
+
+	client, _, err := manager.GetClient(ctx)
 	e.CmpNoError(err)
 	e.NotNil(client)
 	e.CmpDeeply(client.Key, state.Accounts[0].PrivateKey)
 
-	client2, err := manager.GetClient(ctx)
+	client2, client2DisableFunc, err := manager.GetClient(ctx)
 	e.CmpNoError(err)
-	e.True(client == client2)
+	e.True(client2 != client) // get second client
+
+	client3, _, err := manager.GetClient(ctx)
+	e.CmpNoError(err)
+	e.True(client3 == client) // get first client, cycle
+
+	client2DisableFunc()
+
+	client3, _, err = manager.GetClient(ctx)
+	e.CmpNoError(err)
+	e.True(client3 == client) // second client disable, got first
 
 	ctxCancelled, ctxCancelledCancel := context.WithCancel(ctx)
 	ctxCancelledCancel()
 
-	client3, err := manager.GetClient(ctxCancelled)
+	client4, _, err := manager.GetClient(ctxCancelled)
 	e.CmpError(err)
-	e.Nil(client3)
+	e.Nil(client4)
+}
+
+func TestClientManager_nextEnabledClientIndex(t *testing.T) {
+	table := []struct {
+		name             string
+		accountsEnabled  []bool
+		lastAccountIndex int
+		resIndex         int
+		resOk            bool
+	}{
+		{
+			"Empty",
+			nil,
+			0,
+			0,
+			false,
+		},
+		{
+			"OneEnabled",
+			[]bool{true},
+			0,
+			0,
+			true,
+		},
+		{
+			"OneDisabled",
+			[]bool{false},
+			0,
+			0,
+			false,
+		},
+		{
+			"TwoEnabledLastFirst",
+			[]bool{true, true},
+			0,
+			1,
+			true,
+		},
+		{
+			"TwoEnabledLastSecond",
+			[]bool{true, true},
+			1,
+			0,
+			true,
+		},
+		{
+			"TwoDisabledLastFirst",
+			[]bool{false, false},
+			0,
+			0,
+			false,
+		},
+		{
+			"TwoDisabledLastSecond",
+			[]bool{false, false},
+			1,
+			0,
+			false,
+		},
+		{
+			"DisabledEnabledFirst",
+			[]bool{false, true},
+			0,
+			1,
+			true,
+		},
+		{
+			"EnabledDisabledSecond",
+			[]bool{true, false},
+			1,
+			0,
+			true,
+		},
+	}
+
+	for _, test := range table {
+		t.Run(test.name, func(t *testing.T) {
+			e, _, flush := th.NewEnv(t)
+			defer flush()
+
+			m := AcmeManager{
+				lastAccountIndex: test.lastAccountIndex,
+			}
+
+			for _, enabled := range test.accountsEnabled {
+				m.accounts = append(m.accounts, clientAccount{enabled: enabled})
+			}
+
+			resIndex, resOk := m.nextEnabledClientIndex()
+			e.Cmp(resIndex, test.resIndex)
+			e.Cmp(resOk, test.resOk)
+		})
+	}
 }
 
 func TestClientManagerStateMigration(t *testing.T) {

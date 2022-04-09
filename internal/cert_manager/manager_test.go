@@ -79,7 +79,7 @@ func createTestClientManager(t *testing.T) *AcmeClientManagerMock {
 
 	clientManager := NewAcmeClientManagerMock(t)
 	clientManager.CloseMock.Return(nil)
-	clientManager.GetClientMock.Return(&client, nil)
+	clientManager.GetClientMock.Return(&client, func() {}, nil)
 	return clientManager
 }
 

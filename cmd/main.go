@@ -122,8 +122,11 @@ func startProgram(config *configType) {
 
 	storage := &cache.DiskCache{Dir: config.General.StorageDir}
 	clientManager := acme_client_manager.New(ctx, storage)
+
 	clientManager.DirectoryURL = config.General.AcmeServer
-	_, err = clientManager.GetClient(ctx)
+	logger.Info("Acme directory", zap.String("url", config.General.AcmeServer))
+
+	_, _, err = clientManager.GetClient(ctx)
 	log.InfoFatal(logger, err, "Get acme client")
 
 	certManager := cert_manager.New(clientManager, storage, registry)

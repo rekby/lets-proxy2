@@ -27,6 +27,7 @@ import (
 
 const rsaKeyLength = 2048
 const renewAccountInterval = time.Hour * 24
+const disableDuration = time.Hour
 
 var errClosed = xerrors.Errorf("acmeManager already closed")
 
@@ -43,10 +44,17 @@ type AcmeManager struct {
 	cache                 cache.Bytes
 	httpClient            *http.Client
 
-	mu      sync.Mutex
+	mu               sync.Mutex
+	lastAccountIndex int
+	accounts         []clientAccount
+	stateLoaded      bool
+	closed           bool
+}
+
+type clientAccount struct {
 	client  *acme.Client
 	account *acme.Account
-	closed  bool
+	enabled bool
 }
 
 func New(ctx context.Context, cache cache.Bytes) *AcmeManager {
@@ -58,6 +66,7 @@ func New(ctx context.Context, cache cache.Bytes) *AcmeManager {
 		AgreeFunction:        acme.AcceptTOS,
 		RenewAccountInterval: renewAccountInterval,
 		httpClient:           http.DefaultClient,
+		lastAccountIndex:     -1,
 	}
 }
 
@@ -84,64 +93,65 @@ func (m *AcmeManager) Close() error {
 	return nil
 }
 
-func (m *AcmeManager) GetClient(ctx context.Context) (*acme.Client, error) {
+func (m *AcmeManager) GetClient(ctx context.Context) (_ *acme.Client, disableFunc func(), err error) {
 	if ctx.Err() != nil {
-		return nil, errors.New("acme manager context closed")
+		return nil, nil, errors.New("acme manager context closed")
 	}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if m.closed {
-		return nil, xerrors.Errorf("GetClient: %w", errClosed)
+		return nil, nil, xerrors.Errorf("GetClient: %w", errClosed)
 	}
 
-	if m.client != nil {
-		return m.client, nil
+	createDisableFunc := func(index int) func() {
+		return func() {
+			wasEnabled := m.disableAccountSelfSync(index)
+			if wasEnabled {
+				time.AfterFunc(disableDuration, func() {
+					m.accountEnableSelfSync(index)
+				})
+			}
+		}
 	}
 
-	if m.cache != nil && !m.IgnoreCacheLoad {
+	if !m.stateLoaded && m.cache != nil && !m.IgnoreCacheLoad {
 		err := m.loadFromCache(ctx)
-		if err != cache.ErrCacheMiss {
-			return m.client, err
+		if err != nil && err != cache.ErrCacheMiss {
+			return nil, nil, err
 		}
+		m.stateLoaded = true
 	}
 
-	client := m.createClient()
+	if index, ok := m.nextEnabledClientIndex(); ok {
+		return m.accounts[index].client, createDisableFunc(index), nil
+	}
 
-	key, account, err := createAccount(ctx, client, m.AgreeFunction)
+	acc, err := m.registerAccount(ctx)
+	m.accounts = append(m.accounts, acc)
+	// handlepanic: in accountRenewSelfSync
+	go m.accountRenewSelfSync(len(m.accounts) - 1)
+
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	m.account = account
-	m.client = client
-	state := acmeManagerState{Accounts: []acmeAccountState{{PrivateKey: key, AcmeAccount: account}}}
-	stateBytes, err := json.Marshal(state)
-	log.InfoPanicCtx(ctx, err, "Marshal account state to json")
-
-	if m.cache != nil {
-		err = m.cache.Put(ctx, certName(m.DirectoryURL), stateBytes)
-		if err != nil {
-			return nil, err
-		}
+	if err = m.saveState(ctx); err != nil {
+		return nil, nil, err
 	}
 
-	if m.client != nil {
-		// handlepanic: in accountRenew
-		go m.accountRenew()
-	}
-
-	return m.client, err
+	return acc.client, createDisableFunc(len(m.accounts) - 1), nil
 }
 
-func (m *AcmeManager) accountRenew() {
+func (m *AcmeManager) accountRenewSelfSync(index int) {
 	logger := zc.L(m.ctx)
 	ctx, ctxCancel := context.WithCancel(m.ctx)
 	defer ctxCancel()
 
 	m.mu.Lock()
 	m.ctxAutorenewCompleted = ctx
+	acc := m.accounts[index]
 	m.mu.Unlock()
 
 	if m.ctx.Err() != nil {
@@ -163,16 +173,36 @@ func (m *AcmeManager) accountRenew() {
 			func() {
 				defer log.HandlePanic(logger)
 
-				newAccount = renewTos(m.ctx, m.client, m.account)
+				newAccount = renewTos(m.ctx, acc.client, acc.account)
 			}()
+			acc.account = newAccount
 			m.mu.Lock()
-			m.account = newAccount
+			m.accounts[index] = acc
 			m.mu.Unlock()
 		}
 	}
 }
 
-func (m *AcmeManager) createClient() *acme.Client {
+func (m *AcmeManager) disableAccountSelfSync(index int) (wasEnabled bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.accounts[index].enabled {
+		m.accounts[index].enabled = false
+		return true
+	}
+
+	return false
+}
+
+func (m *AcmeManager) accountEnableSelfSync(index int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.accounts[index].enabled = true
+}
+
+func (m *AcmeManager) initClient() *acme.Client {
 	return &acme.Client{DirectoryURL: m.DirectoryURL, HTTPClient: m.httpClient}
 }
 
@@ -187,7 +217,7 @@ func (m *AcmeManager) loadFromCache(ctx context.Context) (err error) {
 		log.DebugErrorCtx(ctx, effectiveError, "Load acme manager from cache.", zap.NamedError("raw_err", err))
 	}()
 
-	content, err := m.cache.Get(ctx, certName(m.DirectoryURL))
+	content, err := m.cache.Get(ctx, stateName(m.DirectoryURL))
 	if err != nil {
 		return err
 	}
@@ -202,17 +232,96 @@ func (m *AcmeManager) loadFromCache(ctx context.Context) (err error) {
 		return xerrors.Errorf("no accounts in state")
 	}
 
-	m.account = state.Accounts[0].AcmeAccount
-	m.client = m.createClient()
-	m.client.Key = state.Accounts[0].PrivateKey
+	m.accounts = make([]clientAccount, 0, len(state.Accounts))
+	for index, stateAccount := range state.Accounts {
+		client := m.initClient()
+		client.Key = stateAccount.PrivateKey
+		acc := clientAccount{
+			client:  client,
+			account: stateAccount.AcmeAccount,
+			enabled: true,
+		}
 
-	// handlepanic: in accountRenew
-	go m.accountRenew()
+		// handlepanic inside accountRenewSelfSync
+		go m.accountRenewSelfSync(index)
+		m.accounts = append(m.accounts, acc)
+	}
 
 	return nil
 }
 
-func createAccount(ctx context.Context, client *acme.Client, agreeFunction func(tosurl string) bool) (*rsa.PrivateKey, *acme.Account, error) {
+func (m *AcmeManager) nextEnabledClientIndex() (int, bool) {
+	switch {
+	case len(m.accounts) == 0:
+		return 0, false
+	case len(m.accounts) == 1 && m.accounts[0].enabled:
+		return 0, true
+	default:
+		// pass
+	}
+
+	startIndex := m.lastAccountIndex
+	if startIndex < 0 {
+		startIndex = len(m.accounts) - 1
+	}
+	index := startIndex
+	for {
+		index++
+		if index >= len(m.accounts) {
+			index = 0
+		}
+		if m.accounts[index].enabled {
+			m.lastAccountIndex = index
+			return index, true
+		}
+		if index == startIndex {
+			return 0, false
+		}
+	}
+}
+
+func (m *AcmeManager) registerAccount(ctx context.Context) (clientAccount, error) {
+	// create account
+	client := m.initClient()
+
+	account, err := createAcmeAccount(ctx, client, m.AgreeFunction)
+	log.InfoErrorCtx(ctx, err, "Create acme account")
+	if err != nil {
+		return clientAccount{}, err
+	}
+
+	acc := clientAccount{
+		client:  client,
+		account: account,
+		enabled: true,
+	}
+
+	return acc, nil
+}
+
+func (m *AcmeManager) saveState(ctx context.Context) error {
+	var state acmeManagerState
+	state.Accounts = make([]acmeAccountState, 0, len(m.accounts))
+
+	for _, acc := range m.accounts {
+		state.Accounts = append(state.Accounts, acmeAccountState{PrivateKey: acc.client.Key.(*rsa.PrivateKey), AcmeAccount: acc.account})
+	}
+
+	stateBytes, err := json.Marshal(state)
+	log.InfoPanicCtx(ctx, err, "Marshal account state to json")
+
+	if m.cache != nil {
+		err = m.cache.Put(ctx, stateName(m.DirectoryURL), stateBytes)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// createAcmeAccount create account on acme server and store private key in client.Key
+func createAcmeAccount(ctx context.Context, client *acme.Client, agreeFunction func(tosurl string) bool) (*acme.Account, error) {
 	key, err := rsa.GenerateKey(rand.Reader, rsaKeyLength)
 	log.InfoDPanicCtx(ctx, err, "Generate account key")
 
@@ -220,12 +329,12 @@ func createAccount(ctx context.Context, client *acme.Client, agreeFunction func(
 	account := &acme.Account{}
 	account, err = client.Register(ctx, account, agreeFunction)
 	log.InfoErrorCtx(ctx, err, "Register acme account")
-	return key, account, err
+	return account, err
 }
 
-func certName(url string) string {
+func stateName(s string) string {
 	hasher := sha256.New()
-	hasher.Write([]byte(url))
+	hasher.Write([]byte(s))
 	sum := hasher.Sum(nil)
 	sumPrefix := sum[:4]
 	return fmt.Sprintf("account_info_%x.client_manager.json", sumPrefix)

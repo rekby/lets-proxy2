@@ -29,7 +29,7 @@ type AcmeClient interface {
 
 type AcmeClientManager interface {
 	Close() error
-	GetClient(ctx context.Context) (*acme.Client, error)
+	GetClient(ctx context.Context) (client *acme.Client, clientDisableFunc func(), err error)
 }
 
 type managerDefaults struct{}

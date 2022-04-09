@@ -9,4 +9,5 @@ var (
 	defaultConfigP     = flag.Bool("print-default-config", false, "Write default config to stdout and exit.")
 	versionP           = flag.Bool("version", false, "print version and exit")
 	testAcmeServerP    = flag.Bool("test-acme-server", false, "Use test acme server, instead address from config")
+	manualAcmeServer   = flag.String("acme-server", "", "Override acme server")
 )
