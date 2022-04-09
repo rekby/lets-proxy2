@@ -228,7 +228,9 @@ func createAccount(ctx context.Context, client *acme.Client, agreeFunction func(
 }
 
 func certName(url string) string {
-	sum := sha256.New().Sum([]byte(url))
+	hasher := sha256.New()
+	hasher.Write([]byte(url))
+	sum := hasher.Sum(nil)
 	sumPrefix := sum[:4]
 	return fmt.Sprintf("account_info_%x.client_manager.json", sumPrefix)
 }
