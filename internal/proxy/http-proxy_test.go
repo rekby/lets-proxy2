@@ -10,11 +10,13 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gojuno/minimock/v3"
-
 	"github.com/maxatome/go-testdeep"
+	"github.com/rekby/fixenv"
 	zc "github.com/rekby/zapcontext"
+	"golang.org/x/xerrors"
 
 	"github.com/rekby/lets-proxy2/internal/th"
 )
@@ -140,4 +142,61 @@ func TestNewHttpProxy(t *testing.T) {
 	_ = resp.Body.Close()
 	td.CmpNoError(err)
 	td.CmpDeeply(res, []byte{3, 4})
+}
+
+func TestNoDoubleSlashredirectIssue177(t *testing.T) {
+	e, _, flush := th.NewEnv(t)
+	defer flush()
+
+	_, addr := httpProxy(e, th.HttpQuery(e))
+
+	client := http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	resp, err := client.Get(addr + "/test//")
+	e.CmpNoError(err)
+
+	body, err := ioutil.ReadAll(resp.Body)
+	e.CmpNoError(err)
+	e.CmpNoError(resp.Body.Close())
+
+	e.Cmp(string(body), "/test//")
+}
+
+func httpProxy(e *th.Env, dst string) (*HTTPProxy, string) {
+	var proxy *HTTPProxy
+	var addr string
+	e.Cache(dst,
+		&fixenv.FixtureOptions{
+			CleanupFunc: func() {
+				_ = proxy.Close()
+			},
+		}, func() (res interface{}, err error) {
+			dstURL, err := url.Parse(dst)
+			if err != nil {
+				return nil, xerrors.Errorf("failed parse dst url %q: %%w", dst, err)
+			}
+			listener := th.TcpListener(e)
+			addr = "http://" + listener.Addr().String()
+			proxy = NewHTTPProxy(e.Ctx, listener)
+			proxy.Director = NewDirectorChain(
+				DirectorHost(dstURL.Host),
+				DirectorSetScheme(dstURL.Scheme),
+			)
+			errChan := make(chan error, 1)
+
+			go func() { errChan <- proxy.Start() }()
+
+			select {
+			case proxyStartErr := <-errChan:
+				err = proxyStartErr
+			case <-time.After(time.Millisecond * 10):
+				// pass
+			}
+
+			return proxy, err
+		})
+	return proxy, addr
 }

@@ -71,13 +71,11 @@ func (p *HTTPProxy) Start() error {
 	}
 	p.logger.Info("Access log", zap.Bool("enabled", p.EnableAccessLog))
 
-	mux := &http.ServeMux{}
-	mux.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+	p.httpServer.Handler = http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if !p.HandleHTTPValidation(writer, request) {
 			p.httpReverseProxy.ServeHTTP(writer, request)
 		}
 	})
-	p.httpServer.Handler = mux
 	p.httpServer.IdleTimeout = p.IdleTimeout
 
 	p.logger.Info("Http builtin reverse proxy start")
