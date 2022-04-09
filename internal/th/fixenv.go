@@ -11,7 +11,7 @@ import (
 )
 
 type Env struct {
-	ctx context.Context
+	Ctx context.Context
 	*fixenv.EnvT
 	TD
 }
@@ -22,7 +22,7 @@ func NewEnv(t *testing.T) (env *Env, ctx context.Context, cancel func()) {
 	tWrap := &testWrapper{T: td}
 	env = &Env{
 		EnvT: fixenv.NewEnv(tWrap),
-		ctx:  ctx,
+		Ctx:  ctx,
 		TD:   TD{T: td},
 	}
 	tWrap.Cleanup(ctxCancel)
