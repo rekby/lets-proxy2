@@ -24,7 +24,7 @@ type AcmeClientManagerMock struct {
 	beforeCloseCounter uint64
 	CloseMock          mAcmeClientManagerMockClose
 
-	funcGetClient          func(ctx context.Context) (cp1 *acme.Client, err error)
+	funcGetClient          func(ctx context.Context) (client *acme.Client, clientDisableFunc func(), err error)
 	inspectFuncGetClient   func(ctx context.Context)
 	afterGetClientCounter  uint64
 	beforeGetClientCounter uint64
@@ -213,8 +213,9 @@ type AcmeClientManagerMockGetClientParams struct {
 
 // AcmeClientManagerMockGetClientResults contains results of the AcmeClientManager.GetClient
 type AcmeClientManagerMockGetClientResults struct {
-	cp1 *acme.Client
-	err error
+	client            *acme.Client
+	clientDisableFunc func()
+	err               error
 }
 
 // Expect sets up expected params for AcmeClientManager.GetClient
@@ -249,7 +250,7 @@ func (mmGetClient *mAcmeClientManagerMockGetClient) Inspect(f func(ctx context.C
 }
 
 // Return sets up results that will be returned by AcmeClientManager.GetClient
-func (mmGetClient *mAcmeClientManagerMockGetClient) Return(cp1 *acme.Client, err error) *AcmeClientManagerMock {
+func (mmGetClient *mAcmeClientManagerMockGetClient) Return(client *acme.Client, clientDisableFunc func(), err error) *AcmeClientManagerMock {
 	if mmGetClient.mock.funcGetClient != nil {
 		mmGetClient.mock.t.Fatalf("AcmeClientManagerMock.GetClient mock is already set by Set")
 	}
@@ -257,12 +258,12 @@ func (mmGetClient *mAcmeClientManagerMockGetClient) Return(cp1 *acme.Client, err
 	if mmGetClient.defaultExpectation == nil {
 		mmGetClient.defaultExpectation = &AcmeClientManagerMockGetClientExpectation{mock: mmGetClient.mock}
 	}
-	mmGetClient.defaultExpectation.results = &AcmeClientManagerMockGetClientResults{cp1, err}
+	mmGetClient.defaultExpectation.results = &AcmeClientManagerMockGetClientResults{client, clientDisableFunc, err}
 	return mmGetClient.mock
 }
 
 //Set uses given function f to mock the AcmeClientManager.GetClient method
-func (mmGetClient *mAcmeClientManagerMockGetClient) Set(f func(ctx context.Context) (cp1 *acme.Client, err error)) *AcmeClientManagerMock {
+func (mmGetClient *mAcmeClientManagerMockGetClient) Set(f func(ctx context.Context) (client *acme.Client, clientDisableFunc func(), err error)) *AcmeClientManagerMock {
 	if mmGetClient.defaultExpectation != nil {
 		mmGetClient.mock.t.Fatalf("Default expectation is already set for the AcmeClientManager.GetClient method")
 	}
@@ -291,13 +292,13 @@ func (mmGetClient *mAcmeClientManagerMockGetClient) When(ctx context.Context) *A
 }
 
 // Then sets up AcmeClientManager.GetClient return parameters for the expectation previously defined by the When method
-func (e *AcmeClientManagerMockGetClientExpectation) Then(cp1 *acme.Client, err error) *AcmeClientManagerMock {
-	e.results = &AcmeClientManagerMockGetClientResults{cp1, err}
+func (e *AcmeClientManagerMockGetClientExpectation) Then(client *acme.Client, clientDisableFunc func(), err error) *AcmeClientManagerMock {
+	e.results = &AcmeClientManagerMockGetClientResults{client, clientDisableFunc, err}
 	return e.mock
 }
 
 // GetClient implements AcmeClientManager
-func (mmGetClient *AcmeClientManagerMock) GetClient(ctx context.Context) (cp1 *acme.Client, err error) {
+func (mmGetClient *AcmeClientManagerMock) GetClient(ctx context.Context) (client *acme.Client, clientDisableFunc func(), err error) {
 	mm_atomic.AddUint64(&mmGetClient.beforeGetClientCounter, 1)
 	defer mm_atomic.AddUint64(&mmGetClient.afterGetClientCounter, 1)
 
@@ -315,7 +316,7 @@ func (mmGetClient *AcmeClientManagerMock) GetClient(ctx context.Context) (cp1 *a
 	for _, e := range mmGetClient.GetClientMock.expectations {
 		if minimock.Equal(e.params, mm_params) {
 			mm_atomic.AddUint64(&e.Counter, 1)
-			return e.results.cp1, e.results.err
+			return e.results.client, e.results.clientDisableFunc, e.results.err
 		}
 	}
 
@@ -331,7 +332,7 @@ func (mmGetClient *AcmeClientManagerMock) GetClient(ctx context.Context) (cp1 *a
 		if mm_results == nil {
 			mmGetClient.t.Fatal("No results are set for the AcmeClientManagerMock.GetClient")
 		}
-		return (*mm_results).cp1, (*mm_results).err
+		return (*mm_results).client, (*mm_results).clientDisableFunc, (*mm_results).err
 	}
 	if mmGetClient.funcGetClient != nil {
 		return mmGetClient.funcGetClient(ctx)

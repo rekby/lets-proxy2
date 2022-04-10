@@ -185,10 +185,6 @@ func (m *Manager) GetCertificate(hello *tls.ClientHelloInfo) (resultCert *tls.Ce
 	return m.getCertificate(ctx, needDomain, KeyRSA)
 }
 
-func (m *Manager) GetAcmeClient(ctx context.Context) (AcmeClient, error) {
-	return m.acmeClientManager.GetClient(ctx)
-}
-
 //nolint:funlen,gocognit
 func (m *Manager) getCertificate(ctx context.Context, needDomain domain.DomainName, certType KeyType) (resultCert *tls.Certificate, err error) {
 	switch certType {
@@ -410,11 +406,29 @@ func (m *Manager) createCertificateForDomains(ctx context.Context, cd CertDescri
 
 	logger.Debug("Start issue process")
 
-	acmeClient, err := m.GetAcmeClient(ctx)
-	log.DebugError(logger, err, "Get acme client")
-	if err != nil {
-		return nil, xerrors.Errorf("failed to get acme client: %w", err)
+	for {
+		acmeClient, acmeClientDisableFunc, err := m.acmeClientManager.GetClient(ctx)
+		log.DebugError(logger, err, "Get acme client")
+		if err != nil {
+			return nil, xerrors.Errorf("failed to get acme client: %w", err)
+		}
+
+		res, err := m.createOrderAndCertificate(ctx, acmeClient, cd, domainNames)
+		switch {
+		case err == nil:
+			return res, nil
+		case isErrTooManyOrders(err):
+			logger.Info("Too many orders, try next client")
+			acmeClientDisableFunc()
+			continue
+		default:
+			return nil, err
+		}
 	}
+}
+
+func (m *Manager) createOrderAndCertificate(ctx context.Context, acmeClient AcmeClient, cd CertDescription, domainNames []domain.DomainName) (*tls.Certificate, error) {
+	logger := zc.L(ctx)
 
 	order, err := m.createOrderForDomains(ctx, acmeClient, domainNames...)
 	log.DebugWarning(logger, err, "Domains authorized")
@@ -422,7 +436,7 @@ func (m *Manager) createCertificateForDomains(ctx context.Context, cd CertDescri
 		return nil, errors.New("order authorization error")
 	}
 
-	res, err = m.issueCertificate(ctx, acmeClient, cd, order)
+	res, err := m.issueCertificate(ctx, acmeClient, cd, order)
 	log.DebugWarning(logger, err, "Issue certificate")
 	return res, err
 }
@@ -999,6 +1013,13 @@ func isCertLocked(ctx context.Context, storage cache.Bytes, certName CertDescrip
 	default:
 		return false, err
 	}
+}
+
+func isErrTooManyOrders(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "too many new orders recently")
 }
 
 // copy from golang.org/x/crypto/acme/autocert/autocert.go
