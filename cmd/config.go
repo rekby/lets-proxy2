@@ -60,6 +60,7 @@ type configGeneral struct {
 	AllowRSACert            bool
 	AllowECDSACert          bool
 	AllowInsecureTLSChipers bool
+	MinTLSVersion           string
 }
 
 //nolint:maligned
@@ -89,6 +90,7 @@ func getConfig(ctx context.Context) *configType {
 		_config = &configType{}
 		mergeConfigBytes(ctx, _config, defaultConfig(ctx), "default")
 		mergeConfigByTemplate(ctx, _config, *configFileP)
+		applyMoveConfigDetails(_config)
 		applyFlags(ctx, _config)
 		logger.Info("Parse configs finished", zap.Int("readed_files", parsedConfigFiles),
 			zap.Int("max_read_files", _config.General.MaxConfigFilesRead))
@@ -113,6 +115,10 @@ func applyFlags(ctx context.Context, config *configType) {
 		zc.L(ctx).Info("Set force acme server address", zap.String("server", *manualAcmeServer))
 		config.General.AcmeServer = *manualAcmeServer
 	}
+}
+
+func applyMoveConfigDetails(cfg *configType) {
+	cfg.Listen.MinTLSVersion = cfg.General.MinTLSVersion
 }
 
 func defaultConfig(ctx context.Context) []byte {

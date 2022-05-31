@@ -10,8 +10,9 @@ import (
 )
 
 type Config struct {
-	TLSAddresses []string
-	TCPAddresses []string
+	TLSAddresses  []string
+	TCPAddresses  []string
+	MinTLSVersion string
 }
 
 func (c Config) Apply(ctx context.Context, l *ListenersHandler) error {
@@ -41,5 +42,13 @@ func (c Config) Apply(ctx context.Context, l *ListenersHandler) error {
 	}
 	l.ListenersForHandleTLS = tlsListeners
 	l.Listeners = tcpListeners
+
+	if tlsVersion, err := ParseTLSVersion(c.MinTLSVersion); err == nil {
+		l.MinTLSVersion = tlsVersion
+		logger.Info("Min tls version", zap.String("tls_version", c.MinTLSVersion))
+	} else {
+		return err
+	}
+
 	return nil
 }
