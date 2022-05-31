@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/rekby/lets-proxy2/internal/metrics"
+	"golang.org/x/xerrors"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -25,6 +26,7 @@ import (
 
 type ListenersHandler struct {
 	GetCertificate        func(*tls.ClientHelloInfo) (*tls.Certificate, error)
+	MinTLSVersion         uint16
 	ListenersForHandleTLS []net.Listener // listener which will handle TLS
 
 	// listeners which will not handle TLS, but will proxy to self listener. It is comfortable for listen https and http
@@ -140,6 +142,7 @@ func (p *ListenersHandler) init() {
 	p.tlsConfig = tls.Config{
 		GetCertificate: p.GetCertificate,
 		NextProtos:     append(nextProtos, acme.ALPNProto),
+		MinVersion:     p.MinTLSVersion,
 	}
 	p.connectionsContext = make(map[string]contextInfo)
 }
@@ -289,3 +292,31 @@ type dummyAddr struct{}
 
 func (dummyAddr) Network() string { return "dummy net" }
 func (dummyAddr) String() string  { return "dummy addr" }
+
+func ParseTLSVersion(s string) (uint16, error) {
+	// constant values copied from
+	// https://github.com/golang/go/blob/8ed0e51b5e5cc50985444f39dc56c55e4fa3bcf9/src/crypto/tls/common.go#L30
+	const (
+		VersionTLS10 = 0x0301
+		VersionTLS11 = 0x0302
+		VersionTLS12 = 0x0303
+		VersionTLS13 = 0x0304
+	)
+
+	switch s {
+	case "1.0":
+		return VersionTLS10, nil
+	case "1.1":
+		return VersionTLS11, nil
+	case "1.2":
+		return VersionTLS12, nil
+	case "1.3":
+		if supportTLS13 {
+			return VersionTLS13, nil
+		} else {
+			return 0, xerrors.Errorf("the go version unsupported tls 1.3: '%v'", runtime.Version())
+		}
+	default:
+		return 0, xerrors.Errorf("Unexpected TLS version: '%v'", s)
+	}
+}
