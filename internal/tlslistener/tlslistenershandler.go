@@ -294,26 +294,17 @@ func (dummyAddr) Network() string { return "dummy net" }
 func (dummyAddr) String() string  { return "dummy addr" }
 
 func ParseTLSVersion(s string) (uint16, error) {
-	// constant values copied from
-	// https://github.com/golang/go/blob/8ed0e51b5e5cc50985444f39dc56c55e4fa3bcf9/src/crypto/tls/common.go#L30
-	const (
-		VersionTLS10 = 0x0301
-		VersionTLS11 = 0x0302
-		VersionTLS12 = 0x0303
-		VersionTLS13 = 0x0304
-	)
-
 	switch s {
 	case "": // default
-		return VersionTLS10, nil
+		return tls.VersionTLS10, nil
 	case "1.0":
-		return VersionTLS10, nil
+		return tls.VersionTLS10, nil
 	case "1.1":
-		return VersionTLS11, nil
+		return tls.VersionTLS11, nil
 	case "1.2":
-		return VersionTLS12, nil
+		return tls.VersionTLS12, nil
 	case "1.3":
-		return VersionTLS13, nil
+		return tls.VersionTLS13, nil
 	default:
 		return 0, xerrors.Errorf("Unexpected TLS version: '%v'", s)
 	}
