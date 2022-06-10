@@ -6,16 +6,13 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-20.04
-    strategy:
-      matrix:
-        goVersion: ["1.10", "1.17"]
     env:
-      GO_VERSION: ${{ matrix.goVersion }}
+      GO_VERSION: "1.18"
     steps:
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
-          go-version: ${{ matrix.goVersion }}
+          go-version: ${{ env.GO_VERSION }}
 
       - name: install dos2unix
         run: sudo apt-get install dos2unix
