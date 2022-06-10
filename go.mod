@@ -6,7 +6,6 @@ require (
 	github.com/BurntSushi/toml v1.1.0
 	github.com/aws/aws-sdk-go v1.44.32
 	github.com/docker/docker v20.10.17+incompatible // need old version for compatible with go1.10
-	github.com/gobuffalo/packr v1.30.1
 	github.com/gojuno/minimock/v3 v3.0.5
 	github.com/kardianos/minwinsvc v1.0.0
 	github.com/maxatome/go-testdeep v1.1.0
@@ -34,12 +33,9 @@ require (
 	github.com/docker/distribution v2.8.1+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
-	github.com/gobuffalo/envy v1.10.1 // indirect
-	github.com/gobuffalo/packd v1.0.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
-	github.com/joho/godotenv v1.4.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/moby/term v0.0.0-20210619224110-3f7ff695adc6 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
@@ -48,7 +44,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/common v0.34.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
-	github.com/rogpeppe/go-internal v1.8.1 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
