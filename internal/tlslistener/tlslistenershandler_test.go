@@ -216,9 +216,9 @@ func TestParseTLSVersion(t *testing.T) {
 		hasErr bool
 	}{
 		{
-			value:  "",
-			res:    0,
-			hasErr: true,
+			value:  "", // default
+			res:    tls.VersionTLS10,
+			hasErr: false,
 		},
 		{
 			value:  "1.0",
