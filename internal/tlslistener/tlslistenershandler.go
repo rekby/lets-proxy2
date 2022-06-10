@@ -304,6 +304,8 @@ func ParseTLSVersion(s string) (uint16, error) {
 	)
 
 	switch s {
+	case "": // default
+		return VersionTLS10, nil
 	case "1.0":
 		return VersionTLS10, nil
 	case "1.1":
