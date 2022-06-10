@@ -92,16 +92,6 @@ github.com/docker/go-connections/tlsconfig
 # github.com/docker/go-units v0.4.0
 ## explicit
 github.com/docker/go-units
-# github.com/gobuffalo/envy v1.10.1
-## explicit; go 1.13
-github.com/gobuffalo/envy
-# github.com/gobuffalo/packd v1.0.1
-## explicit; go 1.13
-github.com/gobuffalo/packd
-github.com/gobuffalo/packd/internal/takeon/github.com/markbates/errx
-# github.com/gobuffalo/packr v1.30.1
-## explicit; go 1.12
-github.com/gobuffalo/packr
 # github.com/gogo/protobuf v1.3.2
 ## explicit; go 1.15
 github.com/gogo/protobuf/proto
@@ -115,9 +105,6 @@ github.com/golang/protobuf/ptypes/timestamp
 # github.com/jmespath/go-jmespath v0.4.0
 ## explicit; go 1.14
 github.com/jmespath/go-jmespath
-# github.com/joho/godotenv v1.4.0
-## explicit; go 1.12
-github.com/joho/godotenv
 # github.com/kardianos/minwinsvc v1.0.0
 ## explicit; go 1.15
 github.com/kardianos/minwinsvc
@@ -178,11 +165,6 @@ github.com/rekby/fixenv
 # github.com/rekby/zapcontext v0.0.4
 ## explicit
 github.com/rekby/zapcontext
-# github.com/rogpeppe/go-internal v1.8.1
-## explicit; go 1.16
-github.com/rogpeppe/go-internal/modfile
-github.com/rogpeppe/go-internal/module
-github.com/rogpeppe/go-internal/semver
 # github.com/satori/go.uuid v1.2.0
 ## explicit
 github.com/satori/go.uuid
