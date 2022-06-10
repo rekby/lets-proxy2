@@ -35,6 +35,9 @@ AllowRSACert = true
 AllowECDSACert = true
 AllowInsecureTLSChipers = false
 
+# Available: 1.0, 1.1, 1.2, 1.3
+MinTLSVersion="1.2"
+
 [Log]
 EnableLogToFile = true
 EnableLogToStdErr = true

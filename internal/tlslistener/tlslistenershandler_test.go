@@ -207,3 +207,57 @@ func dummyGetCertificate(info *tls.ClientHelloInfo) (certificate *tls.Certificat
 	}
 	return certificate, err
 }
+
+func TestParseTLSVersion(t *testing.T) {
+	//goland:noinspection GoBoolExpressions
+	table := []struct {
+		value  string
+		res    uint16
+		hasErr bool
+	}{
+		{
+			value:  "", // default
+			res:    tls.VersionTLS10,
+			hasErr: false,
+		},
+		{
+			value:  "1.0",
+			res:    tls.VersionTLS10,
+			hasErr: false,
+		},
+		{
+			value:  "1.1",
+			res:    tls.VersionTLS11,
+			hasErr: false,
+		},
+		{
+			value:  "1.2",
+			res:    tls.VersionTLS12,
+			hasErr: false,
+		},
+		{
+			value:  "1.3",
+			res:    tls.VersionTLS13,
+			hasErr: false,
+		},
+		{
+			value:  "asd",
+			res:    0,
+			hasErr: true,
+		},
+	}
+
+	for _, test := range table {
+		t.Run(test.value, func(t *testing.T) {
+			td := testdeep.NewT(t)
+			res, err := ParseTLSVersion(test.value)
+			if test.hasErr {
+				td.CmpError(err)
+				td.Cmp(res, uint16(0))
+			} else {
+				td.CmpNoError(err)
+				td.Cmp(res, test.res)
+			}
+		})
+	}
+}

@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/rekby/lets-proxy2/internal/metrics"
+	"golang.org/x/xerrors"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -25,6 +26,7 @@ import (
 
 type ListenersHandler struct {
 	GetCertificate        func(*tls.ClientHelloInfo) (*tls.Certificate, error)
+	MinTLSVersion         uint16
 	ListenersForHandleTLS []net.Listener // listener which will handle TLS
 
 	// listeners which will not handle TLS, but will proxy to self listener. It is comfortable for listen https and http
@@ -140,6 +142,7 @@ func (p *ListenersHandler) init() {
 	p.tlsConfig = tls.Config{
 		GetCertificate: p.GetCertificate,
 		NextProtos:     append(nextProtos, acme.ALPNProto),
+		MinVersion:     p.MinTLSVersion,
 	}
 	p.connectionsContext = make(map[string]contextInfo)
 }
@@ -289,3 +292,20 @@ type dummyAddr struct{}
 
 func (dummyAddr) Network() string { return "dummy net" }
 func (dummyAddr) String() string  { return "dummy addr" }
+
+func ParseTLSVersion(s string) (uint16, error) {
+	switch s {
+	case "": // default
+		return tls.VersionTLS10, nil
+	case "1.0":
+		return tls.VersionTLS10, nil
+	case "1.1":
+		return tls.VersionTLS11, nil
+	case "1.2":
+		return tls.VersionTLS12, nil
+	case "1.3":
+		return tls.VersionTLS13, nil
+	default:
+		return 0, xerrors.Errorf("Unexpected TLS version: '%v'", s)
+	}
+}
