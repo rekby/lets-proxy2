@@ -1,45 +1,60 @@
 module github.com/rekby/lets-proxy2
 
-go 1.14
+go 1.18
 
 require (
-	github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78 // indirect
-	github.com/BurntSushi/toml v0.3.1
-	github.com/Microsoft/go-winio v0.4.16 // indirect
-	github.com/Nvveen/Gotty v0.0.0-20120604004816-cd527374f1e5 // indirect
-	github.com/aws/aws-sdk-go v1.29.19
-	github.com/docker/distribution v2.7.1+incompatible // indirect
-	github.com/docker/docker v17.12.0-ce-rc1.0.20190206233949-eb137ff1765f+incompatible // need old version for compatible with go1.10
-	github.com/docker/go-connections v0.4.0 // indirect
-	github.com/docker/go-units v0.4.0 // indirect
-	github.com/gobuffalo/envy v1.9.0 // indirect
-	github.com/gobuffalo/packd v1.0.0 // indirect
+	github.com/BurntSushi/toml v1.1.0
+	github.com/aws/aws-sdk-go v1.44.32
+	github.com/docker/docker v20.10.17+incompatible // need old version for compatible with go1.10
 	github.com/gobuffalo/packr v1.30.1
-	github.com/gogo/protobuf v1.2.1 // indirect
 	github.com/gojuno/minimock/v3 v3.0.5
-	github.com/gorilla/mux v1.8.0 // indirect
-	github.com/kardianos/minwinsvc v0.0.0-20151122163309-cad6b2b879b0
+	github.com/kardianos/minwinsvc v1.0.0
 	github.com/maxatome/go-testdeep v1.1.0
-	github.com/miekg/dns v1.1.25
-	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/opencontainers/image-spec v1.0.1 // indirect
+	github.com/miekg/dns v1.1.49
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.4.1
+	github.com/prometheus/client_golang v1.12.2
 	github.com/prometheus/client_model v0.2.0
 	github.com/rekby/fixenv v0.0.0-20210828185014-c79c816ca0c9
 	github.com/rekby/zapcontext v0.0.4
-	github.com/rogpeppe/go-internal v1.6.0 // indirect
 	github.com/satori/go.uuid v1.2.0
-	github.com/sirupsen/logrus v1.6.0
-	go.uber.org/atomic v1.4.0 // indirect
-	go.uber.org/zap v1.11.0
-	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5
-	golang.org/x/net v0.0.0-20210825183410-e898025ed96a
-	golang.org/x/sync v0.0.0-20200625203802-6e8e738ad208 // indirect
-	golang.org/x/sys v0.0.0-20210823070655-63515b42dcdf // indirect
-	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4 // indirect
-	golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543
-	google.golang.org/grpc v1.21.0 // indirect
+	github.com/sirupsen/logrus v1.8.1
+	go.uber.org/zap v1.21.0
+	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e
+	golang.org/x/net v0.0.0-20220607020251-c690dde0001d
+	golang.org/x/xerrors v0.0.0-20220609144429-65e65417b02f
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
-	gotest.tools v2.2.0+incompatible // indirect
+)
+
+require (
+	github.com/Microsoft/go-winio v0.5.2 // indirect
+	github.com/benbjohnson/clock v1.1.0 // indirect
+	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/cespare/xxhash/v2 v2.1.2 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/docker/distribution v2.8.1+incompatible // indirect
+	github.com/docker/go-connections v0.4.0 // indirect
+	github.com/docker/go-units v0.4.0 // indirect
+	github.com/gobuffalo/envy v1.10.1 // indirect
+	github.com/gobuffalo/packd v1.0.1 // indirect
+	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/golang/protobuf v1.5.2 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	github.com/joho/godotenv v1.4.0 // indirect
+	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
+	github.com/moby/term v0.0.0-20210619224110-3f7ff695adc6 // indirect
+	github.com/morikuni/aec v1.0.0 // indirect
+	github.com/opencontainers/go-digest v1.0.0 // indirect
+	github.com/opencontainers/image-spec v1.0.2 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/prometheus/common v0.34.0 // indirect
+	github.com/prometheus/procfs v0.7.3 // indirect
+	github.com/rogpeppe/go-internal v1.8.1 // indirect
+	go.uber.org/atomic v1.9.0 // indirect
+	go.uber.org/multierr v1.8.0 // indirect
+	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
+	golang.org/x/sys v0.0.0-20220608164250-635b8c9b7f68 // indirect
+	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/tools v0.1.11 // indirect
+	google.golang.org/protobuf v1.28.0 // indirect
+	gotest.tools/v3 v3.2.0 // indirect
 )
