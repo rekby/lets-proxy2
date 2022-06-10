@@ -9,8 +9,6 @@ import (
 
 	"github.com/rekby/lets-proxy2/internal/th"
 
-	"github.com/gobuffalo/packr"
-
 	"github.com/maxatome/go-testdeep"
 )
 
@@ -24,17 +22,13 @@ func TestConfigEmbed(t *testing.T) {
 	td.CmpNoError(err)
 	defer os.Rename("static/default-config.toml.tmp", "static/default-config.toml")
 
-	box := packr.NewBox("static")
-	boxBytes, err := box.Find("default-config.toml")
-	td.CmpNoError(err)
-
 	toUnixString := func(source []byte) string {
 		s := string(source)
 		s = strings.Replace(s, "\r\n", "\n", -1)
 		return s
 	}
 
-	td.CmpDeeply(toUnixString(boxBytes), toUnixString(sourceConfig))
+	td.CmpDeeply(toUnixString(defaultConfigContent), toUnixString(sourceConfig))
 }
 
 func TestReadConfig(t *testing.T) {

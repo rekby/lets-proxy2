@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	_ "embed"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -10,27 +11,21 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/rekby/lets-proxy2/internal/docker"
-
-	"github.com/rekby/lets-proxy2/internal/config"
-
-	"github.com/gobuffalo/packr"
-
-	"github.com/rekby/lets-proxy2/internal/profiler"
-	"github.com/rekby/lets-proxy2/internal/tlslistener"
-
-	"github.com/rekby/lets-proxy2/internal/proxy"
-
-	"github.com/rekby/lets-proxy2/internal/domain_checker"
-
-	"github.com/rekby/lets-proxy2/internal/log"
-
 	"github.com/BurntSushi/toml"
+	"github.com/rekby/lets-proxy2/internal/config"
+	"github.com/rekby/lets-proxy2/internal/docker"
+	"github.com/rekby/lets-proxy2/internal/domain_checker"
+	"github.com/rekby/lets-proxy2/internal/log"
+	"github.com/rekby/lets-proxy2/internal/profiler"
+	"github.com/rekby/lets-proxy2/internal/proxy"
+	"github.com/rekby/lets-proxy2/internal/tlslistener"
 	zc "github.com/rekby/zapcontext"
 	"go.uber.org/zap"
 )
 
-//go:generate packr
+//go:embed static/default-config.toml
+var defaultConfigContent []byte
+
 type configType struct {
 	General      configGeneral
 	Log          logConfig
@@ -122,10 +117,8 @@ func applyMoveConfigDetails(cfg *configType) {
 }
 
 func defaultConfig(ctx context.Context) []byte {
-	box := packr.NewBox("static")
-	configBytes, err := box.Find("default-config.toml")
-	configBytes = bytes.Replace(configBytes, []byte("\r\n"), []byte("\n"), -1)
-	log.DebugFatalCtx(ctx, err, "Got builtin default config")
+	configBytes := bytes.Replace(defaultConfigContent, []byte("\r\n"), []byte("\n"), -1)
+	log.DebugCtx(ctx, "Got builtin default config")
 	return configBytes
 }
 
