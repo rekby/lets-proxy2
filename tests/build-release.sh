@@ -14,7 +14,7 @@ export PATH="$GOROOT/bin:$PATH"
 (
   # prevent modify project's go.mod
   cd /tmp
-  go get github.com/mitchellh/gox
+  go install github.com/mitchellh/gox@latest
 )
 export GOPATH="$TESTBUILD_DIR"
 DEST="$GOPATH/src/github.com/rekby/lets-proxy2"
