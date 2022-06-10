@@ -24,7 +24,7 @@ services:
       acmenet:
         ipv4_address: 10.40.50.12
   test:
-    image: golang:${GO_VERSION:-1.17}
+    image: golang:${GO_VERSION:-1.18}
     working_dir: /go/src/github.com/rekby/lets-proxy2
     command: go test -covermode=count -coverprofile=coverage.out ${LETS_PROXY_TEST_OPTIONS:-} ./...
     environment:

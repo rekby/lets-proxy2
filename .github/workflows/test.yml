@@ -9,8 +9,6 @@ jobs:
 
       - name: Set up Go
         uses: actions/setup-go@v2
-        with:
-          go-version: "1.10"
 
       - name: test-build
         run: bash ./tests/build-test.sh
@@ -18,11 +16,8 @@ jobs:
   run-test:
     needs: test-build
     runs-on: ubuntu-20.04
-    strategy:
-      matrix:
-        goVersion: ["1.10", "1.17"]
     env:
-      GO_VERSION: ${{ matrix.goVersion }}
+      GO_VERSION: "1.18"
     steps:
       - name: checkout
         uses: actions/checkout@v2
@@ -34,14 +29,3 @@ jobs:
         uses: shogo82148/actions-goveralls@v1
         with:
           path-to-profile: coverage.out
-          flag-name: Go-${{ matrix.goVersion }}
-          parallel: true
-
-  # notifies that all test jobs are finished.
-  finish:
-    needs: run-test
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: shogo82148/actions-goveralls@v1
-        with:
-          parallel-finished: true

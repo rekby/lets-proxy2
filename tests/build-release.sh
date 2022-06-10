@@ -25,11 +25,7 @@ cd "$DEST"
 go version
 go env
 
-if [ "$GO_VERSION" = "1.10" ]; then
-  OS_ARCH_BUILDS="linux/386 linux/amd64 linux/arm freebsd/386 freebsd/amd64 freebsd/arm windows/386 windows/amd64"
-else
-  OS_ARCH_BUILDS="linux/386 linux/amd64 linux/arm freebsd/386 freebsd/amd64 freebsd/arm windows/386 windows/amd64 darwin/amd64"
-fi
+OS_ARCH_BUILDS="linux/386 linux/amd64 linux/arm freebsd/386 freebsd/amd64 freebsd/arm windows/386 windows/amd64 darwin/amd64"
 
 GITHUB_TAG="${GITHUB_REF/refs\/tags\//}"
 BUILD_TIME=$(TZ=UTC date --rfc-3339=seconds)
