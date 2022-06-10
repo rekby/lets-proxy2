@@ -311,11 +311,7 @@ func ParseTLSVersion(s string) (uint16, error) {
 	case "1.2":
 		return VersionTLS12, nil
 	case "1.3":
-		if supportTLS13 {
-			return VersionTLS13, nil
-		} else {
-			return 0, xerrors.Errorf("the go version unsupported tls 1.3: '%v'", runtime.Version())
-		}
+		return VersionTLS13, nil
 	default:
 		return 0, xerrors.Errorf("Unexpected TLS version: '%v'", s)
 	}

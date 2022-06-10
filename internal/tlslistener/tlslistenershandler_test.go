@@ -238,7 +238,7 @@ func TestParseTLSVersion(t *testing.T) {
 		{
 			value:  "1.3",
 			res:    tls.VersionTLS13,
-			hasErr: !supportTLS13,
+			hasErr: false,
 		},
 		{
 			value:  "asd",
