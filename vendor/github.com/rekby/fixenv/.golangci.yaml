@@ -1,0 +1,13 @@
+run:
+  tests: true
+
+linters:
+  enable:
+    - revive
+
+issues:
+  exclude-rules:
+    - linters:
+        - stylecheck
+        - golint
+      source: "package (custom_env|custom_env_with_shared_content)"

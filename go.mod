@@ -13,7 +13,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.2
 	github.com/prometheus/client_model v0.2.0
-	github.com/rekby/fixenv v0.0.0-20210828185014-c79c816ca0c9
+	github.com/rekby/fixenv v0.2.3
 	github.com/rekby/zapcontext v0.0.4
 	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.8.1

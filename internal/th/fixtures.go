@@ -12,12 +12,12 @@ import (
 
 func HttpQuery(e fixenv.Env) string {
 	var server *httptest.Server
-	return e.Cache(nil,
+	return fixenv.Cache(e, "",
 		&fixenv.FixtureOptions{
 			CleanupFunc: func() {
 				server.Close()
 			},
-		}, func() (res interface{}, err error) {
+		}, func() (res string, err error) {
 			server = httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 				u := *request.URL
 				u.Scheme = ""
@@ -25,29 +25,29 @@ func HttpQuery(e fixenv.Env) string {
 				_, _ = writer.Write([]byte(u.String()))
 			}))
 			return server.URL, nil
-		}).(string)
+		})
 }
 
 func TcpListener(e fixenv.Env) *net.TCPListener {
 	var listener *net.TCPListener
 
-	return e.Cache(nil,
+	return fixenv.Cache(e, "",
 		&fixenv.FixtureOptions{
 			CleanupFunc: func() {
 				_ = listener.Close()
 			}},
-		func() (res interface{}, err error) {
+		func() (res *net.TCPListener, err error) {
 			listener, err = net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1)})
 			return listener, err
-		}).(*net.TCPListener)
+		})
 }
 
 func TmpDir(e fixenv.Env) string {
 	var dirPath string
-	return e.Cache(nil, &fixenv.FixtureOptions{CleanupFunc: func() {
+	return fixenv.Cache(e, "", &fixenv.FixtureOptions{CleanupFunc: func() {
 		_ = os.RemoveAll(dirPath)
-	}}, func() (res interface{}, err error) {
+	}}, func() (res string, err error) {
 		dirPath, err = ioutil.TempDir("", "lets-proxy2-test-")
 		return dirPath, err
-	}).(string)
+	})
 }
