@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rekby/fixenv"
 	"github.com/rekby/lets-proxy2/internal/cache"
 
 	"go.uber.org/zap"
@@ -30,7 +31,6 @@ import (
 	"golang.org/x/crypto/acme"
 )
 
-const testACMEServer = "https://acme-server:4001/dir"
 const rsaKeyLength = 2048
 
 type contextConnection struct {
@@ -50,8 +50,8 @@ func init() {
 	}
 }
 
-func createTestClientManager(t *testing.T) *AcmeClientManagerMock {
-	resp, err := http.Get(testACMEServer)
+func createTestClientManager(env fixenv.Env, t *testing.T) *AcmeClientManagerMock {
+	resp, err := http.Get(th.AcmeServerDirURL(env))
 	if err != nil {
 		t.Fatalf("Can't connect to buoulder server: %q", err)
 	}
@@ -67,7 +67,7 @@ func createTestClientManager(t *testing.T) *AcmeClientManagerMock {
 		},
 	}
 
-	client.DirectoryURL = testACMEServer
+	client.DirectoryURL = th.AcmeServerDirURL(env)
 	client.Key, _ = rsa.GenerateKey(rand.Reader, rsaKeyLength)
 	_, err = client.Register(context.Background(), &acme.Account{}, func(tosURL string) bool {
 		return true

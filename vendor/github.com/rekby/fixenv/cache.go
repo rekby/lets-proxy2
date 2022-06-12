@@ -26,7 +26,7 @@ func newCache() *cache {
 }
 
 // GetOrSet atomic get exist values from cache or call f for set new value and return it.
-// it has gurantee about only one f will execute same time for the key.
+// it has guarantee about only one f will execute same time for the key.
 // but many f may execute simultaneously for different keys
 func (c *cache) GetOrSet(key cacheKey, f FixtureCallbackFunc) (interface{}, error) {
 	res, ok := c.get(key)

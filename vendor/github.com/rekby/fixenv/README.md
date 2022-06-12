@@ -1,4 +1,7 @@
+[![Go Reference](https://pkg.go.dev/badge/github.com/rekby/fixenv.svg)](https://pkg.go.dev/github.com/rekby/fixenv)
 [![Coverage Status](https://coveralls.io/repos/github/rekby/fixenv/badge.svg?branch=master)](https://coveralls.io/github/rekby/fixenv?branch=master)
+[![GoReportCard](https://goreportcard.com/badge/github.com/rekby/fixenv)](https://goreportcard.com/report/github.com/rekby/fixenv)
+[![Mentioned in Awesome Go](https://awesome.re/mentioned-badge.svg)](https://github.com/avelino/awesome-go)  
 
 Go Fixtures
 ===========

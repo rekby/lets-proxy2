@@ -20,6 +20,11 @@ var (
 	globalScopeInfo = make(map[string]*scopeInfo)
 )
 
+// EnvT - fixture cache and cleanup engine
+// it created from test and pass to fixture function
+// manage cache of fixtures, depends from fixture, param, test, scope.
+// and call cleanup, when scope closed.
+// It can be base to own, more powerful local environments.
 type EnvT struct {
 	t T
 	c *cache
@@ -28,6 +33,7 @@ type EnvT struct {
 	scopes map[string]*scopeInfo
 }
 
+// NewEnv create EnvT from test
 func NewEnv(t T) *EnvT {
 	env := newEnv(t, globalCache, globalMutex, globalScopeInfo)
 	env.onCreate()
@@ -43,11 +49,55 @@ func newEnv(t T, c *cache, m sync.Locker, scopes map[string]*scopeInfo) *EnvT {
 	}
 }
 
+// T return test from EnvT created
 func (e *EnvT) T() T {
 	return e.t
 }
 
+// Cache call from fixture and manage call f and cache it.
+// Cache must be called direct from fixture - it use runtime stacktrace for
+// detect called method - it is part of cache key.
+// params - part of cache key. Usually - parameters, passed to fixture.
+//          it allow use parametrized fixtures with different results.
+//          params must be json serializable.
+// opt - fixture options, nil for default options.
+// f - callback - fixture body.
+// Cache guarantee for call f exactly once for same Cache called and params combination.
 func (e *EnvT) Cache(params interface{}, opt *FixtureOptions, f FixtureCallbackFunc) interface{} {
+	return e.cache(params, opt, f)
+}
+
+// CacheWithCleanup call from fixture and manage call f and cache it.
+// CacheWithCleanup must be called direct from fixture - it use runtime stacktrace for
+// detect called method - it is part of cache key.
+// params - part of cache key. Usually - parameters, passed to fixture.
+//          it allow use parametrized fixtures with different results.
+//          params must be json serializable.
+// opt - fixture options, nil for default options.
+// f - callback - fixture body.
+// cleanup, returned from f called while fixture cleanup
+// Cache guarantee for call f exactly once for same Cache called and params combination.
+func (e *EnvT) CacheWithCleanup(params interface{}, opt *FixtureOptions, f FixtureCallbackWithCleanupFunc) interface{} {
+	if opt == nil {
+		opt = &FixtureOptions{}
+	}
+
+	var resCleanupFunc FixtureCleanupFunc
+
+	var fWithoutCleanup FixtureCallbackFunc = func() (res interface{}, err error) {
+		res, resCleanupFunc, err = f()
+		return res, err
+	}
+	opt.cleanupFunc = func() {
+		if resCleanupFunc != nil {
+			resCleanupFunc()
+		}
+	}
+
+	return e.cache(params, opt, fWithoutCleanup)
+}
+
+func (e *EnvT) cache(params interface{}, opt *FixtureOptions, f FixtureCallbackFunc) interface{} {
 	if opt == nil {
 		opt = globalEmptyFixtureOptions
 	}
@@ -60,18 +110,21 @@ func (e *EnvT) Cache(params interface{}, opt *FixtureOptions, f FixtureCallbackF
 	wrappedF := e.fixtureCallWrapper(key, f, opt)
 	res, err := e.c.GetOrSet(key, wrappedF)
 	if err != nil {
-		e.t.Fatalf("failed to call fixture func: %v", err)
-		// return not reachable after Fatalf
-		return nil
+		if errors.Is(err, ErrSkipTest) {
+			e.T().SkipNow()
+		} else {
+			e.t.Fatalf("failed to call fixture func: %v", err)
+		}
+
+		// panic must be not reachable after SkipNow or Fatalf
+		panic("fixenv: must be unreachable code after err check in fixture cache")
 	}
 
 	return res
 }
 
-func (e *EnvT) Cleanup(f func()) {
-	e.T().Cleanup(f)
-}
-
+// tearDown called from base test cleanup
+// it clean env cache and call fixture's cleanups for the scope.
 func (e *EnvT) tearDown() {
 	e.m.Lock()
 	defer e.m.Unlock()
@@ -86,6 +139,7 @@ func (e *EnvT) tearDown() {
 	}
 }
 
+// onCreate register env in internal stuctures.
 func (e *EnvT) onCreate() {
 	e.m.Lock()
 	defer e.m.Unlock()
@@ -102,17 +156,18 @@ func (e *EnvT) onCreate() {
 // makeCacheKey generate cache key
 // must be called from first level of env functions - for detect external caller
 func makeCacheKey(testname string, params interface{}, opt *FixtureOptions, testCall bool) (cacheKey, error) {
-	externalCallerLevel := 4
+	externalCallerLevel := 5
 	var pc = make([]uintptr, externalCallerLevel)
 	var extCallerFrame runtime.Frame
-	if externalCallerLevel == runtime.Callers(0, pc) {
+	if externalCallerLevel == runtime.Callers(opt.additionlSkipExternalCalls, pc) {
 		frames := runtime.CallersFrames(pc)
 		frames.Next()                     // callers
 		frames.Next()                     // the function
-		frames.Next()                     // caller of the function
+		frames.Next()                     // caller of the function (env private function)
+		frames.Next()                     // caller of private function (env public function)
 		extCallerFrame, _ = frames.Next() // external caller
 	}
-	scopeName := scopeName(testname, opt.Scope)
+	scopeName := makeScopeName(testname, opt.Scope)
 	return makeCacheKeyFromFrame(params, opt.Scope, extCallerFrame, scopeName, testCall)
 }
 
@@ -153,7 +208,7 @@ func makeCacheKeyFromFrame(params interface{}, scope CacheScope, f runtime.Frame
 
 func (e *EnvT) fixtureCallWrapper(key cacheKey, f FixtureCallbackFunc, opt *FixtureOptions) FixtureCallbackFunc {
 	return func() (res interface{}, err error) {
-		scopeName := scopeName(e.t.Name(), opt.Scope)
+		scopeName := makeScopeName(e.t.Name(), opt.Scope)
 
 		e.m.Lock()
 		si := e.scopes[scopeName]
@@ -164,19 +219,22 @@ func (e *EnvT) fixtureCallWrapper(key cacheKey, f FixtureCallbackFunc, opt *Fixt
 			// not reachable
 			return nil, nil
 		}
+
 		defer func() {
 			si.AddKey(key)
 		}()
 
 		res, err = f()
-		if opt.CleanupFunc != nil {
-			si.t.Cleanup(opt.CleanupFunc)
+
+		if opt.cleanupFunc != nil {
+			si.t.Cleanup(opt.cleanupFunc)
 		}
+
 		return res, err
 	}
 }
 
-func scopeName(testName string, scope CacheScope) string {
+func makeScopeName(testName string, scope CacheScope) string {
 	switch scope {
 	case ScopePackage:
 		return packageScopeName

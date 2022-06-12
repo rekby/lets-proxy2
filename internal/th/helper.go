@@ -6,14 +6,22 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 
+	"github.com/rekby/fixenv"
 	"go.uber.org/zap/zaptest"
 
 	zc "github.com/rekby/zapcontext"
 
 	"go.uber.org/zap"
 )
+
+func TestHttpServer(e fixenv.Env, handler http.Handler) *httptest.Server {
+	server := httptest.NewServer(handler)
+	e.T().Cleanup(server.Close)
+	return server
+}
 
 func TestContext(t zaptest.TestingT) (ctx context.Context, flush func()) {
 	ctx, cancel := context.WithCancel(
