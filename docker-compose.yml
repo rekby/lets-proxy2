@@ -22,7 +22,7 @@ services:
       acmenet:
         ipv4_address: 10.40.50.4
     depends_on:
-      - nginx
+       - nginx
 networks:
   acmenet:
     driver: bridge
