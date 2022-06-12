@@ -159,6 +159,7 @@ func TestManager_GetCertificateTls(t *testing.T) {
 }
 
 func TestDockerFindDomain(t *testing.T) {
+	t.Skip("docker will remove")
 	ctx, flush := th.TestContext(t)
 	defer flush()
 
@@ -189,6 +190,7 @@ func TestDockerFindDomain(t *testing.T) {
 }
 
 func TestProxyToDocker(t *testing.T) {
+	t.Skip("docker will remove")
 	td := testdeep.NewT(t)
 	ctx, flush := th.TestContext(t)
 	defer flush()

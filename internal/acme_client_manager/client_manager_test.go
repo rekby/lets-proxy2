@@ -34,11 +34,11 @@ func TestClientManagerCreateNew(t *testing.T) {
 	//register account
 	manager := New(ctx, c)
 	manager.httpClient = th.GetHttpClient()
-	manager.DirectoryURL = th.AcmeServerDirURL(e)
+	manager.DirectoryURL = th.Pebble(e).HTTPSDirectoryURL
 
 	c.PutMock.Return(nil)
 	c.GetMock.Return(nil, cache.ErrCacheMiss)
-	manager.DirectoryURL = th.AcmeServerDirURL(e)
+	manager.DirectoryURL = th.Pebble(e).HTTPSDirectoryURL
 
 	// create first client
 	client, clientDisableFunc, err := manager.GetClient(ctx)
