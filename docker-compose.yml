@@ -22,8 +22,6 @@ services:
       acmenet:
         ipv4_address: 10.40.50.4
     depends_on:
-      - acme-server
-      - fake-dns
       - nginx
 networks:
   acmenet:
