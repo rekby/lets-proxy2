@@ -35,27 +35,30 @@ import (
 	"golang.org/x/crypto/acme"
 )
 
-const forceRsaDomain = "force-rsa.ru"
+const localDomainSuffix = ".l.rekby.ru"
+const forceRsaDomain = "force-rsa.ru" + localDomainSuffix
 const testCertIssueTimeout = time.Second * 30
 
 func TestManager_GetCertificateHttp01(t *testing.T) {
-	t.Parallel()
+	env, ctx, cancel := th.NewEnv(t)
+	defer cancel()
 
-	ctx, flush := th.TestContext(t)
-	defer flush()
+	th.Pebble(env)
+
+	t.Parallel()
 
 	logger := zc.L(ctx)
 
 	mc := minimock.NewController(t)
 	defer mc.Finish()
 
-	manager := New(createTestClientManager(t), newCacheMock(mc), nil)
+	manager := New(createTestClientManager(env, t), newCacheMock(mc), nil)
 	manager.CertificateIssueTimeout = testCertIssueTimeout
 	manager.AutoSubdomains = []string{"www."}
 	manager.EnableTLSValidation = false
 	manager.EnableHTTPValidation = true
 
-	lisneter, err := net.ListenTCP("tcp", &net.TCPAddr{Port: 5002})
+	lisneter, err := net.ListenTCP("tcp", &net.TCPAddr{Port: th.PebbleHTTPValidationPort(env)})
 
 	if err != nil {
 		t.Fatal(err)
@@ -92,23 +95,25 @@ func TestManager_GetCertificateHttp01(t *testing.T) {
 }
 
 func TestManager_GetCertificateTls(t *testing.T) {
-	t.Parallel()
+	env, ctx, cancel := th.NewEnv(t)
+	defer cancel()
 
-	ctx, flush := th.TestContext(t)
-	defer flush()
+	th.Pebble(env)
+
+	t.Parallel()
 
 	logger := zc.L(ctx)
 
 	mc := minimock.NewController(t)
 	defer mc.Finish()
 
-	manager := New(createTestClientManager(t), newCacheMock(mc), nil)
+	manager := New(createTestClientManager(env, t), newCacheMock(mc), nil)
 	manager.CertificateIssueTimeout = testCertIssueTimeout
 	manager.AutoSubdomains = []string{"www."}
 	manager.EnableTLSValidation = true
 	manager.EnableHTTPValidation = false
 
-	lisneter, err := net.ListenTCP("tcp", &net.TCPAddr{Port: 5001})
+	lisneter, err := net.ListenTCP("tcp", &net.TCPAddr{Port: th.PebbleTLSValidationPort(env)})
 
 	if err != nil {
 		t.Fatal(err)
@@ -257,12 +262,12 @@ func fastCreateTestCert(domains []string, now time.Time) (certBytes, keyBytes []
 
 func newCacheMock(t minimock.Tester) *BytesMock {
 	cacheMock := NewBytesMock(t)
-	forceRSACert, forceRSAKey := fastCreateTestCert([]string{"force-rsa.ru", "www.force-rsa.ru"}, time.Now())
+	forceRSACert, forceRSAKey := fastCreateTestCert([]string{forceRsaDomain, "www." + forceRsaDomain}, time.Now())
 	cacheMock.GetMock.Set(func(ctx context.Context, key string) (ba1 []byte, err error) {
 		zc.L(ctx).Debug("Cache mock get", zap.String("key", key))
 
 		switch key {
-		case "locked.ru.lock":
+		case "locked.ru" + localDomainSuffix + ".lock":
 			return []byte{}, nil
 
 		// force-rsa locked cert
@@ -295,23 +300,23 @@ func getCertificatesTests(t *testing.T, manager *Manager, ctx context.Context, l
 func getCertificatesTestsKeyType(t *testing.T, manager *Manager, keyType KeyType, ctx context.Context, logger *zap.Logger) {
 	t.Run("OneCert", func(t *testing.T) {
 		t.Parallel()
-		checkOkDomain(ctx, t, manager, keyType, keyType, "onecert.ru")
+		checkOkDomain(ctx, t, manager, keyType, keyType, localDomain("onecert.ru"))
 	})
 
 	t.Run("punycode-domain", func(t *testing.T) {
 		t.Parallel()
-		checkOkDomain(ctx, t, manager, keyType, keyType, "xn--80adjurfhd.xn--p1ai") // проверка.рф
+		checkOkDomain(ctx, t, manager, keyType, keyType, localDomain("xn--80adjurfhd.xn--p1ai")) // проверка.рф
 	})
 
 	t.Run("OneCertCamelCase", func(t *testing.T) {
 		t.Parallel()
-		checkOkDomain(ctx, t, manager, keyType, keyType, "onecertCamelCase.ru")
+		checkOkDomain(ctx, t, manager, keyType, keyType, localDomain("onecertCamelCase.ru"))
 	})
 
 	t.Run("Locked", func(t *testing.T) {
 		td := testdeep.NewT(t)
 		t.Parallel()
-		domain := "locked.ru"
+		domain := localDomain("locked.ru")
 
 		cert, err := manager.GetCertificate(createTLSHello(ctx, keyType, domain))
 		td.CmpError(err)
@@ -330,7 +335,7 @@ func getCertificatesTestsKeyType(t *testing.T, manager *Manager, keyType KeyType
 			logger = oldLogger
 		}()
 
-		domain := "ParallelCert.ru"
+		domain := localDomain("ParallelCert.ru")
 		const cnt = 100
 
 		chanCerts := make(chan *tls.Certificate, cnt)
@@ -359,7 +364,7 @@ func getCertificatesTestsKeyType(t *testing.T, manager *Manager, keyType KeyType
 
 	t.Run("RenewSoonExpiredCert", func(t *testing.T) {
 		t.Parallel()
-		const domain = "soon-expired.com"
+		domain := localDomain("soon-expired.com")
 
 		// issue certificate
 		cert, err := manager.GetCertificate(createTLSHello(ctx, keyType, domain))
@@ -448,4 +453,8 @@ func checkOkDomain(ctx context.Context, t *testing.T, manager *Manager, keyTypeH
 	if cert.Leaf.VerifyHostname("www."+certDomain) != nil {
 		t.Error(cert.Leaf.VerifyHostname(certDomain))
 	}
+}
+
+func localDomain(domain string) string {
+	return domain + localDomainSuffix
 }

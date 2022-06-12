@@ -11,6 +11,11 @@ type Env interface {
 	// f call exactly once for every combination of scope and params
 	// params must be json serializable (deserialize not need)
 	Cache(params interface{}, opt *FixtureOptions, f FixtureCallbackFunc) interface{}
+
+	// CacheWithCleanup cache result of f calls
+	// f call exactly once for every combination of scope and params
+	// params must be json serializable (deserialize not need)
+	CacheWithCleanup(params interface{}, opt *FixtureOptions, f FixtureCallbackWithCleanupFunc) interface{}
 }
 
 var (
@@ -48,8 +53,17 @@ const (
 // then cache error about unexpected exit
 type FixtureCallbackFunc func() (res interface{}, err error)
 
+// FixtureCallbackWithCleanupFunc - function, which result can cached
+// res - result for cache.
+// cleanup - if not nil - call on fixture cleanup. It called exactly once for every successfully call fixture
+// if err not nil - T().Fatalf() will called with error message
+// if res exit without return (panic, GoExit, t.FailNow, ...)
+// then cache error about unexpected exit
+type FixtureCallbackWithCleanupFunc func() (res interface{}, cleanup FixtureCleanupFunc, err error)
+
 // FixtureCleanupFunc - callback function for cleanup after
 // fixture value out from lifetime scope
+// it called exactly once for every succesully call fixture
 type FixtureCleanupFunc func()
 
 // FixtureOptions options for fixenv engine
@@ -58,9 +72,11 @@ type FixtureOptions struct {
 	// Scope for cache result
 	Scope CacheScope
 
-	// CleanupFunc if not nil - called for cleanup fixture results
-	// it called exactly once for every succesully call fixture
-	CleanupFunc FixtureCleanupFunc
+	additionlSkipExternalCalls int
+
+	// cleanupFunc if not nil - called for cleanup fixture results
+	// internal implementation details
+	cleanupFunc FixtureCleanupFunc
 }
 
 // T is subtype of testing.TB

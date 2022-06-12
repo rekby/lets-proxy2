@@ -168,35 +168,31 @@ func TestNoDoubleSlashredirectIssue177(t *testing.T) {
 func httpProxy(e *th.Env, dst string) (*HTTPProxy, string) {
 	var proxy *HTTPProxy
 	var addr string
-	e.Cache(dst,
-		&fixenv.FixtureOptions{
-			CleanupFunc: func() {
-				_ = proxy.Close()
-			},
-		}, func() (res interface{}, err error) {
-			dstURL, err := url.Parse(dst)
-			if err != nil {
-				return nil, xerrors.Errorf("failed parse dst url %q: %%w", dst, err)
-			}
-			listener := th.TcpListener(e)
-			addr = "http://" + listener.Addr().String()
-			proxy = NewHTTPProxy(e.Ctx, listener)
-			proxy.Director = NewDirectorChain(
-				DirectorHost(dstURL.Host),
-				DirectorSetScheme(dstURL.Scheme),
-			)
-			errChan := make(chan error, 1)
+	e.CacheWithCleanup(dst, nil, func() (res interface{}, cleanup fixenv.FixtureCleanupFunc, err error) {
+		dstURL, err := url.Parse(dst)
+		if err != nil {
+			return nil, nil, xerrors.Errorf("failed parse dst url %q: %%w", dst, err)
+		}
+		listener := th.NewLocalTcpListener(e)
+		addr = "http://" + listener.Addr().String()
+		proxy = NewHTTPProxy(e.Ctx, listener)
+		proxy.Director = NewDirectorChain(
+			DirectorHost(dstURL.Host),
+			DirectorSetScheme(dstURL.Scheme),
+		)
+		errChan := make(chan error, 1)
 
-			go func() { errChan <- proxy.Start() }()
+		go func() { errChan <- proxy.Start() }()
 
-			select {
-			case proxyStartErr := <-errChan:
-				err = proxyStartErr
-			case <-time.After(time.Millisecond * 10):
-				// pass
-			}
+		select {
+		case proxyStartErr := <-errChan:
+			err = proxyStartErr
+		case <-time.After(time.Millisecond * 10):
+			// pass
+		}
 
-			return proxy, err
-		})
+		cleanup = func() { _ = proxy.Close() }
+		return proxy, cleanup, err
+	})
 	return proxy, addr
 }

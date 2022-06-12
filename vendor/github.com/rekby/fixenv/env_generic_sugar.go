@@ -3,7 +3,8 @@
 
 package fixenv
 
-func Cache[TEnv Env, TParams any, TRes any](env TEnv, params TParams, opt *FixtureOptions, f func() (TRes, error)) TRes {
+func Cache[TRes any](env Env, params any, opt *FixtureOptions, f func() (TRes, error)) TRes {
+	addSkipLevel(&opt)
 	callbackResult := env.Cache(params, opt, func() (res interface{}, err error) {
 		return f()
 	})
@@ -13,4 +14,24 @@ func Cache[TEnv Env, TParams any, TRes any](env TEnv, params TParams, opt *Fixtu
 		res = callbackResult.(TRes)
 	}
 	return res
+}
+
+func CacheWithCleanup[TRes any](env Env, params any, opt *FixtureOptions, f func() (TRes, FixtureCleanupFunc, error)) TRes {
+	addSkipLevel(&opt)
+	callbackResult := env.CacheWithCleanup(params, opt, func() (res interface{}, cleanup FixtureCleanupFunc, err error) {
+		return f()
+	})
+
+	var res TRes
+	if callbackResult != nil {
+		res = callbackResult.(TRes)
+	}
+	return res
+}
+
+func addSkipLevel(optspp **FixtureOptions) {
+	if *optspp == nil {
+		*optspp = &FixtureOptions{}
+	}
+	(*optspp).additionlSkipExternalCalls++
 }

@@ -13,7 +13,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.12.2
 	github.com/prometheus/client_model v0.2.0
-	github.com/rekby/fixenv v0.2.3
+	github.com/rekby/fixenv v0.3.1
 	github.com/rekby/zapcontext v0.0.4
 	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.8.1
@@ -23,6 +23,8 @@ require (
 	golang.org/x/xerrors v0.0.0-20220609144429-65e65417b02f
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
+
+require github.com/letsencrypt/pebble/v2 v2.4.0
 
 require (
 	github.com/Microsoft/go-winio v0.5.2 // indirect
@@ -36,6 +38,7 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	github.com/letsencrypt/challtestsrv v1.2.1 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/moby/term v0.0.0-20210619224110-3f7ff695adc6 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
@@ -51,5 +54,6 @@ require (
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/tools v0.1.11 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
+	gopkg.in/square/go-jose.v2 v2.6.0 // indirect
 	gotest.tools/v3 v3.2.0 // indirect
 )
