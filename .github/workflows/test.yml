@@ -1,5 +1,10 @@
 name: Test
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
 jobs:
   test:
     runs-on: ubuntu-20.04
@@ -15,7 +20,7 @@ jobs:
         run: go build -mod=vendor -v ./...
 
       - name: Test
-        run: go test -mod=vendor -test.count=10 -race -covermode=atomic -coverprofile=coverage.out -v ./...
+        run: go test -mod=vendor -race -covermode=atomic -coverprofile=coverage.out -v ./...
 
       - name: push coverage
         uses: shogo82148/actions-goveralls@v1
