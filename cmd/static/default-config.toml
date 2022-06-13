@@ -159,15 +159,6 @@ TLSAddresses = [":443"]
 # Bind addresses without TLS secure (for HTTP reverse proxy and http-01 validation without redirect to https)
 TCPAddresses = []
 
-[DockerRouter]
-# Default docker
-Enable = false
-
-# Port of target docker container
-DefaultHttpPort = 80
-
-LabelDomain = "lets-proxy.domain"
-
 [Metrics]
 # Enable metrics in prometheous formath by http.
 Enable = false

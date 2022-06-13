@@ -12,8 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rekby/lets-proxy2/internal/docker"
-
 	"golang.org/x/xerrors"
 
 	"github.com/rekby/lets-proxy2/internal/config"
@@ -143,13 +141,7 @@ func startProgram(config *configType) {
 		certManager.AutoSubdomains = append(certManager.AutoSubdomains, subdomain)
 	}
 
-	var dockerClient docker.Interface
-	if config.DockerRouter.Enable {
-		dockerClient, err = docker.New(config.DockerRouter.Config)
-		log.InfoFatal(logger, err, "Enable docker router")
-	}
-
-	certManager.DomainChecker, err = config.CheckDomains.CreateDomainChecker(ctx, dockerClient)
+	certManager.DomainChecker, err = config.CheckDomains.CreateDomainChecker(ctx)
 	log.DebugFatal(logger, err, "Config domain checkers.")
 
 	err = startMetrics(ctx, registry, config.Metrics, certManager.GetCertificate)
@@ -172,7 +164,7 @@ func startProgram(config *configType) {
 		return tlsListener.GetConnectionContext(req.RemoteAddr, localAddr.String())
 	}
 
-	err = config.Proxy.Apply(ctx, p, dockerClient)
+	err = config.Proxy.Apply(ctx, p)
 	log.InfoFatal(logger, err, "Apply proxy config")
 
 	go func() {

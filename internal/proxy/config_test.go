@@ -235,14 +235,14 @@ func TestConfig_Apply(t *testing.T) {
 	var p = &HTTPProxy{}
 
 	c := Config{}
-	err = c.Apply(ctx, p, nil)
+	err = c.Apply(ctx, p)
 	td.CmpError(err)
 
 	c = Config{
 		Headers: []string{"aaa:bbb"},
 	}
 	p = &HTTPProxy{}
-	err = c.Apply(ctx, p, nil)
+	err = c.Apply(ctx, p)
 	td.CmpError(err)
 
 	c = Config{
@@ -250,7 +250,7 @@ func TestConfig_Apply(t *testing.T) {
 		Headers:       []string{"aaa:bbb"},
 	}
 	p = &HTTPProxy{}
-	err = c.Apply(ctx, p, nil)
+	err = c.Apply(ctx, p)
 	td.CmpNoError(err)
 	td.CmpDeeply(p.Director,
 		NewDirectorChain(
@@ -267,7 +267,7 @@ func TestConfig_Apply(t *testing.T) {
 		Headers:       []string{"aaa:bbb"},
 	}
 	p = &HTTPProxy{}
-	err = c.Apply(ctx, p, nil)
+	err = c.Apply(ctx, p)
 	td.CmpNoError(err)
 	td.CmpDeeply(p.Director, NewDirectorChain(
 		NewDirectorHost("1.2.3.4:94"),
@@ -280,13 +280,13 @@ func TestConfig_Apply(t *testing.T) {
 
 	c = Config{HTTPSBackendIgnoreCert: false}
 	p = &HTTPProxy{}
-	_ = c.Apply(ctx, p, nil)
+	_ = c.Apply(ctx, p)
 	transport := p.HTTPTransport.(Transport)
 	transport.IgnoreHTTPSCertificate = false
 
 	c = Config{HTTPSBackendIgnoreCert: true}
 	p = &HTTPProxy{}
-	_ = c.Apply(ctx, p, nil)
+	_ = c.Apply(ctx, p)
 	transport = p.HTTPTransport.(Transport)
 	transport.IgnoreHTTPSCertificate = true
 }

@@ -10,7 +10,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"net"
 	"net/http"
@@ -20,12 +19,6 @@ import (
 	"time"
 
 	"github.com/maxatome/go-testdeep"
-
-	"github.com/rekby/lets-proxy2/internal/proxy"
-
-	"github.com/rekby/lets-proxy2/internal/domain"
-
-	"github.com/rekby/lets-proxy2/internal/docker"
 
 	"github.com/gojuno/minimock/v3"
 	"github.com/rekby/lets-proxy2/internal/cache"
@@ -156,88 +149,6 @@ func TestManager_GetCertificateTls(t *testing.T) {
 		}
 	}()
 	getCertificatesTests(t, manager, ctx, logger)
-}
-
-func TestDockerFindDomain(t *testing.T) {
-	t.Skip("docker will remove")
-	ctx, flush := th.TestContext(t)
-	defer flush()
-
-	dClient, err := docker.New(docker.Config{LabelDomain: "lets-proxy.domain", DefaultHttpPort: 80})
-	if err != nil {
-		t.Fatal(err)
-	}
-	dn, err := domain.NormalizeDomain("docker-test.internal")
-	if err != nil {
-		t.Fatal(err)
-	}
-	target, err := dClient.GetTarget(ctx, dn)
-	if err != nil {
-		t.Error(err)
-	}
-
-	ipS, port, err := net.SplitHostPort(target.TargetAddress)
-	if err != nil {
-		t.Error(err)
-	}
-	if port != "80" {
-		t.Errorf("need port '80', got port '%v'", port)
-	}
-	ip := net.ParseIP(ipS)
-	if len(ip) == 0 {
-		t.Error("can't parse ip")
-	}
-}
-
-func TestProxyToDocker(t *testing.T) {
-	t.Skip("docker will remove")
-	td := testdeep.NewT(t)
-	ctx, flush := th.TestContext(t)
-	defer flush()
-
-	lisneter, err := net.ListenTCP("tcp", &net.TCPAddr{Port: 5003})
-	if err != nil {
-		t.Fatalf("Create listener: %v", err)
-	}
-	defer func() { _ = lisneter.Close() }()
-
-	dockerClient, err := docker.New(docker.Config{
-		DefaultHttpPort: 80,
-		LabelDomain:     "lets-proxy.domain",
-	})
-	proxyConfig := proxy.Config{
-		DefaultTarget: "127.0.0.1",
-	}
-
-	p := proxy.NewHTTPProxy(ctx, lisneter)
-	err = proxyConfig.Apply(ctx, p, dockerClient)
-	td.CmpNoError(err)
-
-	go func() {
-		err := p.Start()
-		if err != http.ErrServerClosed {
-			td.CmpNoError(err)
-		}
-	}()
-	defer func() {
-		_ = p.Close()
-		time.Sleep(time.Second / 10)
-	}()
-
-	req, err := http.NewRequest(http.MethodGet, "http://docker-test.internal", nil)
-	td.CmpNoError(err)
-
-	req.URL.Host = "localhost:5003"
-	res, err := http.DefaultClient.Do(req)
-	td.CmpNoError(err)
-
-	body, err := ioutil.ReadAll(res.Body)
-	td.CmpNoError(err)
-	_ = res.Body.Close()
-	bodyS := strings.ToLower(string(body))
-	if !strings.Contains(bodyS, "nginx") {
-		td.Errorf("Unexpected body:\n'''\n%v\n'''", bodyS)
-	}
 }
 
 func fastCreateTestCert(domains []string, now time.Time) (certBytes, keyBytes []byte) {

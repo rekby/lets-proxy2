@@ -2,15 +2,9 @@ package proxy
 
 import (
 	"context"
-	"errors"
 	"net"
 	"net/http"
-	"strings"
 	"testing"
-
-	"github.com/rekby/lets-proxy2/internal/domain"
-
-	"github.com/rekby/lets-proxy2/internal/docker"
 
 	"github.com/rekby/lets-proxy2/internal/contextlabel"
 
@@ -76,64 +70,6 @@ func TestDirectorDestMap(t *testing.T) {
 		ctx, http.LocalAddrContextKey, &net.TCPAddr{IP: net.ParseIP("1.2.3.2"), Port: 443}))
 	d.Director(req)
 	td.CmpDeeply(req.URL.Host, "2.2.2.2:80")
-}
-
-//go:generate minimock -i github.com/rekby/lets-proxy2/internal/proxy.dockerInterface -o internal_docker_mock_test.go -g
-type dockerInterface interface {
-	// stub for generator
-	docker.Interface
-}
-
-func TestDirectorDocker(t *testing.T) {
-	td := testdeep.NewT(t)
-
-	ctx, flush := th.TestContext(td)
-	defer flush()
-
-	mc := minimock.NewController(td)
-
-	table := []struct {
-		Name           string
-		Domain         string
-		GetTarget      string
-		GetTargetError error
-		ResultHost     string
-		ResultError    string
-	}{
-		{"ok", "domain", "docker:80", nil, "docker:80", ""},
-		{"bad-domain", "domain:sasfdsa:sadasd", "", nil, "", "normalize domain name"},
-		{"target-error", "domain", "", errors.New("test-error"), "", "test-error"},
-	}
-
-	for _, test := range table {
-		dockerMock := NewDockerInterfaceMock(mc)
-		if test.GetTargetError != nil || test.GetTarget != "" {
-			dockerMock.GetTargetMock.Set(func(ctx context.Context, dn domain.DomainName) (dp1 *docker.DomainInfo, err error) {
-				if dn.String() != test.Domain {
-					td.Fatalf("Unexpected call with domain '%v' instead of '%v'", dn, test.Domain)
-				}
-
-				if test.GetTargetError == nil {
-					return &docker.DomainInfo{TargetAddress: test.GetTarget}, nil
-				} else {
-					return nil, test.GetTargetError
-				}
-			})
-		}
-
-		dockerDirector := NewDirectorDocker(dockerMock)
-		req := &http.Request{Host: test.Domain}
-		req = req.WithContext(ctx)
-		err := dockerDirector.Director(req)
-		if test.ResultError == "" {
-			td.CmpNoError(err)
-		} else {
-			errString := err.Error()
-			if !strings.Contains(errString, test.ResultError) {
-				td.Error(err)
-			}
-		}
-	}
 }
 
 func TestDirectorHost(t *testing.T) {
