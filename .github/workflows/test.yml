@@ -1,10 +1,5 @@
 name: Test
-on:
-  push:
-    branches:
-      - master
-  pull_request:
-
+on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-20.04
@@ -24,5 +19,6 @@ jobs:
 
       - name: push coverage
         uses: shogo82148/actions-goveralls@v1
+        if: ${{ github.base_ref == 'master' }}
         with:
           path-to-profile: coverage.out
