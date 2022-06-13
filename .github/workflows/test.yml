@@ -24,6 +24,5 @@ jobs:
 
       - name: push coverage
         uses: shogo82148/actions-goveralls@v1
-        if: ${{ github.base_ref == 'master' }}
         with:
           path-to-profile: coverage.out
