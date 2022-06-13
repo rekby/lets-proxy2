@@ -6,12 +6,6 @@ import (
 	"net/url"
 	"strconv"
 
-	"golang.org/x/xerrors"
-
-	"github.com/rekby/lets-proxy2/internal/domain"
-
-	"github.com/rekby/lets-proxy2/internal/docker"
-
 	"github.com/rekby/lets-proxy2/internal/contextlabel"
 
 	"github.com/rekby/lets-proxy2/internal/log"
@@ -117,40 +111,6 @@ func NewDirectorDestMap(m map[string]string) DirectorDestMap {
 		res[k] = v
 	}
 	return res
-}
-
-type DirectorDocker struct {
-	client docker.Interface
-}
-
-func (d DirectorDocker) Director(request *http.Request) error {
-	ctx := request.Context()
-	logger := zc.L(ctx)
-
-	destDomain, err := domain.NormalizeDomain(request.Host)
-	if err != nil {
-		logger.Warn("Can't normalize incoming domain name", zap.String("domain", request.Host), zap.Error(err))
-		return xerrors.Errorf("normalize domain name: %w", err)
-	}
-	logger = logger.With(domain.LogDomain(destDomain))
-	ctx = zc.WithLogger(ctx, logger)
-
-	target, err := d.client.GetTarget(ctx, destDomain)
-	if err != nil {
-		logger.Warn("Can't get target from docker", zap.Error(err))
-		return xerrors.Errorf("get docker target: %w", err)
-	}
-
-	logger.Debug("Set docker target url", zap.String("target", target.TargetAddress))
-	if request.URL == nil {
-		request.URL = &url.URL{}
-	}
-	request.URL.Host = target.TargetAddress
-	return nil
-}
-
-func NewDirectorDocker(dockerClient docker.Interface) DirectorDocker {
-	return DirectorDocker{dockerClient}
 }
 
 type DirectorHost string

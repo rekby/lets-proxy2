@@ -13,7 +13,6 @@ import (
 
 	"github.com/BurntSushi/toml"
 	"github.com/rekby/lets-proxy2/internal/config"
-	"github.com/rekby/lets-proxy2/internal/docker"
 	"github.com/rekby/lets-proxy2/internal/domain_checker"
 	"github.com/rekby/lets-proxy2/internal/log"
 	"github.com/rekby/lets-proxy2/internal/profiler"
@@ -33,15 +32,8 @@ type configType struct {
 	CheckDomains domain_checker.Config
 	Listen       tlslistener.Config
 
-	DockerRouter configDocker
-
 	Profiler profiler.Config
 	Metrics  config.Config
-}
-
-type configDocker struct {
-	Enable bool
-	docker.Config
 }
 
 type configGeneral struct {
@@ -92,9 +84,6 @@ func getConfig(ctx context.Context) *configType {
 
 		if *debugLog {
 			_config.Log.LogLevel = "debug"
-		}
-		if *enableDockerRouter {
-			_config.DockerRouter.Enable = true
 		}
 	}
 	return _config

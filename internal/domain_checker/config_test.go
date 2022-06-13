@@ -19,7 +19,7 @@ func TestConfig_CreateDomainCheckerEmpty(t *testing.T) {
 
 	td := testdeep.NewT(t)
 	cfg := Config{}
-	checker, err := cfg.CreateDomainChecker(ctx, nil)
+	checker, err := cfg.CreateDomainChecker(ctx)
 	td.CmpNoError(err)
 
 	res, err := checker.IsDomainAllowed(ctx, "asd")
@@ -35,7 +35,7 @@ func TestConfig_CreateDomainCheckerBadBlackList(t *testing.T) {
 	cfg := Config{
 		BlackList: "12(",
 	}
-	res, err := cfg.CreateDomainChecker(ctx, nil)
+	res, err := cfg.CreateDomainChecker(ctx)
 	td.Nil(res)
 	td.CmpError(err)
 }
@@ -48,7 +48,7 @@ func TestConfig_CreateDomainCheckerBadWhiteList(t *testing.T) {
 	cfg := Config{
 		WhiteList: "12(",
 	}
-	res, err := cfg.CreateDomainChecker(ctx, nil)
+	res, err := cfg.CreateDomainChecker(ctx)
 	td.Nil(res)
 	td.CmpError(err)
 }
@@ -61,7 +61,7 @@ func TestConfig_CreateDomainCheckerBlackListOnly(t *testing.T) {
 	cfg := Config{
 		BlackList: `.*\.com$`,
 	}
-	checker, err := cfg.CreateDomainChecker(ctx, nil)
+	checker, err := cfg.CreateDomainChecker(ctx)
 	td.CmpNoError(err)
 
 	res, err := checker.IsDomainAllowed(ctx, "asd.com")
@@ -81,7 +81,7 @@ func TestConfig_CreateDomainCheckerWhiteListOnly(t *testing.T) {
 	cfg := Config{
 		WhiteList: `.*\.com$`,
 	}
-	checker, err := cfg.CreateDomainChecker(ctx, nil)
+	checker, err := cfg.CreateDomainChecker(ctx)
 	td.CmpNoError(err)
 
 	res, err := checker.IsDomainAllowed(ctx, "asd.com")
@@ -111,7 +111,7 @@ func TestConfig_CreateDomainCheckerSelfIPOnly(t *testing.T) {
 		IPSelfDetectMethod: "bind",
 	}
 
-	checker, err := cfg.CreateDomainChecker(ctx, nil)
+	checker, err := cfg.CreateDomainChecker(ctx)
 	td.CmpNoError(err)
 	ipList := checker.(All)[1].(Any)[0].(Any)[0].(*IPList)
 
@@ -152,7 +152,7 @@ func TestConfig_CreateDomainCheckerWhitelist(t *testing.T) {
 		IPWhiteList: "2.3.4.5,3.3.3.3",
 	}
 
-	checker, err := cfg.CreateDomainChecker(ctx, nil)
+	checker, err := cfg.CreateDomainChecker(ctx)
 	td.CmpNoError(err)
 	whiteIPList := checker.(All)[1].(Any)[0].(*IPList)
 
@@ -194,7 +194,7 @@ func TestConfig_CreateDomainCheckerComplex(t *testing.T) {
 		IPWhiteList:        "2.3.4.5,3.3.3.3",
 	}
 
-	checker, err := cfg.CreateDomainChecker(ctx, nil)
+	checker, err := cfg.CreateDomainChecker(ctx)
 	td.CmpNoError(err)
 
 	selfIPList := checker.(All)[1].(Any)[0].(Any)[0].(*IPList)
