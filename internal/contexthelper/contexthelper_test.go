@@ -121,24 +121,33 @@ func TestCombinedContext_Value(t *testing.T) {
 
 func TestCombinedContext_Done(t *testing.T) {
 	td := testdeep.NewT(t)
+
 	var ctx *CombinedContext
-	var done bool
 
-	wait := func() { time.Sleep(100 * time.Millisecond) }
+	ctx1, ctx1Cancel := context.WithCancel(context.Background())
 
-	ctx1, ctx1Cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
-	defer ctx1Cancel()
-
-	done = false
 	ctx = CombineContext(ctx1)
+	td.CmpNoError(ctx.Err())
 
-	go func() {
-		<-ctx.Done()
-		done = true
-	}()
+	select {
+	case <-ctx.Done():
+		t.Error()
+	default:
+		// pass
+	}
 
-	wait()
-	td.True(done)
+	ctx1Cancel()
+
+	time.Sleep(time.Millisecond * 100)
+
+	td.CmpError(ctx.Err())
+
+	select {
+	case <-ctx.Done():
+		// pass
+	default:
+		t.Error()
+	}
 }
 
 func TestDropCancelContext(t *testing.T) {

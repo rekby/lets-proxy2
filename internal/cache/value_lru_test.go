@@ -253,6 +253,8 @@ func TestLimitValueRenumberItems(t *testing.T) {
 	time.Sleep(time.Millisecond * 10)
 	td.CmpDeeply(len(c.m), 6)
 
+	c.mu.RLock()
+	defer c.mu.RLock()
 	td.CmpDeeply(c.m["1"].lastUsedTime, uint64(0))
 	td.CmpDeeply(c.m["2"].lastUsedTime, uint64(1))
 	td.CmpDeeply(c.m["3"].lastUsedTime, uint64(2))

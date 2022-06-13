@@ -55,6 +55,7 @@ func TestClientManagerCreateNew(t *testing.T) {
 	e.CmpNoError(err)
 	e.True(client3 != client)
 
+	_ = manager.Close()
 }
 
 func TestClientManagerGetFromCache(t *testing.T) {
