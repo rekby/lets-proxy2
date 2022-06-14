@@ -143,26 +143,35 @@ func lookupWithClient(ctx context.Context, host string, server string, recordTyp
 		},
 	}
 	msg.RecursionDesired = true
-	exchangeCompleted := make(chan struct{})
+	exchangeCompleted := make(chan struct {
+		answer *mdns.Msg
+		err    error
+	}, 1)
 
-	var dnsAnswer *mdns.Msg
 	go func() { // nolint:wsl
 		defer close(exchangeCompleted)
 		defer log.HandlePanic(logger)
 
-		dnsAnswer, _, err = client.Exchange(&msg, server)
+		dnsAnswer, _, dnsErr := client.Exchange(&msg, server)
+		exchangeCompleted <- struct {
+			answer *mdns.Msg
+			err    error
+		}{answer: dnsAnswer, err: dnsErr}
 	}()
 
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case <-exchangeCompleted:
+	case answer := <-exchangeCompleted:
+		dnsAnswer := answer.answer
 		if dnsAnswer != nil && dnsAnswer.Truncated {
 			return nil, errTruncatedResponse
 		}
-		if err != nil {
-			return nil, err
+
+		if answer.err != nil {
+			return nil, answer.err
 		}
+
 		var resIPs []net.IPAddr
 		for _, r := range dnsAnswer.Answer {
 			rType := r.Header().Rrtype

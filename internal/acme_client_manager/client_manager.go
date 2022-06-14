@@ -44,6 +44,7 @@ type AcmeManager struct {
 	cache                 cache.Bytes
 	httpClient            *http.Client
 
+	background       sync.WaitGroup
 	mu               sync.Mutex
 	lastAccountIndex int
 	accounts         []clientAccount
@@ -90,6 +91,7 @@ func (m *AcmeManager) Close() error {
 		<-ctxAutorenewCompleted.Done()
 		logger.Debug("Autorenew context closed")
 	}
+	m.background.Wait()
 	return nil
 }
 
@@ -130,8 +132,13 @@ func (m *AcmeManager) GetClient(ctx context.Context) (_ *acme.Client, disableFun
 
 	acc, err := m.registerAccount(ctx)
 	m.accounts = append(m.accounts, acc)
+
+	m.background.Add(1)
 	// handlepanic: in accountRenewSelfSync
-	go m.accountRenewSelfSync(len(m.accounts) - 1)
+	go func(index int) {
+		defer m.background.Done()
+		m.accountRenewSelfSync(index)
+	}(len(m.accounts) - 1)
 
 	if err != nil {
 		return nil, nil, err
@@ -242,8 +249,12 @@ func (m *AcmeManager) loadFromCache(ctx context.Context) (err error) {
 			enabled: true,
 		}
 
+		m.background.Add(1)
 		// handlepanic inside accountRenewSelfSync
-		go m.accountRenewSelfSync(index)
+		go func(index int) {
+			defer m.background.Done()
+			m.accountRenewSelfSync(index)
+		}(index)
 		m.accounts = append(m.accounts, acc)
 	}
 

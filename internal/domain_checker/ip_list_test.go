@@ -286,18 +286,23 @@ func TestIPList_DoubleStart(t *testing.T) {
 
 	td := testdeep.NewT(t)
 
-	s := NewIPList(ctx, func(ctx context.Context) (ips []net.IP, e error) {
-		return nil, nil
-	})
-	s.StartAutoRenew()
-
 	td.CmpPanic(func() {
+		s := NewIPList(ctx, func(ctx context.Context) (ips []net.IP, e error) {
+			return nil, nil
+		})
 		s.ctx = zc.WithLogger(ctx, zap.NewNop().WithOptions(zap.Development())) // force panic on dpanic
+
+		s.StartAutoRenew()
 		s.StartAutoRenew()
 	}, testdeep.NotNil())
 
 	td.CmpNotPanic(func() {
+		s := NewIPList(ctx, func(ctx context.Context) (ips []net.IP, e error) {
+			return nil, nil
+		})
 		s.ctx = zc.WithLogger(ctx, zap.NewNop()) // force no panic on dpanic
+
+		s.StartAutoRenew()
 		s.StartAutoRenew()
 	})
 }
