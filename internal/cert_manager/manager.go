@@ -48,19 +48,16 @@ const (
 )
 
 var (
-	// copy from go 1.17 insecure chipers
-	// https://github.com/golang/go/blob/ba66d62b688d50f4e89b724d1c5b48bb05f8b117/src/crypto/tls/cipher_suites.go#L84
-	insecureChipers = map[uint16]struct{}{
-		tls.TLS_RSA_WITH_RC4_128_SHA:                {},
-		tls.TLS_RSA_WITH_3DES_EDE_CBC_SHA:           {},
-		tls.TLS_RSA_WITH_AES_128_CBC_SHA256:         {},
-		tls.TLS_ECDHE_ECDSA_WITH_RC4_128_SHA:        {},
-		tls.TLS_ECDHE_RSA_WITH_RC4_128_SHA:          {},
-		tls.TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA:     {},
-		tls.TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256: {},
-		tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256:   {},
-	}
+	insecureChipers map[uint16]struct{}
 )
+
+func init() {
+	insecureChipersSlice := tls.InsecureCipherSuites()
+	insecureChipers = make(map[uint16]struct{}, len(insecureChipersSlice))
+	for _, chiper := range tls.InsecureCipherSuites() {
+		insecureChipers[chiper.ID] = struct{}{}
+	}
+}
 
 const domainKeyRSALength = 2048
 const renewBeforeExpire = time.Hour * 24 * 30
@@ -454,6 +451,7 @@ func (m *Manager) supportedChallenges() []string {
 
 // createOrderForDomains similar to func (m *Manager) verifyRFC(ctx context.Context, client *acme.Client, domain string) (*acme.Order, error)
 // from acme/autocert
+//
 //nolint:funlen,gocognit
 func (m *Manager) createOrderForDomains(ctx context.Context, acmeClient AcmeClient, domains ...domain.DomainName) (*acme.Order, error) {
 	logger := zc.L(ctx)
