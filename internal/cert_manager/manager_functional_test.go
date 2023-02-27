@@ -51,6 +51,7 @@ func TestManager_GetCertificateHttp01(t *testing.T) {
 	manager.EnableTLSValidation = false
 	manager.EnableHTTPValidation = true
 
+	t.Log("http port", th.PebbleHTTPValidationPort(env))
 	lisneter, err := net.ListenTCP("tcp", &net.TCPAddr{Port: th.PebbleHTTPValidationPort(env)})
 
 	if err != nil {
@@ -106,6 +107,7 @@ func TestManager_GetCertificateTls(t *testing.T) {
 	manager.EnableTLSValidation = true
 	manager.EnableHTTPValidation = false
 
+	t.Log("tls port", th.PebbleTLSValidationPort(env))
 	lisneter, err := net.ListenTCP("tcp", &net.TCPAddr{Port: th.PebbleTLSValidationPort(env)})
 
 	if err != nil {

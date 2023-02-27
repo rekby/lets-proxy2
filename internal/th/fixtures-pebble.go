@@ -60,11 +60,15 @@ func Pebble(e fixenv.Env) *PebbleServer {
 }
 
 func PebbleHTTPValidationPort(e fixenv.Env) int {
-	return pebbleHttpValidationPort
+	return fixenv.Cache(e, nil, nil, func() (int, error) {
+		return NewFreeLocalTcpAddress(e).Port, nil
+	})
 }
 
 func PebbleTLSValidationPort(e fixenv.Env) int {
-	return pebbleTLSValidationPort
+	return fixenv.Cache(e, nil, nil, func() (int, error) {
+		return NewFreeLocalTcpAddress(e).Port, nil
+	})
 }
 
 func acmeServerListener(e fixenv.Env) *net.TCPListener {
