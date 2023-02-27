@@ -26,6 +26,10 @@ type Config struct {
 	HTTPSBackend            bool
 	HTTPSBackendIgnoreCert  bool
 	EnableAccessLog         bool
+	RateLimit               int
+	RateLimitTimeWindow     int
+	RateLimitBurst          int
+	RateLimitCacheSize      int
 }
 
 func (c *Config) Apply(ctx context.Context, p *HTTPProxy) error {
@@ -42,11 +46,21 @@ func (c *Config) Apply(ctx context.Context, p *HTTPProxy) error {
 		chain = append(chain, director)
 	}
 
+	rateLimiter, resErr := NewRateLimiter(
+		c.RateLimit,
+		c.RateLimitTimeWindow,
+		c.RateLimitBurst,
+		c.RateLimitCacheSize,
+	)
+
 	appendDirector(c.getDefaultTargetDirector)
 	appendDirector(c.getMapDirector)
 	appendDirector(c.getHeadersDirector)
 	appendDirector(c.getSchemaDirector)
-	p.HTTPTransport = Transport{c.HTTPSBackendIgnoreCert}
+	p.HTTPTransport = Transport{
+		IgnoreHTTPSCertificate: c.HTTPSBackendIgnoreCert,
+		RateLimiter:            rateLimiter,
+	}
 	p.EnableAccessLog = c.EnableAccessLog
 
 	if resErr != nil {
@@ -90,7 +104,7 @@ func (c *Config) getDefaultTargetDirector(ctx context.Context) (Director, error)
 	return NewDirectorHost(defaultTarget.String()), nil
 }
 
-//can return nil,nil
+// can return nil,nil
 func (c *Config) getHeadersDirector(ctx context.Context) (Director, error) {
 	logger := zc.L(ctx)
 

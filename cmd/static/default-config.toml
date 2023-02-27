@@ -107,6 +107,17 @@ HTTPSBackend = false
 # Ignore backend https certificate validations if HTTPSBackend is true
 HTTPSBackendIgnoreCert = true
 
+# Maximum amount of requests per host in a unit of time defined at "RateLimitTimeWindow".
+# 0 means no rate limit
+RateLimit = 0
+# Value in milliseconds
+RateLimitTimeWindow = 1000
+# The number of requests per host that can be handled in paralles. The default value 0
+# means the value will be the same as RateLimit
+RateLimitBurst = 0
+# The size of LRU cache for the rate limiting information
+RateLimitCacheSize = 100000
+
 [CheckDomains]
 
 # Allow domain if it resolver for one of public IPs of this server.
