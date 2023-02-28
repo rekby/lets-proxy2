@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"github.com/rekby/fastuuid"
 	"net"
 	"runtime"
 	"sync"
@@ -20,7 +21,6 @@ import (
 	"github.com/rekby/lets-proxy2/internal/log"
 
 	zc "github.com/rekby/zapcontext"
-	uuid "github.com/satori/go.uuid"
 	"go.uber.org/zap"
 )
 
@@ -162,7 +162,7 @@ func (p *ListenersHandler) registerConnection(conn net.Conn, tls bool) ContextCo
 		p.logger.DPanic("Connection already exist in map", zap.String("key", key))
 	} else {
 		ctxStruct.ctx, ctxStruct.cancelFunc = context.WithCancel(context.Background())
-		connectionUUID := uuid.NewV4().String()
+		connectionUUID := fastuuid.MustUUIDv4String()
 		logger := p.logger.With(zap.String("connection_id", connectionUUID))
 		ctxStruct.ctx = context.WithValue(ctxStruct.ctx, contextlabel.TLSConnection, tls)
 		ctxStruct.ctx = context.WithValue(ctxStruct.ctx, contextlabel.ConnectionID, connectionUUID)
