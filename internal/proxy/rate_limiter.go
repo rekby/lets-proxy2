@@ -57,8 +57,12 @@ func (rl *RateLimiter) getLimiter(r *http.Request) *rate.Limiter {
 	rl.mx.Lock()
 	defer rl.mx.Unlock()
 
-	limiter = rate.NewLimiter(rate.Limit(rl.rateLimit*1000/rl.timeWindow), rl.burst)
-	rl.cache.Add(ip, limiter)
+	// we need to check cache again to avoid data race
+	limiter, ok = rl.cache.Get(ip)
+	if !ok {
+		limiter = rate.NewLimiter(rate.Limit(rl.rateLimit*1000/rl.timeWindow), rl.burst)
+		rl.cache.Add(ip, limiter)
+	}
 
 	return limiter
 }
