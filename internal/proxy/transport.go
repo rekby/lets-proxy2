@@ -20,7 +20,7 @@ type Transport struct {
 }
 
 func (t Transport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if err := t.RateLimiter.Wait(req); err != nil {
+	if !t.RateLimiter.Allow(req) {
 		return &http.Response{
 			Status:     "429 Too Many Requests",
 			StatusCode: http.StatusTooManyRequests,

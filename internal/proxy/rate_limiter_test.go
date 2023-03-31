@@ -3,112 +3,134 @@ package proxy
 import (
 	"context"
 	"net/http"
-	"sync"
-	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/maxatome/go-testdeep"
 )
 
-func TestRateLimiter_Wait(t *testing.T) {
+func TestMaxRequestsPerSec(t *testing.T) {
 	req1, _ := http.NewRequest("GET", "http://url1.com", nil)
 	req1.RemoteAddr = "ip1"
 
 	req2, _ := http.NewRequest("GET", "http://url2.com", nil)
-	req1.RemoteAddr = "ip2"
+	req2.RemoteAddr = "ip2"
 
-	ctx, close := context.WithCancel(context.Background())
-	close()
-	reqWithClosedCtx, _ := http.NewRequestWithContext(ctx, "GET", "http://with-closed-ctx.com", nil)
-	reqWithClosedCtx.RemoteAddr = "with-closed-ctx"
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	canceledReq, _ := http.NewRequestWithContext(ctx, "GET", "http://canceled.com", nil)
+	canceledReq.RemoteAddr = "canceled"
 
-	type want struct {
-		errorNumber int32
-		cacheLen    int
+	type reqSpec struct {
+		req                      *http.Request
+		wantAllowedRequestAround int // expected the limiter to allow +-1
 	}
+
 	tests := []struct {
 		name string
 
 		rateLimit  int
 		timeWindow int
-		burst      int
-		cacheSize  int
+		testTime   time.Duration
 
-		requests []*http.Request
-
-		want want
+		reqSpecs []reqSpec
 	}{
 		{
-			name: "queries with the same IP should be handled sequentially",
+			name: "should limit the amount of requests per second",
 
-			rateLimit:  1,
-			timeWindow: 1,
-			burst:      1,
-			cacheSize:  100,
+			rateLimit:  10,
+			timeWindow: 1000,
+			testTime:   time.Second,
 
-			requests: []*http.Request{req1, req1, req1},
-
-			want: want{
-				errorNumber: 0,
-				cacheLen:    1,
+			reqSpecs: []reqSpec{
+				{
+					req:                      req1,
+					wantAllowedRequestAround: 10,
+				},
 			},
 		},
 		{
-			name: "queries with different IPs should be handled in parallel",
+			name: "should restart the timer for the next time window",
 
-			rateLimit:  1,
-			timeWindow: 1,
-			burst:      1,
-			cacheSize:  100,
+			rateLimit:  10,
+			timeWindow: 500,
+			testTime:   time.Second,
 
-			requests: []*http.Request{req1, req1, req2},
-
-			want: want{
-				errorNumber: 0,
-				cacheLen:    2,
+			reqSpecs: []reqSpec{
+				{
+					req:                      req1,
+					wantAllowedRequestAround: 20,
+				},
 			},
 		},
 		{
-			name: "waiting should fail in case the context is done",
+			name: "requests from different IPs should NOT influence each other",
 
-			rateLimit:  1,
-			timeWindow: 1,
-			burst:      1,
-			cacheSize:  100,
+			rateLimit:  10,
+			timeWindow: 1000,
+			testTime:   time.Second,
 
-			requests: []*http.Request{req1, reqWithClosedCtx, req2},
+			reqSpecs: []reqSpec{
+				{
+					req:                      req1,
+					wantAllowedRequestAround: 10,
+				},
+				{
+					req:                      req2,
+					wantAllowedRequestAround: 10,
+				},
+			},
+		},
+		{
+			name: "canceled request should always fail",
 
-			want: want{
-				errorNumber: 1,
-				cacheLen:    3,
+			rateLimit:  10,
+			timeWindow: 1000,
+			testTime:   time.Second,
+
+			reqSpecs: []reqSpec{
+				{
+					req:                      canceledReq,
+					wantAllowedRequestAround: 0,
+				},
 			},
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			limiter, err := NewRateLimiter(tt.rateLimit, tt.timeWindow, tt.burst, tt.cacheSize)
+
+			// Preparations
+			limiter, err := NewRateLimiter(tt.rateLimit, tt.timeWindow, 1, 100)
 			testdeep.CmpNoError(t, err)
 
-			var errCounter int32 = 0
-			var wg sync.WaitGroup
+			endTime := time.Now().Add(tt.testTime)
+			successCounters := make([]int, len(tt.reqSpecs))
+			reqCounters := make([]int, len(tt.reqSpecs))
 
-			for _, req := range tt.requests {
-				req := req
-				wg.Add(1)
-				go func() {
-					err := limiter.Wait(req)
-					if err != nil {
-						atomic.AddInt32(&errCounter, 1)
+			// The test itself
+			for time.Now().Before(endTime) {
+				for idx, spec := range tt.reqSpecs {
+					reqCounters[idx]++
+					if limiter.Allow(spec.req) {
+						successCounters[idx]++
 					}
-					wg.Done()
-				}()
+				}
 			}
 
-			wg.Wait()
-
-			testdeep.Cmp(t, limiter.cache.Len(), tt.want.cacheLen, "incorrect cache length")
-			testdeep.Cmp(t, errCounter, tt.want.errorNumber, "incorrect number of errors")
+			// Check the expectations
+			for idx, spec := range tt.reqSpecs {
+				testdeep.CmpBetween(
+					t,
+					successCounters[idx],
+					spec.wantAllowedRequestAround-1,
+					spec.wantAllowedRequestAround+1,
+					testdeep.BoundsInIn,
+				)
+				testdeep.CmpGt(t, reqCounters[idx], successCounters[idx])
+			}
 		})
 	}
+
 }

@@ -35,12 +35,15 @@ func NewRateLimiter(rateLimit, timeWindow, burst, cacheSize int) (*RateLimiter, 
 	}, nil
 }
 
-func (rl *RateLimiter) Wait(r *http.Request) error {
+func (rl *RateLimiter) Allow(r *http.Request) bool {
 	if rl.rateLimit == 0 {
-		return nil
+		return true
+	}
+	if r.Context().Err() != nil {
+		return false
 	}
 
-	return rl.getLimiter(r).Wait(r.Context())
+	return rl.getLimiter(r).Allow()
 }
 
 func (rl *RateLimiter) getLimiter(r *http.Request) *rate.Limiter {
