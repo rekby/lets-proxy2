@@ -16,9 +16,22 @@ var defaultHTTPTransport = defaultTransport()
 
 type Transport struct {
 	IgnoreHTTPSCertificate bool
+	RateLimiter            *RateLimiter
 }
 
 func (t Transport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if !t.RateLimiter.Allow(req) {
+		return &http.Response{
+			Status:     "429 Too Many Requests",
+			StatusCode: http.StatusTooManyRequests,
+			Proto:      req.Proto,
+			ProtoMajor: req.ProtoMajor,
+			ProtoMinor: req.ProtoMinor,
+			Request:    req,
+			Header:     make(http.Header, 0),
+		}, nil
+	}
+
 	return t.getTransport(req).RoundTrip(req)
 }
 
