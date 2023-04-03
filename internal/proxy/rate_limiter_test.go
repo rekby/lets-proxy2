@@ -10,6 +10,22 @@ import (
 	"github.com/maxatome/go-testdeep"
 )
 
+func TestRateLimiter_Allow(t *testing.T) {
+	t.Run("should trigger an error if cache size is less than zero", func(t *testing.T) {
+		_, err := NewRateLimiter(RateLimitParams{RateLimit: 1, CacheSize: -1})
+		testdeep.CmpError(t, err)
+	})
+
+	t.Run("should always allow if rate limit is zero", func(t *testing.T) {
+		td := testdeep.NewT(t)
+		rateLimiter, err := NewRateLimiter(RateLimitParams{RateLimit: 0})
+		req, _ := http.NewRequest(http.MethodGet, "http://url.com", nil)
+
+		td.CmpNoError(err)
+		td.True(rateLimiter.Allow(req))
+	})
+}
+
 func TestMaxRequestsPerSec(t *testing.T) {
 	req1, _ := http.NewRequest("GET", "http://url1.com", nil)
 	req1.RemoteAddr = "ip1"
@@ -142,5 +158,4 @@ func TestMaxRequestsPerSec(t *testing.T) {
 			}
 		})
 	}
-
 }
