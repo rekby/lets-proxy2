@@ -110,12 +110,12 @@ func TestMaxRequestsPerSec(t *testing.T) {
 			})
 			testdeep.CmpNoError(t, err)
 
-			endTime := time.Now().Add(tt.testTime)
+			startTime := time.Now()
 			successCounters := make([]int, len(tt.reqSpecs))
 			reqCounters := make([]int, len(tt.reqSpecs))
 
 			// The test itself
-			for time.Now().Before(endTime) {
+			for time.Since(startTime) < tt.testTime {
 				for idx, spec := range tt.reqSpecs {
 					reqCounters[idx]++
 					if limiter.Allow(spec.req) {
