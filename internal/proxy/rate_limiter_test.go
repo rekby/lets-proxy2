@@ -30,7 +30,7 @@ func TestMaxRequestsPerSec(t *testing.T) {
 		name string
 
 		rateLimit  int
-		timeWindow int
+		timeWindow time.Duration
 		testTime   time.Duration
 
 		reqSpecs []reqSpec
@@ -102,7 +102,12 @@ func TestMaxRequestsPerSec(t *testing.T) {
 			t.Parallel()
 
 			// Preparations
-			limiter, err := NewRateLimiter(tt.rateLimit, tt.timeWindow, 1, 100)
+			limiter, err := NewRateLimiter(RateLimitParams{
+				RateLimit:  tt.rateLimit,
+				TimeWindow: tt.timeWindow,
+				Burst:      1,
+				CacheSize:  100,
+			})
 			testdeep.CmpNoError(t, err)
 
 			endTime := time.Now().Add(tt.testTime)

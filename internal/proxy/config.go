@@ -46,12 +46,12 @@ func (c *Config) Apply(ctx context.Context, p *HTTPProxy) error {
 		chain = append(chain, director)
 	}
 
-	rateLimiter, resErr := NewRateLimiter(
-		c.RateLimit,
-		c.RateLimitTimeWindow,
-		c.RateLimitBurst,
-		c.RateLimitCacheSize,
-	)
+	rateLimiter, resErr := NewRateLimiter(RateLimitParams{
+		RateLimit:  c.RateLimit,
+		TimeWindow: time.Duration(c.RateLimitTimeWindow) * time.Millisecond,
+		Burst:      c.RateLimitBurst,
+		CacheSize:  c.RateLimitCacheSize,
+	})
 
 	appendDirector(c.getDefaultTargetDirector)
 	appendDirector(c.getMapDirector)
