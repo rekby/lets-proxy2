@@ -112,7 +112,7 @@ HTTPSBackendIgnoreCert = true
 RateLimit = 0
 
 # Value in milliseconds
-RateLimitTimeWindow = 1000
+RateLimitTimeWindowMs = 1000
 
 # The number of requests per host that can be handled in paralles. The default value 0
 # means the value will be the same as RateLimit

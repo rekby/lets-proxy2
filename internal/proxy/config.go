@@ -27,7 +27,7 @@ type Config struct {
 	HTTPSBackendIgnoreCert  bool
 	EnableAccessLog         bool
 	RateLimit               int
-	RateLimitTimeWindow     int
+	RateLimitTimeWindowMs   int
 	RateLimitBurst          int
 	RateLimitCacheSize      int
 }
@@ -48,7 +48,7 @@ func (c *Config) Apply(ctx context.Context, p *HTTPProxy) error {
 
 	rateLimiter, resErr := NewRateLimiter(RateLimitParams{
 		RateLimit:  c.RateLimit,
-		TimeWindow: time.Duration(c.RateLimitTimeWindow) * time.Millisecond,
+		TimeWindow: time.Duration(c.RateLimitTimeWindowMs) * time.Millisecond,
 		Burst:      c.RateLimitBurst,
 		CacheSize:  c.RateLimitCacheSize,
 	})
