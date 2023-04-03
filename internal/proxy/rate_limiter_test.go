@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jonboulle/clockwork"
 	"github.com/maxatome/go-testdeep"
 )
 
@@ -39,7 +40,7 @@ func TestMaxRequestsPerSec(t *testing.T) {
 			name: "should limit the amount of requests per second",
 
 			rateLimit:  10,
-			timeWindow: 1000,
+			timeWindow: time.Second,
 			testTime:   time.Second,
 
 			reqSpecs: []reqSpec{
@@ -53,7 +54,7 @@ func TestMaxRequestsPerSec(t *testing.T) {
 			name: "should restart the timer for the next time window",
 
 			rateLimit:  10,
-			timeWindow: 500,
+			timeWindow: 500 * time.Millisecond,
 			testTime:   time.Second,
 
 			reqSpecs: []reqSpec{
@@ -67,7 +68,7 @@ func TestMaxRequestsPerSec(t *testing.T) {
 			name: "requests from different IPs should NOT influence each other",
 
 			rateLimit:  10,
-			timeWindow: 1000,
+			timeWindow: time.Second,
 			testTime:   time.Second,
 
 			reqSpecs: []reqSpec{
@@ -85,7 +86,7 @@ func TestMaxRequestsPerSec(t *testing.T) {
 			name: "canceled request should always fail",
 
 			rateLimit:  10,
-			timeWindow: 1000,
+			timeWindow: time.Second,
 			testTime:   time.Second,
 
 			reqSpecs: []reqSpec{
@@ -98,30 +99,34 @@ func TestMaxRequestsPerSec(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
 			// Preparations
+			startTime := time.Now()
+			clock := clockwork.NewFakeClockAt(startTime)
 			limiter, err := NewRateLimiter(RateLimitParams{
 				RateLimit:  tt.rateLimit,
 				TimeWindow: tt.timeWindow,
 				Burst:      1,
 				CacheSize:  100,
+				Clock:      clock,
 			})
 			testdeep.CmpNoError(t, err)
 
-			startTime := time.Now()
 			successCounters := make([]int, len(tt.reqSpecs))
 			reqCounters := make([]int, len(tt.reqSpecs))
 
 			// The test itself
-			for time.Since(startTime) < tt.testTime {
+			for clock.Since(startTime) < tt.testTime {
 				for idx, spec := range tt.reqSpecs {
 					reqCounters[idx]++
 					if limiter.Allow(spec.req) {
 						successCounters[idx]++
 					}
 				}
+				clock.Advance(time.Millisecond)
 			}
 
 			// Check the expectations

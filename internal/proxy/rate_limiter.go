@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/golang-lru/v2"
+	"github.com/jonboulle/clockwork"
 	"golang.org/x/time/rate"
 )
 
@@ -14,6 +15,7 @@ type RateLimiter struct {
 	timeWindow time.Duration
 	burst      int
 
+	clock clockwork.Clock
 	mx    sync.RWMutex
 	cache *lru.Cache[string, *rate.Limiter]
 }
@@ -23,6 +25,7 @@ type RateLimitParams struct {
 	TimeWindow time.Duration
 	Burst      int
 	CacheSize  int
+	Clock      clockwork.Clock
 }
 
 func NewRateLimiter(params RateLimitParams) (*RateLimiter, error) {
@@ -35,12 +38,19 @@ func NewRateLimiter(params RateLimitParams) (*RateLimiter, error) {
 		return nil, err
 	}
 
-	return &RateLimiter{
+	self := &RateLimiter{
 		rateLimit:  params.RateLimit,
 		timeWindow: params.TimeWindow,
 		burst:      params.Burst,
 		cache:      cache,
-	}, nil
+		clock:      params.Clock,
+	}
+
+	if self.clock == nil {
+		self.clock = clockwork.NewRealClock()
+	}
+
+	return self, nil
 }
 
 func (rl *RateLimiter) Allow(r *http.Request) bool {
@@ -51,7 +61,7 @@ func (rl *RateLimiter) Allow(r *http.Request) bool {
 		return false
 	}
 
-	return rl.getLimiter(r).Allow()
+	return rl.getLimiter(r).AllowN(rl.clock.Now(), 1)
 }
 
 func (rl *RateLimiter) getLimiter(r *http.Request) *rate.Limiter {

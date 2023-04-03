@@ -70,6 +70,9 @@ github.com/hashicorp/golang-lru/v2/simplelru
 # github.com/jmespath/go-jmespath v0.4.0
 ## explicit; go 1.14
 github.com/jmespath/go-jmespath
+# github.com/jonboulle/clockwork v0.4.0
+## explicit; go 1.15
+github.com/jonboulle/clockwork
 # github.com/kardianos/minwinsvc v1.0.0
 ## explicit; go 1.15
 github.com/kardianos/minwinsvc
