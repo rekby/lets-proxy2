@@ -136,3 +136,60 @@ func TestDirectorSetHeaders(t *testing.T) {
 	d.Director(req)
 	td.CmpDeeply(req.Header.Get("TestProtocol"), "http")
 }
+
+func TestDirectorSetHeadersByIP_Director(t *testing.T) {
+	type args struct {
+		request *http.Request
+	}
+
+	h := DirectorSetHeadersByIP{
+		&net.IPNet{IP: net.ParseIP("192.168.0.0"), Mask: net.CIDRMask(16, 32)}: map[string]string{
+			"TestHeader1": "TestHeaderValue1",
+			"TestHeader2": "TestHeaderValue2",
+			"TestHeader3": "TestHeaderValue3",
+			"TestHeader4": "TestHeaderValue4",
+		},
+	}
+	r, err := http.NewRequest(http.MethodGet, "qdwqff", nil)
+	if err != nil {
+		t.Fatalf("can't create request: %v", err)
+	}
+
+	r.RemoteAddr = "192.168.0.1"
+	tests := []struct {
+		name    string
+		addr    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "ok",
+			addr: "192.168.0.19",
+			args: args{
+				request: r,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := h.Director(tt.args.request); (err != nil) != tt.wantErr {
+				t.Errorf("Director() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr {
+				return
+			}
+
+			for ipNet, headers := range h {
+				if !ipNet.Contains(net.ParseIP(tt.addr)) {
+					continue
+				}
+				for name, value := range headers {
+					if tt.args.request.Header.Get(name) != value {
+						t.Errorf("header %s has wrong value: %s", name, tt.args.request.Header.Get(name))
+					}
+				}
+			}
+
+		})
+	}
+}

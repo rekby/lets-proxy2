@@ -177,6 +177,53 @@ func (h DirectorSetHeaders) Director(request *http.Request) error {
 	return nil
 }
 
+type DirectorSetHeadersByIP map[*net.IPNet]map[string]string
+
+func NewDirectorSetHeadersByIP(m map[string]map[string]string) DirectorSetHeadersByIP {
+	res := make(DirectorSetHeadersByIP, len(m))
+	for k, v := range m {
+		_, subnet, err := net.ParseCIDR(k)
+		if err != nil {
+			continue // TODO: add logging here
+		}
+
+		for headerName, headerVal := range v {
+			res[subnet][headerName] = headerVal
+		}
+	}
+	return res
+}
+
+func (h DirectorSetHeadersByIP) Director(request *http.Request) error {
+	_ = request.Context()
+	host, _, _ := net.SplitHostPort(request.RemoteAddr)
+
+	//log.DebugDPanicCtx(ctx, errHostPort, "Parse remote addr for headers", zap.String("host", host), zap.String("port", port))
+
+	//_, subnet, err := net.ParseCIDR(host)
+	//if err != nil {
+	//	fmt.Println(err)
+	//	//log.DebugDPanicCtx(ctx, err, "ParseCIDR", zap.String("host", host))
+	//	return fmt.Errorf("can't parse CIDR: %w", err)
+	//}
+
+	for ipNet, header := range h {
+		if ipNet.Contains(net.ParseIP(host)) {
+			continue
+		}
+
+		if request.Header == nil {
+			request.Header = make(http.Header)
+		}
+
+		for name, value := range header {
+			request.Header.Set(name, value)
+		}
+	}
+
+	return nil
+}
+
 type DirectorSetScheme string
 
 func (d DirectorSetScheme) Director(req *http.Request) error {
