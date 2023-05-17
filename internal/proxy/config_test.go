@@ -1,9 +1,7 @@
 package proxy
 
 import (
-	"context"
 	"net"
-	"reflect"
 	"testing"
 
 	"github.com/rekby/lets-proxy2/internal/th"
@@ -297,18 +295,18 @@ func TestConfig_Apply(t *testing.T) {
 func TestConfig_getHeadersByIPDirector(t *testing.T) {
 	ctx, flush := th.TestContext(t)
 	defer flush()
-	type args struct {
-		ctx context.Context
-	}
+	td := testdeep.NewT(t)
+
 	tests := []struct {
 		name    string
 		c       Config
-		want    Director
+		want    DirectorSetHeadersByIP
 		wantErr bool
 	}{
 		{
 			name: "empty",
 			c:    Config{},
+			want: nil,
 		},
 		{
 			name: "1 network",
@@ -328,30 +326,103 @@ func TestConfig_getHeadersByIPDirector(t *testing.T) {
 				},
 			},
 		},
-		//{
-		//	name: "10 networks",
-		//	c: Config{
-		//		HeadersByIP: []string{
-		//			"IPNET:192.168.1.0/24",
-		//			"User-Agent:PostmanRuntime/7.29.2",
-		//			"Accept:*/*",
-		//			"Accept-Encoding:gzip, deflate, br",
-		//
-		//			"IPNET:172.16.0.0/24",
-		//			"Connection:Keep-Alive",
-		//		},
-		//	},
-		//},
+		{
+			name: "5 networks",
+			c: Config{
+				HeadersByIP: []string{
+					"IPNET:192.168.1.0/24",
+					"User-Agent:PostmanRuntime/7.29.2",
+					"Accept:*/*",
+					"Accept-Encoding:gzip, deflate, br",
+
+					"IPNET:172.16.0.0/24",
+					"Connection:Keep-Alive",
+					"Upgrade-Insecure-Requests:1",
+					"Cache-Control:no-cache",
+
+					"IPNET:172.16.99.0/24",
+					"Origin:https://example.com",
+					"Content-Type:application/json",
+					"Content-Length:123",
+
+					"IPNET:192.168.32.0/24",
+					"Accept-Encoding:gzip, deflate, br",
+					"Accept-Language:en-US,en;q=0.9",
+
+					"IPNET:fe80:0000:0000:0000::/64",
+					"Accept:*/*",
+					"Accept-Encoding:gzip, deflate, br",
+					"Accept-Language:en-US,en;q=0.9",
+				},
+			},
+			want: DirectorSetHeadersByIP{
+				&net.IPNet{IP: net.ParseIP("192.168.1.0"), Mask: net.CIDRMask(24, 32)}: {
+					"User-Agent":      "PostmanRuntime/7.29.2",
+					"Accept":          "*/*",
+					"Accept-Encoding": "gzip, deflate, br",
+				},
+				&net.IPNet{IP: net.ParseIP("172.16.0.0"), Mask: net.CIDRMask(24, 32)}: {
+					"Connection":                "Keep-Alive",
+					"Upgrade-Insecure-Requests": "1",
+					"Cache-Control":             "no-cache",
+				},
+				&net.IPNet{IP: net.ParseIP("172.16.99.0"), Mask: net.CIDRMask(24, 32)}: {
+					"Origin":         "https://example.com",
+					"Content-Type":   "application/json",
+					"Content-Length": "123",
+				},
+				&net.IPNet{IP: net.ParseIP("192.168.32.0"), Mask: net.CIDRMask(24, 32)}: {
+					"Accept-Encoding": "gzip, deflate, br",
+					"Accept-Language": "en-US,en;q=0.9",
+				},
+				&net.IPNet{IP: net.ParseIP("fe80:0000:0000:0000::"), Mask: net.CIDRMask(64, 128)}: {
+					"Accept":          "*/*",
+					"Accept-Encoding": "gzip, deflate, br",
+					"Accept-Language": "en-US,en;q=0.9",
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := tt.c.getHeadersByIPDirector(ctx)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("getHeadersByIPDirector() error = %v, wantErr %v", err, tt.wantErr)
+				t.Fatalf("getHeadersByIPDirector() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if tt.wantErr {
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("getHeadersByIPDirector() got = %v, want %v", got, tt.want)
+
+			getMapDir := func(d DirectorSetHeadersByIP) map[string]map[string]string {
+				var mp = make(map[string]map[string]string)
+				for k, v := range d {
+					if v == nil {
+						return mp
+					}
+					headersMap := (map[string]string)(v)
+					if _, ok := mp[k.String()]; !ok {
+						mp[k.String()] = make(map[string]string)
+					}
+					for h, val := range headersMap {
+						mp[k.String()][h] = val
+					}
+				}
+
+				t.Logf("getMapDir() got = %v", mp)
+				return mp
+			}
+
+			if got == nil && tt.want == nil {
+				return
+			}
+
+			if gotDir, ok := got.(DirectorSetHeadersByIP); !ok {
+				t.Fatalf("can't lead to the type %v", got)
+			} else {
+				gotMap := getMapDir(gotDir)
+				wantMap := getMapDir(tt.want)
+				td.CmpDeeply(gotMap, wantMap)
 			}
 		})
 	}
