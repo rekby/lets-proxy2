@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -177,14 +178,19 @@ func (h DirectorSetHeaders) Director(request *http.Request) error {
 	return nil
 }
 
-type DirectorSetHeadersByIP map[*net.IPNet]map[string]string
+type headers map[string]string
+type DirectorSetHeadersByIP map[*net.IPNet]headers
 
-func NewDirectorSetHeadersByIP(m map[string]map[string]string) DirectorSetHeadersByIP {
+func NewDirectorSetHeadersByIP(m map[string]headers) DirectorSetHeadersByIP {
 	res := make(DirectorSetHeadersByIP, len(m))
 	for k, v := range m {
 		_, subnet, err := net.ParseCIDR(k)
 		if err != nil {
 			continue // TODO: add logging here
+		}
+
+		if res[subnet] == nil {
+			res[subnet] = make(headers, len(v))
 		}
 
 		for headerName, headerVal := range v {
@@ -195,17 +201,16 @@ func NewDirectorSetHeadersByIP(m map[string]map[string]string) DirectorSetHeader
 }
 
 func (h DirectorSetHeadersByIP) Director(request *http.Request) error {
-	_ = request.Context()
-	host, _, _ := net.SplitHostPort(request.RemoteAddr)
+	if request == nil {
+		return fmt.Errorf("request is nil")
+	}
 
-	//log.DebugDPanicCtx(ctx, errHostPort, "Parse remote addr for headers", zap.String("host", host), zap.String("port", port))
-
-	//_, subnet, err := net.ParseCIDR(host)
-	//if err != nil {
-	//	fmt.Println(err)
-	//	//log.DebugDPanicCtx(ctx, err, "ParseCIDR", zap.String("host", host))
-	//	return fmt.Errorf("can't parse CIDR: %w", err)
-	//}
+	ctx := request.Context()
+	host, port, err := net.SplitHostPort(request.RemoteAddr)
+	if err != nil {
+		zc.L(ctx).Debug(fmt.Sprintf("Split host port error"), zap.Error(err), zap.String("host", host),
+			zap.String("port", port))
+	}
 
 	for ipNet, header := range h {
 		if ipNet.Contains(net.ParseIP(host)) {

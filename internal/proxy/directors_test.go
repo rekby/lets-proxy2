@@ -137,25 +137,27 @@ func TestDirectorSetHeaders(t *testing.T) {
 	td.CmpDeeply(req.Header.Get("TestProtocol"), "http")
 }
 
-func TestDirectorSetHeadersByIP_Director(t *testing.T) {
+func TestDirectorSetHeadersByIP(t *testing.T) {
+	ctx, flush := th.TestContext(t)
+	defer flush()
+
+	td := testdeep.NewT(t)
+
 	type args struct {
 		request *http.Request
 	}
 
-	h := DirectorSetHeadersByIP{
-		&net.IPNet{IP: net.ParseIP("192.168.0.0"), Mask: net.CIDRMask(16, 32)}: map[string]string{
+	m := map[string]headers{
+		"192.168.0.0/24": {
 			"TestHeader1": "TestHeaderValue1",
 			"TestHeader2": "TestHeaderValue2",
 			"TestHeader3": "TestHeaderValue3",
 			"TestHeader4": "TestHeaderValue4",
 		},
 	}
-	r, err := http.NewRequest(http.MethodGet, "qdwqff", nil)
-	if err != nil {
-		t.Fatalf("can't create request: %v", err)
-	}
 
-	r.RemoteAddr = "192.168.0.1"
+	d := NewDirectorSetHeadersByIP(m)
+
 	tests := []struct {
 		name    string
 		addr    string
@@ -163,30 +165,45 @@ func TestDirectorSetHeadersByIP_Director(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "ok",
-			addr: "192.168.0.19",
+			name: "ok ipv4",
 			args: args{
-				request: r,
+				request: &http.Request{RemoteAddr: "192.168.0.19:897"},
 			},
 		},
+		{
+			name: "ok ipv6",
+			args: args{
+				request: &http.Request{RemoteAddr: "[2001:db8:0:1]:897"},
+			},
+		},
+		{
+			name: "nil request",
+			args: args{
+				request: nil,
+			},
+			wantErr: true,
+		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := h.Director(tt.args.request); (err != nil) != tt.wantErr {
+			if tt.args.request != nil {
+				tt.args.request.WithContext(ctx)
+			}
+			if err := d.Director(tt.args.request); (err != nil) != tt.wantErr {
 				t.Errorf("Director() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if tt.wantErr {
 				return
 			}
 
-			for ipNet, headers := range h {
-				if !ipNet.Contains(net.ParseIP(tt.addr)) {
+			for ipNet, headers := range d {
+				if !ipNet.Contains(net.ParseIP(tt.args.request.RemoteAddr)) {
 					continue
 				}
+
 				for name, value := range headers {
-					if tt.args.request.Header.Get(name) != value {
-						t.Errorf("header %s has wrong value: %s", name, tt.args.request.Header.Get(name))
-					}
+					td.CmpDeeply(tt.args.request.Header.Get(name), value)
 				}
 			}
 

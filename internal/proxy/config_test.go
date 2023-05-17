@@ -1,6 +1,9 @@
 package proxy
 
 import (
+	"context"
+	"net"
+	"reflect"
 	"testing"
 
 	"github.com/rekby/lets-proxy2/internal/th"
@@ -289,4 +292,67 @@ func TestConfig_Apply(t *testing.T) {
 	_ = c.Apply(ctx, p)
 	transport = p.HTTPTransport.(Transport)
 	transport.IgnoreHTTPSCertificate = true
+}
+
+func TestConfig_getHeadersByIPDirector(t *testing.T) {
+	ctx, flush := th.TestContext(t)
+	defer flush()
+	type args struct {
+		ctx context.Context
+	}
+	tests := []struct {
+		name    string
+		c       Config
+		want    Director
+		wantErr bool
+	}{
+		{
+			name: "empty",
+			c:    Config{},
+		},
+		{
+			name: "1 network",
+			c: Config{
+				HeadersByIP: []string{
+					"IPNET:192.168.1.0/24",
+					"User-Agent:PostmanRuntime/7.29.2",
+					"Accept:*/*",
+					"Accept-Encoding:gzip, deflate, br",
+				},
+			},
+			want: DirectorSetHeadersByIP{
+				&net.IPNet{IP: net.ParseIP("192.168.1.0"), Mask: net.CIDRMask(24, 32)}: {
+					"User-Agent":      "PostmanRuntime/7.29.2",
+					"Accept":          "*/*",
+					"Accept-Encoding": "gzip, deflate, br",
+				},
+			},
+		},
+		//{
+		//	name: "10 networks",
+		//	c: Config{
+		//		HeadersByIP: []string{
+		//			"IPNET:192.168.1.0/24",
+		//			"User-Agent:PostmanRuntime/7.29.2",
+		//			"Accept:*/*",
+		//			"Accept-Encoding:gzip, deflate, br",
+		//
+		//			"IPNET:172.16.0.0/24",
+		//			"Connection:Keep-Alive",
+		//		},
+		//	},
+		//},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.c.getHeadersByIPDirector(ctx)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("getHeadersByIPDirector() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("getHeadersByIPDirector() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
