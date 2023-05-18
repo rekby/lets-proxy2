@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/rekby/lets-proxy2/internal/contextlabel"
@@ -141,8 +142,6 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 	ctx, flush := th.TestContext(t)
 	defer flush()
 
-	td := testdeep.NewT(t)
-
 	type args struct {
 		request *http.Request
 	}
@@ -154,34 +153,54 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 			"TestHeader3": "TestHeaderValue3",
 			"TestHeader4": "TestHeaderValue4",
 		},
+		"fe80:0000:0000:0000::/64": {
+			"TestHeader5": "TestHeaderValue5",
+		},
 	}
 
 	d := NewDirectorSetHeadersByIP(m)
 
 	tests := []struct {
-		name    string
-		addr    string
-		args    args
-		wantErr bool
+		name         string
+		args         args
+		shouldModify bool
+		wantErr      bool
 	}{
 		{
 			name: "ok ipv4",
 			args: args{
 				request: &http.Request{RemoteAddr: "192.168.0.19:897"},
 			},
+			shouldModify: true,
 		},
 		{
 			name: "ok ipv6",
 			args: args{
-				request: &http.Request{RemoteAddr: "[2001:db8:0:1]:897"},
+				request: &http.Request{RemoteAddr: "[fe80::28ca:829b:2d2e:a908]:897"},
 			},
+			shouldModify: true,
 		},
 		{
 			name: "nil request",
 			args: args{
 				request: nil,
 			},
-			wantErr: true,
+			wantErr:      true,
+			shouldModify: false,
+		},
+		{
+			name: "wrong addr ipv4",
+			args: args{
+				request: &http.Request{RemoteAddr: "172.168.0.1:897"},
+			},
+			shouldModify: false,
+		},
+		{
+			name: "wrong addr ipv6",
+			args: args{
+				request: &http.Request{RemoteAddr: "[ae80:28ca:27ca:829b:2d2e:a908]:897"},
+			},
+			shouldModify: false,
 		},
 	}
 
@@ -193,18 +212,37 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 			if err := d.Director(tt.args.request); (err != nil) != tt.wantErr {
 				t.Errorf("Director() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if tt.wantErr {
+
+			if tt.wantErr || !tt.shouldModify {
 				return
 			}
 
+			var found bool
 			for ipNet, headers := range d {
-				if !ipNet.Contains(net.ParseIP(tt.args.request.RemoteAddr)) {
+				split := strings.Split(tt.args.request.RemoteAddr, ":")
+				ip := tt.args.request.RemoteAddr
+
+				if len(split) > 1 {
+					ip = strings.Trim(strings.Join(split[:len(split)-1], ":"), "[]")
+				} else if len(split) == 0 {
+					t.Errorf("Director() RemoteAddr error")
 					continue
 				}
 
-				for name, value := range headers {
-					td.CmpDeeply(tt.args.request.Header.Get(name), value)
+				if !ipNet.Contains(net.ParseIP(ip)) {
+					continue
 				}
+
+				found = true
+				for name, value := range headers {
+					if tt.args.request.Header.Get(name) != value {
+						t.Errorf("[%s] not found", name)
+					}
+				}
+			}
+
+			if !found {
+				t.Errorf("Director() headers not found")
 			}
 
 		})

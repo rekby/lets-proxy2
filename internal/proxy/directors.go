@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -186,7 +187,9 @@ func NewDirectorSetHeadersByIP(m map[string]headers) DirectorSetHeadersByIP {
 	for k, v := range m {
 		_, subnet, err := net.ParseCIDR(k)
 		if err != nil {
-			continue // TODO: add logging here
+			zc.L(context.Background()).Debug(fmt.Sprintf("ParseCIDR error"), zap.Error(err),
+				zap.String("subnet", k))
+			continue
 		}
 
 		if res[subnet] == nil {
@@ -213,7 +216,7 @@ func (h DirectorSetHeadersByIP) Director(request *http.Request) error {
 	}
 
 	for ipNet, header := range h {
-		if ipNet.Contains(net.ParseIP(host)) {
+		if !ipNet.Contains(net.ParseIP(host)) {
 			continue
 		}
 

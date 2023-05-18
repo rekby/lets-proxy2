@@ -335,7 +335,7 @@ func TestConfig_getHeadersByIPDirector(t *testing.T) {
 					"Accept:*/*",
 					"Accept-Encoding:gzip, deflate, br",
 
-					"IPNET:172.16.0.0/24",
+					"IPNET:172.16.33.0/24",
 					"Connection:Keep-Alive",
 					"Upgrade-Insecure-Requests:1",
 					"Cache-Control:no-cache",
@@ -361,7 +361,7 @@ func TestConfig_getHeadersByIPDirector(t *testing.T) {
 					"Accept":          "*/*",
 					"Accept-Encoding": "gzip, deflate, br",
 				},
-				&net.IPNet{IP: net.ParseIP("172.16.0.0"), Mask: net.CIDRMask(24, 32)}: {
+				&net.IPNet{IP: net.ParseIP("172.16.33.0"), Mask: net.CIDRMask(24, 32)}: {
 					"Connection":                "Keep-Alive",
 					"Upgrade-Insecure-Requests": "1",
 					"Cache-Control":             "no-cache",
