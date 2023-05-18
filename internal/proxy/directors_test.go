@@ -146,7 +146,7 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 		request *http.Request
 	}
 
-	m := map[string]headers{
+	m := map[string]HTTPHeaders{
 		"192.168.0.0/24": {
 			"TestHeader1": "TestHeaderValue1",
 			"TestHeader2": "TestHeaderValue2",
@@ -158,7 +158,10 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 		},
 	}
 
-	d := NewDirectorSetHeadersByIP(m)
+	d, err := NewDirectorSetHeadersByIP(m)
+	if err != nil {
+		t.Fatalf("can't create director SetHeadersByIP: %v", err)
+	}
 
 	tests := []struct {
 		name         string
@@ -202,12 +205,26 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 			},
 			shouldModify: false,
 		},
+		{
+			name: "no port ipv4",
+			args: args{
+				request: &http.Request{RemoteAddr: "172.168.0.1"},
+			},
+			shouldModify: false,
+		},
+		{
+			name: "no port ipv6",
+			args: args{
+				request: &http.Request{RemoteAddr: "[ae80:28ca:27ca:829b:2d2e:a908]"},
+			},
+			shouldModify: false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.args.request != nil {
-				tt.args.request.WithContext(ctx)
+				tt.args.request = tt.args.request.WithContext(ctx)
 			}
 			if err := d.Director(tt.args.request); (err != nil) != tt.wantErr {
 				t.Errorf("Director() error = %v, wantErr %v", err, tt.wantErr)
@@ -218,7 +235,7 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 			}
 
 			var found bool
-			for ipNet, headers := range d {
+			for _, netHeaders := range d {
 				split := strings.Split(tt.args.request.RemoteAddr, ":")
 				ip := tt.args.request.RemoteAddr
 
@@ -229,12 +246,12 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 					continue
 				}
 
-				if !ipNet.Contains(net.ParseIP(ip)) {
+				if !netHeaders.IPNet.Contains(net.ParseIP(ip)) {
 					continue
 				}
 
 				found = true
-				for name, value := range headers {
+				for name, value := range netHeaders.Headers {
 					if tt.args.request.Header.Get(name) != value {
 						t.Errorf("[%s] not found", name)
 					}
@@ -245,6 +262,103 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 				t.Errorf("Director() headers not found")
 			}
 
+		})
+	}
+}
+
+func TestNewDirectorSetHeadersByIP(t *testing.T) {
+	ctx, flush := th.TestContext(t)
+	defer flush()
+	td := testdeep.NewT(t)
+
+	type args struct {
+		ctx context.Context
+		m   map[string]HTTPHeaders
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    DirectorSetHeadersByIP
+		wantErr bool
+	}{
+		{
+			name: "ok",
+			args: args{
+				ctx: ctx,
+				m: map[string]HTTPHeaders{
+					"192.168.0.0/24": {
+						"TestHeader1": "TestHeaderValue1",
+						"TestHeader2": "TestHeaderValue2",
+						"TestHeader3": "TestHeaderValue3",
+						"TestHeader4": "TestHeaderValue4",
+					},
+					"fe80:0000:0000:0000::/64": {
+						"TestHeader5": "TestHeaderValue5",
+					},
+				},
+			},
+			want: DirectorSetHeadersByIP{
+				{
+					IPNet: net.IPNet{IP: net.ParseIP("192.168.0.0"), Mask: net.CIDRMask(24, 32)},
+					Headers: map[string]string{
+						"TestHeader1": "TestHeaderValue1",
+						"TestHeader2": "TestHeaderValue2",
+						"TestHeader3": "TestHeaderValue3",
+						"TestHeader4": "TestHeaderValue4",
+					},
+				},
+				{
+					IPNet: net.IPNet{IP: net.ParseIP("fe80::"), Mask: net.CIDRMask(64, 128)},
+					Headers: map[string]string{
+						"TestHeader5": "TestHeaderValue5",
+					},
+				},
+			},
+		},
+		{
+			name: "wrong format",
+			args: args{
+				ctx: ctx,
+				m: map[string]HTTPHeaders{
+					"192.168.0.v": {
+						"TestHeader1": "TestHeaderValue1",
+						"TestHeader2": "TestHeaderValue2",
+						"TestHeader3": "TestHeaderValue3",
+						"TestHeader4": "TestHeaderValue4",
+					},
+					"fe80:0000:0000:0000::/64": {
+						"TestHeader5": "TestHeaderValue5",
+					},
+				},
+			},
+			want:    DirectorSetHeadersByIP{},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := NewDirectorSetHeadersByIP(tt.args.m)
+			if (err != nil) != tt.wantErr {
+				t.Fatal("NewDirectorSetHeadersByIP error", err)
+			}
+
+			if tt.wantErr {
+				return
+			}
+
+			found := false
+			for _, gotNetHeaders := range got {
+				for _, wantNetHeaders := range tt.want {
+					if gotNetHeaders.IPNet.String() != wantNetHeaders.IPNet.String() {
+						continue
+					}
+					found = true
+					td.CmpDeeply(gotNetHeaders.Headers, wantNetHeaders.Headers)
+				}
+			}
+			if !found {
+				t.Errorf("NewDirectorSetHeadersByIP() headers not found")
+			}
 		})
 	}
 }

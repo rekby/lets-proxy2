@@ -312,73 +312,116 @@ func TestConfig_getHeadersByIPDirector(t *testing.T) {
 			name: "1 network",
 			c: Config{
 				HeadersByIP: []string{
-					"IPNET:192.168.1.0/24",
+					"IPNET=192.168.1.0/24",
 					"User-Agent:PostmanRuntime/7.29.2",
 					"Accept:*/*",
 					"Accept-Encoding:gzip, deflate, br",
 				},
 			},
 			want: DirectorSetHeadersByIP{
-				&net.IPNet{IP: net.ParseIP("192.168.1.0"), Mask: net.CIDRMask(24, 32)}: {
-					"User-Agent":      "PostmanRuntime/7.29.2",
-					"Accept":          "*/*",
-					"Accept-Encoding": "gzip, deflate, br",
+				NetHeaders{
+					IPNet: net.IPNet{IP: net.ParseIP("192.168.1.0"), Mask: net.CIDRMask(24, 32)},
+					Headers: map[string]string{
+						"User-Agent":      "PostmanRuntime/7.29.2",
+						"Accept":          "*/*",
+						"Accept-Encoding": "gzip, deflate, br",
+					},
 				},
 			},
+		},
+		{
+			name: "config error 1",
+			c: Config{
+				HeadersByIP: []string{
+					"IPNET192.168.1.0/24",
+					"User-Agent:PostmanRuntime/7.29.2",
+					"Accept:*/*",
+					"Accept-Encoding:gzip, deflate, br",
+				},
+			},
+			want:    DirectorSetHeadersByIP{},
+			wantErr: true,
+		},
+		{
+			name: "config error 2",
+			c: Config{
+				HeadersByIP: []string{
+					"User-Agent:PostmanRuntime/7.29.2",
+					"Accept:*/*",
+					"Accept-Encoding:gzip, deflate, br",
+				},
+			},
+			want:    DirectorSetHeadersByIP{},
+			wantErr: true,
 		},
 		{
 			name: "5 networks",
 			c: Config{
 				HeadersByIP: []string{
-					"IPNET:192.168.1.0/24",
+					"IPNET=192.168.1.0/24",
 					"User-Agent:PostmanRuntime/7.29.2",
 					"Accept:*/*",
 					"Accept-Encoding:gzip, deflate, br",
 
-					"IPNET:172.16.33.0/24",
+					"IPNET=172.16.33.0/24",
 					"Connection:Keep-Alive",
 					"Upgrade-Insecure-Requests:1",
 					"Cache-Control:no-cache",
 
-					"IPNET:172.16.99.0/24",
+					"IPNET=172.16.99.0/24",
 					"Origin:https://example.com",
 					"Content-Type:application/json",
 					"Content-Length:123",
 
-					"IPNET:192.168.32.0/24",
+					"IPNET=192.168.32.0/24",
 					"Accept-Encoding:gzip, deflate, br",
 					"Accept-Language:en-US,en;q=0.9",
 
-					"IPNET:fe80:0000:0000:0000::/64",
+					"IPNET=fe80:0000:0000:0000::/64",
 					"Accept:*/*",
 					"Accept-Encoding:gzip, deflate, br",
 					"Accept-Language:en-US,en;q=0.9",
 				},
 			},
 			want: DirectorSetHeadersByIP{
-				&net.IPNet{IP: net.ParseIP("192.168.1.0"), Mask: net.CIDRMask(24, 32)}: {
-					"User-Agent":      "PostmanRuntime/7.29.2",
-					"Accept":          "*/*",
-					"Accept-Encoding": "gzip, deflate, br",
+				NetHeaders{
+					IPNet: net.IPNet{IP: net.ParseIP("192.168.1.0"), Mask: net.CIDRMask(24, 32)},
+					Headers: map[string]string{
+						"User-Agent":      "PostmanRuntime/7.29.2",
+						"Accept":          "*/*",
+						"Accept-Encoding": "gzip, deflate, br",
+					},
 				},
-				&net.IPNet{IP: net.ParseIP("172.16.33.0"), Mask: net.CIDRMask(24, 32)}: {
-					"Connection":                "Keep-Alive",
-					"Upgrade-Insecure-Requests": "1",
-					"Cache-Control":             "no-cache",
+				NetHeaders{
+					IPNet: net.IPNet{IP: net.ParseIP("172.16.33.0"), Mask: net.CIDRMask(24, 32)},
+					Headers: map[string]string{
+						"Connection":                "Keep-Alive",
+						"Upgrade-Insecure-Requests": "1",
+						"Cache-Control":             "no-cache",
+					},
 				},
-				&net.IPNet{IP: net.ParseIP("172.16.99.0"), Mask: net.CIDRMask(24, 32)}: {
-					"Origin":         "https://example.com",
-					"Content-Type":   "application/json",
-					"Content-Length": "123",
+				NetHeaders{
+					IPNet: net.IPNet{IP: net.ParseIP("172.16.99.0"), Mask: net.CIDRMask(24, 32)},
+					Headers: map[string]string{
+						"Origin":         "https://example.com",
+						"Content-Type":   "application/json",
+						"Content-Length": "123",
+					},
 				},
-				&net.IPNet{IP: net.ParseIP("192.168.32.0"), Mask: net.CIDRMask(24, 32)}: {
-					"Accept-Encoding": "gzip, deflate, br",
-					"Accept-Language": "en-US,en;q=0.9",
+				NetHeaders{
+					IPNet: net.IPNet{IP: net.ParseIP("192.168.32.0"), Mask: net.CIDRMask(24, 32)},
+					Headers: map[string]string{
+						"Accept-Encoding": "gzip, deflate, br",
+						"Accept-Language": "en-US,en;q=0.9",
+					},
 				},
-				&net.IPNet{IP: net.ParseIP("fe80:0000:0000:0000::"), Mask: net.CIDRMask(64, 128)}: {
-					"Accept":          "*/*",
-					"Accept-Encoding": "gzip, deflate, br",
-					"Accept-Language": "en-US,en;q=0.9",
+				NetHeaders{
+					IPNet: net.IPNet{IP: net.ParseIP("fe80:0000:0000:0000::"), Mask: net.CIDRMask(64, 128)},
+					Headers: map[string]string{
+						"Accept":          "*/*",
+						"Accept-Encoding": "gzip, deflate, br",
+						"Accept-Language": "en-US,en;q=0.9",
+					},
 				},
 			},
 		},
@@ -396,16 +439,16 @@ func TestConfig_getHeadersByIPDirector(t *testing.T) {
 
 			getMapDir := func(d DirectorSetHeadersByIP) map[string]map[string]string {
 				var mp = make(map[string]map[string]string)
-				for k, v := range d {
-					if v == nil {
-						return mp
+				for _, netHeaders := range d {
+					if netHeaders.Headers == nil {
+						continue
 					}
-					headersMap := (map[string]string)(v)
-					if _, ok := mp[k.String()]; !ok {
-						mp[k.String()] = make(map[string]string)
+					headersMap := (map[string]string)(netHeaders.Headers)
+					if _, ok := mp[netHeaders.IPNet.String()]; !ok {
+						mp[netHeaders.IPNet.String()] = make(map[string]string)
 					}
 					for h, val := range headersMap {
-						mp[k.String()][h] = val
+						mp[netHeaders.IPNet.String()][h] = val
 					}
 				}
 

@@ -101,6 +101,22 @@ TargetMap = []
 # ["IP:{{SOURCE_IP}}", "Proxy:lets-proxy", "Protocol:{{HTTP_PROTO}}" ]
 Headers = [ "X-Forwarded-Proto:{{HTTP_PROTO}}", "X-Forwarded-For:{{SOURCE_IP}}" ]
 
+# Array of colon separated HeaderName:HeaderValue with leading IPNET=IP/Mask constraint for add to request
+# with matching ip address for backend.
+# Example:
+# [
+#    "IPNET=192.168.1.0/24",
+#    "User-Agent:PostmanRuntime/7.29.2",
+#    "Accept:*/*",
+#    "Accept-Encoding:gzip, deflate, br",
+#
+#    "IPNET=192.168.132.0/30",
+#    "User-Agent:PostmanRuntime/7.29.2",
+#    "Accept:*/*",
+#    "Accept-Encoding:gzip",
+# ]
+HeadersByIP = []
+
 # Use https requests to backend instead of http
 HTTPSBackend = false
 

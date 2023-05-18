@@ -159,31 +159,33 @@ func (c *Config) getSchemaDirector(ctx context.Context) (Director, error) {
 	return NewSetSchemeDirector(ProtocolHTTP), nil
 }
 
-// transform array to map[string]headers
-// keyword IPNET is used for splitting headers by ip
+// getHeadersByIPDirector transform array to DirectorSetHeadersByIP
+// special line IPNET=? is used for splitting HTTPHeaders by ip
 // example:
 //
 // HeadersByIP = [
 //
-//	"IPNET:192.168.1.0/24",
+//	"IPNET=192.168.1.0/24",
 //	"User-Agent:PostmanRuntime/7.29.2",
 //	"Accept:*/*",
 //	"Accept-Encoding:gzip, deflate, br",
 //
-//	"IPNET:192.168.132.0/30",
+//	"IPNET=192.168.132.0/30",
 //	"Accept-Encoding:gzip",
 //
 // ]
 //
 // out:
 //
-//	map[string]headers{
-//		"192.168.1.0/24": {
+//	DirectorSetHeadersByIP {
+//		IPNet: 192.168.1.0/24,
+//		Headers: map[string]string{
 //			"User-Agent": "PostmanRuntime/7.29.2",
 //			"Accept": "*/*",
 //			"Accept-Encoding": "gzip, deflate, br",
 //		},
-//	    "192.168.132.0/24": {
+//	    IPNet:  192.168.132.0/24,
+//		Headers: map[string]string{
 //			"Accept-Encoding": "gzip",
 //		},
 //	}
@@ -194,35 +196,36 @@ func (c *Config) getHeadersByIPDirector(ctx context.Context) (Director, error) {
 		return nil, nil
 	}
 
-	m := make(map[string]headers)
+	m := make(map[string]HTTPHeaders)
 
 	var ipNet string
 
 	for _, line := range c.HeadersByIP {
 		line = strings.TrimSpace(line)
+		lineEqParts := strings.SplitN(line, "=", 2)
+		if len(lineEqParts) == 2 && strings.TrimSpace(lineEqParts[0]) == "IPNET" {
+			ipNet = strings.TrimSpace(lineEqParts[1])
+			continue
+		}
+
 		lineParts := strings.SplitN(line, ":", 2)
 		if len(lineParts) < 2 {
 			logger.Error("Can't split header line to parts", zap.String("line", line))
 			return nil, errors.New("can't parse headers proxy config")
 		}
 
-		if lineParts[0] == "IPNET" {
-			ipNet = lineParts[1]
-			continue
-		}
-
 		name := lineParts[0]
 		value := lineParts[1]
 
 		if m[ipNet] == nil {
-			m[ipNet] = make(headers)
+			m[ipNet] = make(HTTPHeaders)
 		}
 
 		m[ipNet][name] = value
 	}
 
 	logger.Info("Create headers by ip director", zap.Any("headers", m))
-	return NewDirectorSetHeadersByIP(m), nil
+	return NewDirectorSetHeadersByIP(m)
 }
 
 func parseTCPMapPair(line string) (from, to string, err error) {
