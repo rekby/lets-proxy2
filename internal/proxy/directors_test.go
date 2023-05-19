@@ -148,20 +148,19 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 
 	m := map[string]HTTPHeaders{
 		"192.168.0.0/24": {
-			"TestHeader1": "TestHeaderValue1",
-			"TestHeader2": "TestHeaderValue2",
-			"TestHeader3": "TestHeaderValue3",
-			"TestHeader4": "TestHeaderValue4",
+			{Name: "TestHeader1", Value: "TestHeaderValue1"},
+			{Name: "TestHeader2", Value: "TestHeaderValue2"},
+			{Name: "TestHeader3", Value: "TestHeaderValue3"},
+			{Name: "TestHeader4", Value: "TestHeaderValue4"},
 		},
 		"fe80:0000:0000:0000::/64": {
-			"TestHeader5": "TestHeaderValue5",
+			{Name: "TestHeader5", Value: "TestHeaderValue5"},
 		},
 	}
 
+	td := testdeep.NewT(t)
 	d, err := NewDirectorSetHeadersByIP(m)
-	if err != nil {
-		t.Fatalf("can't create director SetHeadersByIP: %v", err)
-	}
+	td.CmpNoError(err)
 
 	tests := []struct {
 		name         string
@@ -170,21 +169,21 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 		wantErr      bool
 	}{
 		{
-			name: "ok ipv4",
+			name: "okIPv4",
 			args: args{
 				request: &http.Request{RemoteAddr: "192.168.0.19:897"},
 			},
 			shouldModify: true,
 		},
 		{
-			name: "ok ipv6",
+			name: "okIPv6",
 			args: args{
 				request: &http.Request{RemoteAddr: "[fe80::28ca:829b:2d2e:a908]:897"},
 			},
 			shouldModify: true,
 		},
 		{
-			name: "nil request",
+			name: "nilRequest",
 			args: args{
 				request: nil,
 			},
@@ -192,28 +191,28 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 			shouldModify: false,
 		},
 		{
-			name: "wrong addr ipv4",
+			name: "wrongAddrIPv4",
 			args: args{
 				request: &http.Request{RemoteAddr: "172.168.0.1:897"},
 			},
 			shouldModify: false,
 		},
 		{
-			name: "wrong addr ipv6",
+			name: "wrongAddrIPv6",
 			args: args{
 				request: &http.Request{RemoteAddr: "[ae80:28ca:27ca:829b:2d2e:a908]:897"},
 			},
 			shouldModify: false,
 		},
 		{
-			name: "no port ipv4",
+			name: "noPortIPv4",
 			args: args{
 				request: &http.Request{RemoteAddr: "172.168.0.1"},
 			},
 			shouldModify: false,
 		},
 		{
-			name: "no port ipv6",
+			name: "noPortIPv6",
 			args: args{
 				request: &http.Request{RemoteAddr: "[ae80:28ca:27ca:829b:2d2e:a908]"},
 			},
@@ -251,10 +250,8 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 				}
 
 				found = true
-				for name, value := range netHeaders.Headers {
-					if tt.args.request.Header.Get(name) != value {
-						t.Errorf("[%s] not found", name)
-					}
+				for _, header := range netHeaders.Headers {
+					td.CmpDeeply(tt.args.request.Header.Get(header.Name), header.Value)
 				}
 			}
 
@@ -287,47 +284,47 @@ func TestNewDirectorSetHeadersByIP(t *testing.T) {
 				ctx: ctx,
 				m: map[string]HTTPHeaders{
 					"192.168.0.0/24": {
-						"TestHeader1": "TestHeaderValue1",
-						"TestHeader2": "TestHeaderValue2",
-						"TestHeader3": "TestHeaderValue3",
-						"TestHeader4": "TestHeaderValue4",
+						{Name: "TestHeader1", Value: "TestHeaderValue1"},
+						{Name: "TestHeader2", Value: "TestHeaderValue2"},
+						{Name: "TestHeader3", Value: "TestHeaderValue3"},
+						{Name: "TestHeader4", Value: "TestHeaderValue4"},
 					},
 					"fe80:0000:0000:0000::/64": {
-						"TestHeader5": "TestHeaderValue5",
+						{Name: "TestHeader5", Value: "TestHeaderValue5"},
 					},
 				},
 			},
 			want: DirectorSetHeadersByIP{
 				{
 					IPNet: net.IPNet{IP: net.ParseIP("192.168.0.0"), Mask: net.CIDRMask(24, 32)},
-					Headers: map[string]string{
-						"TestHeader1": "TestHeaderValue1",
-						"TestHeader2": "TestHeaderValue2",
-						"TestHeader3": "TestHeaderValue3",
-						"TestHeader4": "TestHeaderValue4",
+					Headers: HTTPHeaders{
+						{Name: "TestHeader1", Value: "TestHeaderValue1"},
+						{Name: "TestHeader2", Value: "TestHeaderValue2"},
+						{Name: "TestHeader3", Value: "TestHeaderValue3"},
+						{Name: "TestHeader4", Value: "TestHeaderValue4"},
 					},
 				},
 				{
 					IPNet: net.IPNet{IP: net.ParseIP("fe80::"), Mask: net.CIDRMask(64, 128)},
-					Headers: map[string]string{
-						"TestHeader5": "TestHeaderValue5",
+					Headers: HTTPHeaders{
+						{Name: "TestHeader5", Value: "TestHeaderValue5"},
 					},
 				},
 			},
 		},
 		{
-			name: "wrong format",
+			name: "wrongFormat",
 			args: args{
 				ctx: ctx,
 				m: map[string]HTTPHeaders{
 					"192.168.0.v": {
-						"TestHeader1": "TestHeaderValue1",
-						"TestHeader2": "TestHeaderValue2",
-						"TestHeader3": "TestHeaderValue3",
-						"TestHeader4": "TestHeaderValue4",
+						{Name: "TestHeader1", Value: "TestHeaderValue1"},
+						{Name: "TestHeader2", Value: "TestHeaderValue2"},
+						{Name: "TestHeader3", Value: "TestHeaderValue3"},
+						{Name: "TestHeader4", Value: "TestHeaderValue4"},
 					},
 					"fe80:0000:0000:0000::/64": {
-						"TestHeader5": "TestHeaderValue5",
+						{Name: "TestHeader5", Value: "TestHeaderValue5"},
 					},
 				},
 			},

@@ -178,7 +178,11 @@ func (h DirectorSetHeaders) Director(request *http.Request) error {
 	return nil
 }
 
-type HTTPHeaders map[string]string
+type HTTPHeader struct {
+	Name  string
+	Value string
+}
+type HTTPHeaders []HTTPHeader
 type NetHeaders struct {
 	IPNet   net.IPNet
 	Headers HTTPHeaders
@@ -224,8 +228,8 @@ func (h DirectorSetHeadersByIP) Director(request *http.Request) error {
 			request.Header = make(http.Header)
 		}
 
-		for name, value := range ipHeaders.Headers {
-			request.Header.Set(name, value)
+		for _, header := range ipHeaders.Headers {
+			request.Header.Set(header.Name, header.Value)
 		}
 	}
 

@@ -309,7 +309,7 @@ func TestConfig_getHeadersByIPDirector(t *testing.T) {
 			want: nil,
 		},
 		{
-			name: "1 network",
+			name: "oneNetwork",
 			c: Config{
 				HeadersByIP: []string{
 					"IPNET=192.168.1.0/24",
@@ -321,16 +321,16 @@ func TestConfig_getHeadersByIPDirector(t *testing.T) {
 			want: DirectorSetHeadersByIP{
 				NetHeaders{
 					IPNet: net.IPNet{IP: net.ParseIP("192.168.1.0"), Mask: net.CIDRMask(24, 32)},
-					Headers: map[string]string{
-						"User-Agent":      "PostmanRuntime/7.29.2",
-						"Accept":          "*/*",
-						"Accept-Encoding": "gzip, deflate, br",
+					Headers: HTTPHeaders{
+						{Name: "User-Agent", Value: "PostmanRuntime/7.29.2"},
+						{Name: "Accept", Value: "*/*"},
+						{Name: "Accept-Encoding", Value: "gzip, deflate, br"},
 					},
 				},
 			},
 		},
 		{
-			name: "config error 1",
+			name: "configError1",
 			c: Config{
 				HeadersByIP: []string{
 					"IPNET192.168.1.0/24",
@@ -343,7 +343,7 @@ func TestConfig_getHeadersByIPDirector(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "config error 2",
+			name: "configError2",
 			c: Config{
 				HeadersByIP: []string{
 					"User-Agent:PostmanRuntime/7.29.2",
@@ -355,7 +355,7 @@ func TestConfig_getHeadersByIPDirector(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "5 networks",
+			name: "5Networks",
 			c: Config{
 				HeadersByIP: []string{
 					"IPNET=192.168.1.0/24",
@@ -386,41 +386,41 @@ func TestConfig_getHeadersByIPDirector(t *testing.T) {
 			want: DirectorSetHeadersByIP{
 				NetHeaders{
 					IPNet: net.IPNet{IP: net.ParseIP("192.168.1.0"), Mask: net.CIDRMask(24, 32)},
-					Headers: map[string]string{
-						"User-Agent":      "PostmanRuntime/7.29.2",
-						"Accept":          "*/*",
-						"Accept-Encoding": "gzip, deflate, br",
+					Headers: HTTPHeaders{
+						{Name: "User-Agent", Value: "PostmanRuntime/7.29.2"},
+						{Name: "Accept", Value: "*/*"},
+						{Name: "Accept-Encoding", Value: "gzip, deflate, br"},
 					},
 				},
 				NetHeaders{
 					IPNet: net.IPNet{IP: net.ParseIP("172.16.33.0"), Mask: net.CIDRMask(24, 32)},
-					Headers: map[string]string{
-						"Connection":                "Keep-Alive",
-						"Upgrade-Insecure-Requests": "1",
-						"Cache-Control":             "no-cache",
+					Headers: HTTPHeaders{
+						{Name: "Connection", Value: "Keep-Alive"},
+						{Name: "Upgrade-Insecure-Requests", Value: "1"},
+						{Name: "Cache-Control", Value: "no-cache"},
 					},
 				},
 				NetHeaders{
 					IPNet: net.IPNet{IP: net.ParseIP("172.16.99.0"), Mask: net.CIDRMask(24, 32)},
-					Headers: map[string]string{
-						"Origin":         "https://example.com",
-						"Content-Type":   "application/json",
-						"Content-Length": "123",
+					Headers: HTTPHeaders{
+						{Name: "Origin", Value: "https://example.com"},
+						{Name: "Content-Type", Value: "application/json"},
+						{Name: "Content-Length", Value: "123"},
 					},
 				},
 				NetHeaders{
 					IPNet: net.IPNet{IP: net.ParseIP("192.168.32.0"), Mask: net.CIDRMask(24, 32)},
-					Headers: map[string]string{
-						"Accept-Encoding": "gzip, deflate, br",
-						"Accept-Language": "en-US,en;q=0.9",
+					Headers: HTTPHeaders{
+						{Name: "Accept-Encoding", Value: "gzip, deflate, br"},
+						{Name: "Accept-Language", Value: "en-US,en;q=0.9"},
 					},
 				},
 				NetHeaders{
 					IPNet: net.IPNet{IP: net.ParseIP("fe80:0000:0000:0000::"), Mask: net.CIDRMask(64, 128)},
-					Headers: map[string]string{
-						"Accept":          "*/*",
-						"Accept-Encoding": "gzip, deflate, br",
-						"Accept-Language": "en-US,en;q=0.9",
+					Headers: HTTPHeaders{
+						{Name: "Accept", Value: "*/*"},
+						{Name: "Accept-Encoding", Value: "gzip, deflate, br"},
+						{Name: "Accept-Language", Value: "en-US,en;q=0.9"},
 					},
 				},
 			},
@@ -443,12 +443,11 @@ func TestConfig_getHeadersByIPDirector(t *testing.T) {
 					if netHeaders.Headers == nil {
 						continue
 					}
-					headersMap := (map[string]string)(netHeaders.Headers)
 					if _, ok := mp[netHeaders.IPNet.String()]; !ok {
 						mp[netHeaders.IPNet.String()] = make(map[string]string)
 					}
-					for h, val := range headersMap {
-						mp[netHeaders.IPNet.String()][h] = val
+					for _, header := range netHeaders.Headers {
+						mp[netHeaders.IPNet.String()][header.Name] = header.Value
 					}
 				}
 

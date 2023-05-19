@@ -218,10 +218,13 @@ func (c *Config) getHeadersByIPDirector(ctx context.Context) (Director, error) {
 		value := lineParts[1]
 
 		if m[ipNet] == nil {
-			m[ipNet] = make(HTTPHeaders)
+			m[ipNet] = make(HTTPHeaders, 0)
 		}
 
-		m[ipNet][name] = value
+		m[ipNet] = append(m[ipNet], HTTPHeader{
+			Name:  name,
+			Value: value,
+		})
 	}
 
 	logger.Info("Create headers by ip director", zap.Any("headers", m))
