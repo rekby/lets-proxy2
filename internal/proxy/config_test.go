@@ -311,11 +311,12 @@ func TestConfig_getHeadersByIPDirector(t *testing.T) {
 		{
 			name: "oneNetwork",
 			c: Config{
-				HeadersByIP: []string{
-					"IPNET=192.168.1.0/24",
-					"User-Agent:PostmanRuntime/7.29.2",
-					"Accept:*/*",
-					"Accept-Encoding:gzip, deflate, br",
+				HeadersByIP: map[string][]string{
+					"192.168.1.0/24": {
+						"User-Agent:PostmanRuntime/7.29.2",
+						"Accept:*/*",
+						"Accept-Encoding:gzip, deflate, br",
+					},
 				},
 			},
 			want: DirectorSetHeadersByIP{
@@ -332,23 +333,12 @@ func TestConfig_getHeadersByIPDirector(t *testing.T) {
 		{
 			name: "configError1",
 			c: Config{
-				HeadersByIP: []string{
-					"IPNET192.168.1.0/24",
-					"User-Agent:PostmanRuntime/7.29.2",
-					"Accept:*/*",
-					"Accept-Encoding:gzip, deflate, br",
-				},
-			},
-			want:    DirectorSetHeadersByIP{},
-			wantErr: true,
-		},
-		{
-			name: "configError2",
-			c: Config{
-				HeadersByIP: []string{
-					"User-Agent:PostmanRuntime/7.29.2",
-					"Accept:*/*",
-					"Accept-Encoding:gzip, deflate, br",
+				HeadersByIP: map[string][]string{
+					"192.168.1.0/24": {
+						"User-AgentPostmanRuntime/7.29.2",
+						"Accept:*/*",
+						"Accept-Encoding:gzip, deflate, br",
+					},
 				},
 			},
 			want:    DirectorSetHeadersByIP{},
@@ -357,30 +347,32 @@ func TestConfig_getHeadersByIPDirector(t *testing.T) {
 		{
 			name: "5Networks",
 			c: Config{
-				HeadersByIP: []string{
-					"IPNET=192.168.1.0/24",
-					"User-Agent:PostmanRuntime/7.29.2",
-					"Accept:*/*",
-					"Accept-Encoding:gzip, deflate, br",
+				HeadersByIP: map[string][]string{
+					"192.168.1.0/24": {
+						"User-Agent:PostmanRuntime/7.29.2",
+						"Accept:*/*",
+						"Accept-Encoding:gzip, deflate, br",
+					},
+					"172.16.33.0/24": {
+						"Connection:Keep-Alive",
+						"Upgrade-Insecure-Requests:1",
+						"Cache-Control:no-cache",
+					},
+					"172.16.99.0/24": {
+						"Origin:https://example.com",
+						"Content-Type:application/json",
+						"Content-Length:123",
+					},
 
-					"IPNET=172.16.33.0/24",
-					"Connection:Keep-Alive",
-					"Upgrade-Insecure-Requests:1",
-					"Cache-Control:no-cache",
-
-					"IPNET=172.16.99.0/24",
-					"Origin:https://example.com",
-					"Content-Type:application/json",
-					"Content-Length:123",
-
-					"IPNET=192.168.32.0/24",
-					"Accept-Encoding:gzip, deflate, br",
-					"Accept-Language:en-US,en;q=0.9",
-
-					"IPNET=fe80:0000:0000:0000::/64",
-					"Accept:*/*",
-					"Accept-Encoding:gzip, deflate, br",
-					"Accept-Language:en-US,en;q=0.9",
+					"192.168.32.0/24": {
+						"Accept-Encoding:gzip, deflate, br",
+						"Accept-Language:en-US,en;q=0.9",
+					},
+					"fe80:0000:0000:0000::/64": {
+						"Accept:*/*",
+						"Accept-Encoding:gzip, deflate, br",
+						"Accept-Language:en-US,en;q=0.9",
+					},
 				},
 			},
 			want: DirectorSetHeadersByIP{
@@ -464,7 +456,9 @@ func TestConfig_getHeadersByIPDirector(t *testing.T) {
 			} else {
 				gotMap := getMapDir(gotDir)
 				wantMap := getMapDir(tt.want)
-				td.CmpDeeply(gotMap, wantMap)
+				if !td.CmpDeeply(gotMap, wantMap) {
+					t.Fatalf("getHeadersByIPDirector() got = %v, want %v", gotMap, wantMap)
+				}
 			}
 		})
 	}
