@@ -104,14 +104,13 @@ Headers = [ "X-Forwarded-Proto:{{HTTP_PROTO}}", "X-Forwarded-For:{{SOURCE_IP}}" 
 # Array of colon separated HeaderName:HeaderValue with leading IPNET=IP/Mask constraint for add to request
 # with matching ip address for backend.
 # Example:
-# [Proxy.HTTPHeaders]
+# [Proxy.HeadersByIP]
 #"192.168.0.0/24" = ["IPLocal:Test"]
 #"192.168.2.0/24" = [
 #   "IPLocal:Test2",
 #   "Local:False"
 # ]
-[Proxy.HTTPHeaders]
-"127.0.0.0/24" = []
+[Proxy.HeadersByIP]
 
 # Use https requests to backend instead of http
 HTTPSBackend = false
