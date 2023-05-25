@@ -101,8 +101,8 @@ TargetMap = []
 # ["IP:{{SOURCE_IP}}", "Proxy:lets-proxy", "Protocol:{{HTTP_PROTO}}" ]
 Headers = [ "X-Forwarded-Proto:{{HTTP_PROTO}}", "X-Forwarded-For:{{SOURCE_IP}}" ]
 
-# Array of colon separated HeaderName:HeaderValue with leading IPNET=IP/Mask constraint for add to request
-# with matching ip address for backend.
+# A map with an IP key/mask and a value with an array of strings separated by a colon Header:Header Value
+# to add to a request with matching ip address for backend.
 # Example:
 # [Proxy.HeadersByIP]
 #"192.168.0.0/24" = ["IPLocal:Test"]
@@ -111,6 +111,7 @@ Headers = [ "X-Forwarded-Proto:{{HTTP_PROTO}}", "X-Forwarded-For:{{SOURCE_IP}}" 
 #   "Local:False"
 # ]
 [Proxy.HeadersByIP]
+"127.0.0.0/24" = []
 
 # Use https requests to backend instead of http
 HTTPSBackend = false
