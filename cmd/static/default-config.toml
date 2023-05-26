@@ -111,7 +111,6 @@ Headers = [ "X-Forwarded-Proto:{{HTTP_PROTO}}", "X-Forwarded-For:{{SOURCE_IP}}" 
 #   "IPLocal:Test2",
 #   "Local:False"
 # ]
-# [Proxy.HeadersByIP]
 
 # Use https requests to backend instead of http
 HTTPSBackend = false

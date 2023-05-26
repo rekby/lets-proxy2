@@ -386,12 +386,12 @@ func Test_sortByIPNet(t *testing.T) {
 				},
 			},
 			want: DirectorSetHeadersByIP{
+				{IPNet: net.IPNet{IP: net.ParseIP("172.0.0.0"), Mask: net.CIDRMask(8, 32)}},
 				{IPNet: net.IPNet{IP: net.ParseIP("192.0.0.0"), Mask: net.CIDRMask(8, 32)}},
+				{IPNet: net.IPNet{IP: net.ParseIP("172.16.0.0"), Mask: net.CIDRMask(16, 32)}},
 				{IPNet: net.IPNet{IP: net.ParseIP("192.168.0.0"), Mask: net.CIDRMask(16, 32)}},
 				{IPNet: net.IPNet{IP: net.ParseIP("192.168.88.0"), Mask: net.CIDRMask(24, 32)}},
 				{IPNet: net.IPNet{IP: net.ParseIP("192.168.99.0"), Mask: net.CIDRMask(24, 32)}},
-				{IPNet: net.IPNet{IP: net.ParseIP("172.0.0.0"), Mask: net.CIDRMask(8, 32)}},
-				{IPNet: net.IPNet{IP: net.ParseIP("172.16.0.0"), Mask: net.CIDRMask(16, 32)}},
 			},
 		},
 		{
@@ -432,8 +432,8 @@ func Test_sortByIPNet(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := sortByIPNet(tt.args.d)
-			if !td.CmpDeeply(got, tt.want) {
+			sortByIPNet(tt.args.d)
+			if !td.CmpDeeply(tt.args.d, tt.want) {
 				t.Errorf("sortByIPNet() = %v, want %v", tt.args.d, tt.want)
 			}
 		})
