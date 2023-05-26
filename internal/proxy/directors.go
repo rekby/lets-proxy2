@@ -1,9 +1,12 @@
 package proxy
 
 import (
+	"bytes"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 
 	"github.com/rekby/lets-proxy2/internal/contextlabel"
@@ -174,6 +177,89 @@ func (h DirectorSetHeaders) Director(request *http.Request) error {
 
 		request.Header.Set(name, value)
 	}
+	return nil
+}
+
+type HTTPHeader struct {
+	Name  string
+	Value string
+}
+type HTTPHeaders []HTTPHeader
+type NetHeaders struct {
+	IPNet   net.IPNet
+	Headers HTTPHeaders
+}
+type DirectorSetHeadersByIP []NetHeaders
+
+func NewDirectorSetHeadersByIP(m map[string]HTTPHeaders) (DirectorSetHeadersByIP, error) {
+	res := make(DirectorSetHeadersByIP, 0, len(m))
+	for k, v := range m {
+		_, subnet, err := net.ParseCIDR(k)
+		if err != nil {
+			return nil, fmt.Errorf("can't parse CIDR: %v %w", k, err)
+		}
+
+		res = append(res, NetHeaders{
+			IPNet:   *subnet,
+			Headers: v,
+		})
+	}
+	sortByIPNet(res)
+	return res, nil
+}
+
+func sortByIPNet(d DirectorSetHeadersByIP) {
+	sort.Slice(d, func(i, j int) bool {
+		left, right := d[i], d[j]
+
+		maskOnes := func(m net.IPMask) int {
+			ones, _ := m.Size()
+			return ones
+		}
+
+		switch {
+		case len(left.IPNet.IP) < len(right.IPNet.IP):
+			return true
+		case len(left.IPNet.IP) > len(right.IPNet.IP):
+			return false
+		case maskOnes(left.IPNet.Mask) < maskOnes(right.IPNet.Mask):
+			return true
+		case maskOnes(left.IPNet.Mask) > maskOnes(right.IPNet.Mask):
+			return false
+		default:
+			return bytes.Compare(left.IPNet.IP, right.IPNet.IP) < 0
+		}
+	})
+}
+
+func (h DirectorSetHeadersByIP) Director(request *http.Request) error {
+	if request == nil {
+		return fmt.Errorf("request is nil")
+	}
+
+	ctx := request.Context()
+	host, port, err := net.SplitHostPort(request.RemoteAddr)
+	if err != nil {
+		zc.L(ctx).Debug("Split host port error", zap.Error(err), zap.String("host", host),
+			zap.String("port", port))
+	}
+
+	ip := net.ParseIP(host)
+
+	for _, ipHeaders := range h {
+		if !ipHeaders.IPNet.Contains(ip) {
+			continue
+		}
+
+		if request.Header == nil {
+			request.Header = make(http.Header)
+		}
+
+		for _, header := range ipHeaders.Headers {
+			request.Header.Set(header.Name, header.Value)
+		}
+	}
+
 	return nil
 }
 

@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"net"
 	"testing"
 
 	"github.com/rekby/lets-proxy2/internal/th"
@@ -289,4 +290,176 @@ func TestConfig_Apply(t *testing.T) {
 	_ = c.Apply(ctx, p)
 	transport = p.HTTPTransport.(Transport)
 	transport.IgnoreHTTPSCertificate = true
+}
+
+func TestConfig_getHeadersByIPDirector(t *testing.T) {
+	ctx, flush := th.TestContext(t)
+	defer flush()
+	td := testdeep.NewT(t)
+
+	tests := []struct {
+		name    string
+		c       Config
+		want    DirectorSetHeadersByIP
+		wantErr bool
+	}{
+		{
+			name: "empty",
+			c:    Config{},
+			want: nil,
+		},
+		{
+			name: "oneNetwork",
+			c: Config{
+				HeadersByIP: map[string][]string{
+					"192.168.1.0/24": {
+						"User-Agent:PostmanRuntime/7.29.2",
+						"Accept:*/*",
+						"Accept-Encoding:gzip, deflate, br",
+					},
+				},
+			},
+			want: DirectorSetHeadersByIP{
+				NetHeaders{
+					IPNet: net.IPNet{IP: net.ParseIP("192.168.1.0"), Mask: net.CIDRMask(24, 32)},
+					Headers: HTTPHeaders{
+						{Name: "User-Agent", Value: "PostmanRuntime/7.29.2"},
+						{Name: "Accept", Value: "*/*"},
+						{Name: "Accept-Encoding", Value: "gzip, deflate, br"},
+					},
+				},
+			},
+		},
+		{
+			name: "configError1",
+			c: Config{
+				HeadersByIP: map[string][]string{
+					"192.168.1.0/24": {
+						"User-AgentPostmanRuntime/7.29.2",
+						"Accept:*/*",
+						"Accept-Encoding:gzip, deflate, br",
+					},
+				},
+			},
+			want:    DirectorSetHeadersByIP{},
+			wantErr: true,
+		},
+		{
+			name: "5Networks",
+			c: Config{
+				HeadersByIP: map[string][]string{
+					"10.0.0.0/8": {
+						"User-Agent:PostmanRuntime/7.29.2",
+						"Accept:*/*",
+						"Accept-Encoding:gzip, deflate, br",
+					},
+					"10.0.0.0/24": {
+						"Connection:Keep-Alive",
+						"Upgrade-Insecure-Requests:1",
+						"Cache-Control:no-cache",
+					},
+					"10.0.1.0/24": {
+						"Origin:https://example.com",
+						"Content-Type:application/json",
+						"Content-Length:123",
+					},
+
+					"10.2.0.0/24": {
+						"Accept-Encoding:gzip, deflate, br",
+						"Accept-Language:en-US,en;q=0.9",
+					},
+					"fe80:0000:0000:0000::/64": {
+						"Accept:*/*",
+						"Accept-Encoding:gzip, deflate, br",
+						"Accept-Language:en-US,en;q=0.9",
+					},
+				},
+			},
+			want: DirectorSetHeadersByIP{
+				NetHeaders{
+					IPNet: net.IPNet{IP: net.ParseIP("10.0.0.0"), Mask: net.CIDRMask(8, 32)},
+					Headers: HTTPHeaders{
+						{Name: "User-Agent", Value: "PostmanRuntime/7.29.2"},
+						{Name: "Accept", Value: "*/*"},
+						{Name: "Accept-Encoding", Value: "gzip, deflate, br"},
+					},
+				},
+				NetHeaders{
+					IPNet: net.IPNet{IP: net.ParseIP("10.0.0.0"), Mask: net.CIDRMask(24, 32)},
+					Headers: HTTPHeaders{
+						{Name: "Connection", Value: "Keep-Alive"},
+						{Name: "Upgrade-Insecure-Requests", Value: "1"},
+						{Name: "Cache-Control", Value: "no-cache"},
+					},
+				},
+				NetHeaders{
+					IPNet: net.IPNet{IP: net.ParseIP("10.0.1.0"), Mask: net.CIDRMask(24, 32)},
+					Headers: HTTPHeaders{
+						{Name: "Origin", Value: "https://example.com"},
+						{Name: "Content-Type", Value: "application/json"},
+						{Name: "Content-Length", Value: "123"},
+					},
+				},
+				NetHeaders{
+					IPNet: net.IPNet{IP: net.ParseIP("10.2.0.0"), Mask: net.CIDRMask(24, 32)},
+					Headers: HTTPHeaders{
+						{Name: "Accept-Encoding", Value: "gzip, deflate, br"},
+						{Name: "Accept-Language", Value: "en-US,en;q=0.9"},
+					},
+				},
+				NetHeaders{
+					IPNet: net.IPNet{IP: net.ParseIP("fe80:0000:0000:0000::"), Mask: net.CIDRMask(64, 128)},
+					Headers: HTTPHeaders{
+						{Name: "Accept", Value: "*/*"},
+						{Name: "Accept-Encoding", Value: "gzip, deflate, br"},
+						{Name: "Accept-Language", Value: "en-US,en;q=0.9"},
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.c.getHeadersByIPDirector(ctx)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("getHeadersByIPDirector() error = %v, wantErr %v", err, tt.wantErr)
+			}
+
+			if tt.wantErr {
+				return
+			}
+
+			getMapDir := func(d DirectorSetHeadersByIP) map[string]map[string]string {
+				var mp = make(map[string]map[string]string)
+				for _, netHeaders := range d {
+					if netHeaders.Headers == nil {
+						continue
+					}
+					if _, ok := mp[netHeaders.IPNet.String()]; !ok {
+						mp[netHeaders.IPNet.String()] = make(map[string]string)
+					}
+					for _, header := range netHeaders.Headers {
+						mp[netHeaders.IPNet.String()][header.Name] = header.Value
+					}
+				}
+
+				t.Logf("getMapDir() got = %v", mp)
+				return mp
+			}
+
+			if got == nil && tt.want == nil {
+				return
+			}
+
+			if gotDir, ok := got.(DirectorSetHeadersByIP); !ok {
+				t.Fatalf("can't lead to the type %v", got)
+			} else {
+				gotMap := getMapDir(gotDir)
+				wantMap := getMapDir(tt.want)
+				if !td.CmpDeeply(gotMap, wantMap) {
+					t.Fatalf("getHeadersByIPDirector() got = %v, want %v", gotMap, wantMap)
+				}
+			}
+		})
+	}
 }

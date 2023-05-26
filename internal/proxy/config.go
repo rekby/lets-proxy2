@@ -17,11 +17,17 @@ import (
 
 const defaultHTTPPort = 80
 
+type IPHeaders struct {
+	Headers map[string]string
+	IP      string
+}
+
 //nolint:lll
 type Config struct {
 	DefaultTarget           string
 	TargetMap               []string
 	Headers                 []string
+	HeadersByIP             map[string][]string
 	KeepAliveTimeoutSeconds int
 	HTTPSBackend            bool
 	HTTPSBackendIgnoreCert  bool
@@ -57,6 +63,7 @@ func (c *Config) Apply(ctx context.Context, p *HTTPProxy) error {
 	appendDirector(c.getMapDirector)
 	appendDirector(c.getHeadersDirector)
 	appendDirector(c.getSchemaDirector)
+	appendDirector(c.getHeadersByIPDirector)
 	p.HTTPTransport = Transport{
 		IgnoreHTTPSCertificate: c.HTTPSBackendIgnoreCert,
 		RateLimiter:            rateLimiter,
@@ -155,6 +162,83 @@ func (c *Config) getSchemaDirector(ctx context.Context) (Director, error) {
 		return NewSetSchemeDirector(ProtocolHTTPS), nil
 	}
 	return NewSetSchemeDirector(ProtocolHTTP), nil
+}
+
+// getHeadersByIPDirector transform array to DirectorSetHeadersByIP
+// can return nil,nil
+// example:
+//
+// [Proxy.HeadersByIP]
+// "192.168.1.0/24" = [
+//
+//		"User-Agent:PostmanRuntime/7.29.2",
+//		"Accept:*/*",
+//		"Accept-Encoding:gzip, deflate, br",
+//	]
+//	"192.168.132.0/30" = [
+//		"Accept-Encoding:gzip",
+//
+// ]
+//
+// out:
+//
+//	DirectorSetHeadersByIP {
+//		HTTPHeader{
+//			IPNet: 192.168.1.0/24,
+//			Headers: []HTTPHeader{
+//				HTTPHeader{
+//					Name: "User-Agent",
+//					Value: "PostmanRuntime/7.29.2",
+//				},
+//				HTTPHeader{
+//					Name: "Accept": "*/*",
+//					Value: "Accept-Encoding": "gzip, deflate, br",
+//				},
+//			},
+//		},
+//		HTTPHeader{
+//	    	IPNet:  192.168.132.0/30,
+//			Headers: []HTTPHeader{
+//				HTTPHeader{
+//					Name: "Accept-Encoding",
+//					Value: "gzip",
+//				},
+//			},
+//		},
+//	}
+func (c *Config) getHeadersByIPDirector(ctx context.Context) (Director, error) {
+	logger := zc.L(ctx)
+
+	if len(c.HeadersByIP) == 0 {
+		return nil, nil
+	}
+
+	m := make(map[string]HTTPHeaders)
+	for ipNet, headers := range c.HeadersByIP {
+		ipNet = strings.TrimSpace(ipNet)
+		for _, header := range headers {
+			lineParts := strings.SplitN(header, ":", 2)
+			if len(lineParts) < 2 {
+				logger.Error("Can't split header line to parts", zap.String("line", header))
+				return nil, errors.New("can't parse headers proxy config")
+			}
+
+			name := lineParts[0]
+			value := lineParts[1]
+
+			if m[ipNet] == nil {
+				m[ipNet] = make(HTTPHeaders, 0)
+			}
+
+			m[ipNet] = append(m[ipNet], HTTPHeader{
+				Name:  name,
+				Value: value,
+			})
+		}
+	}
+
+	logger.Info("Create headers by ip director", zap.Any("headers", m))
+	return NewDirectorSetHeadersByIP(m)
 }
 
 func parseTCPMapPair(line string) (from, to string, err error) {
