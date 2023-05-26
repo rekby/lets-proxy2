@@ -168,7 +168,7 @@ func (c *Config) getSchemaDirector(ctx context.Context) (Director, error) {
 // can return nil,nil
 // example:
 //
-// [Proxy.HTTPHeaders]
+// [Proxy.HeadersByIP]
 // "192.168.1.0/24" = [
 //
 //		"User-Agent:PostmanRuntime/7.29.2",

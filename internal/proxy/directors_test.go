@@ -359,3 +359,83 @@ func TestNewDirectorSetHeadersByIP(t *testing.T) {
 		})
 	}
 }
+
+func Test_sortByIPNet(t *testing.T) {
+	_, flush := th.TestContext(t)
+	defer flush()
+	td := testdeep.NewT(t)
+
+	type args struct {
+		d DirectorSetHeadersByIP
+	}
+	tests := []struct {
+		name string
+		args args
+		want DirectorSetHeadersByIP
+	}{
+		{
+			name: "IPv4Only",
+			args: args{
+				d: DirectorSetHeadersByIP{
+					{IPNet: net.IPNet{IP: net.ParseIP("192.168.88.0"), Mask: net.CIDRMask(24, 32)}},
+					{IPNet: net.IPNet{IP: net.ParseIP("192.0.0.0"), Mask: net.CIDRMask(8, 32)}},
+					{IPNet: net.IPNet{IP: net.ParseIP("172.16.0.0"), Mask: net.CIDRMask(16, 32)}},
+					{IPNet: net.IPNet{IP: net.ParseIP("192.168.0.0"), Mask: net.CIDRMask(16, 32)}},
+					{IPNet: net.IPNet{IP: net.ParseIP("192.168.99.0"), Mask: net.CIDRMask(24, 32)}},
+					{IPNet: net.IPNet{IP: net.ParseIP("172.0.0.0"), Mask: net.CIDRMask(8, 32)}},
+				},
+			},
+			want: DirectorSetHeadersByIP{
+				{IPNet: net.IPNet{IP: net.ParseIP("192.0.0.0"), Mask: net.CIDRMask(8, 32)}},
+				{IPNet: net.IPNet{IP: net.ParseIP("192.168.0.0"), Mask: net.CIDRMask(16, 32)}},
+				{IPNet: net.IPNet{IP: net.ParseIP("192.168.88.0"), Mask: net.CIDRMask(24, 32)}},
+				{IPNet: net.IPNet{IP: net.ParseIP("192.168.99.0"), Mask: net.CIDRMask(24, 32)}},
+				{IPNet: net.IPNet{IP: net.ParseIP("172.0.0.0"), Mask: net.CIDRMask(8, 32)}},
+				{IPNet: net.IPNet{IP: net.ParseIP("172.16.0.0"), Mask: net.CIDRMask(16, 32)}},
+			},
+		},
+		{
+			name: "IPv6Only",
+			args: args{
+				d: DirectorSetHeadersByIP{
+					{IPNet: net.IPNet{IP: net.ParseIP("2001:db8:1234:5678::"), Mask: net.CIDRMask(64, 128)}},
+					{IPNet: net.IPNet{IP: net.ParseIP("2001:db8:1234::"), Mask: net.CIDRMask(48, 128)}},
+					{IPNet: net.IPNet{IP: net.ParseIP("2001:db8:1234:5678:abcd::"), Mask: net.CIDRMask(80, 128)}},
+				},
+			},
+			want: DirectorSetHeadersByIP{
+				{IPNet: net.IPNet{IP: net.ParseIP("2001:db8:1234::"), Mask: net.CIDRMask(48, 128)}},
+				{IPNet: net.IPNet{IP: net.ParseIP("2001:db8:1234:5678::"), Mask: net.CIDRMask(64, 128)}},
+				{IPNet: net.IPNet{IP: net.ParseIP("2001:db8:1234:5678:abcd::"), Mask: net.CIDRMask(80, 128)}},
+			},
+		},
+
+		{
+			name: "IPv6AndIPv4",
+			args: args{
+				d: DirectorSetHeadersByIP{
+					{IPNet: net.IPNet{IP: net.ParseIP("2001:db8:1234:5678:abcd::"), Mask: net.CIDRMask(80, 128)}},
+					{IPNet: net.IPNet{IP: net.ParseIP("192.168.88.0"), Mask: net.CIDRMask(24, 32)}},
+					{IPNet: net.IPNet{IP: net.ParseIP("192.0.0.0"), Mask: net.CIDRMask(8, 32)}},
+					{IPNet: net.IPNet{IP: net.ParseIP("192.168.0.0"), Mask: net.CIDRMask(16, 32)}},
+					{IPNet: net.IPNet{IP: net.ParseIP("2001:db8:1234:5678::"), Mask: net.CIDRMask(64, 128)}},
+				},
+			},
+			want: DirectorSetHeadersByIP{
+				{IPNet: net.IPNet{IP: net.ParseIP("192.0.0.0"), Mask: net.CIDRMask(8, 32)}},
+				{IPNet: net.IPNet{IP: net.ParseIP("192.168.0.0"), Mask: net.CIDRMask(16, 32)}},
+				{IPNet: net.IPNet{IP: net.ParseIP("192.168.88.0"), Mask: net.CIDRMask(24, 32)}},
+				{IPNet: net.IPNet{IP: net.ParseIP("2001:db8:1234:5678::"), Mask: net.CIDRMask(64, 128)}},
+				{IPNet: net.IPNet{IP: net.ParseIP("2001:db8:1234:5678:abcd::"), Mask: net.CIDRMask(80, 128)}},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := sortByIPNet(tt.args.d)
+			if !td.CmpDeeply(got, tt.want) {
+				t.Errorf("sortByIPNet() = %v, want %v", tt.args.d, tt.want)
+			}
+		})
+	}
+}

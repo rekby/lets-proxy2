@@ -348,23 +348,23 @@ func TestConfig_getHeadersByIPDirector(t *testing.T) {
 			name: "5Networks",
 			c: Config{
 				HeadersByIP: map[string][]string{
-					"192.168.1.0/24": {
+					"10.0.0.0/8": {
 						"User-Agent:PostmanRuntime/7.29.2",
 						"Accept:*/*",
 						"Accept-Encoding:gzip, deflate, br",
 					},
-					"172.16.33.0/24": {
+					"10.0.0.0/24": {
 						"Connection:Keep-Alive",
 						"Upgrade-Insecure-Requests:1",
 						"Cache-Control:no-cache",
 					},
-					"172.16.99.0/24": {
+					"10.0.1.0/24": {
 						"Origin:https://example.com",
 						"Content-Type:application/json",
 						"Content-Length:123",
 					},
 
-					"192.168.32.0/24": {
+					"10.2.0.0/24": {
 						"Accept-Encoding:gzip, deflate, br",
 						"Accept-Language:en-US,en;q=0.9",
 					},
@@ -377,7 +377,7 @@ func TestConfig_getHeadersByIPDirector(t *testing.T) {
 			},
 			want: DirectorSetHeadersByIP{
 				NetHeaders{
-					IPNet: net.IPNet{IP: net.ParseIP("192.168.1.0"), Mask: net.CIDRMask(24, 32)},
+					IPNet: net.IPNet{IP: net.ParseIP("10.0.0.0"), Mask: net.CIDRMask(8, 32)},
 					Headers: HTTPHeaders{
 						{Name: "User-Agent", Value: "PostmanRuntime/7.29.2"},
 						{Name: "Accept", Value: "*/*"},
@@ -385,7 +385,7 @@ func TestConfig_getHeadersByIPDirector(t *testing.T) {
 					},
 				},
 				NetHeaders{
-					IPNet: net.IPNet{IP: net.ParseIP("172.16.33.0"), Mask: net.CIDRMask(24, 32)},
+					IPNet: net.IPNet{IP: net.ParseIP("10.0.0.0"), Mask: net.CIDRMask(24, 32)},
 					Headers: HTTPHeaders{
 						{Name: "Connection", Value: "Keep-Alive"},
 						{Name: "Upgrade-Insecure-Requests", Value: "1"},
@@ -393,7 +393,7 @@ func TestConfig_getHeadersByIPDirector(t *testing.T) {
 					},
 				},
 				NetHeaders{
-					IPNet: net.IPNet{IP: net.ParseIP("172.16.99.0"), Mask: net.CIDRMask(24, 32)},
+					IPNet: net.IPNet{IP: net.ParseIP("10.0.1.0"), Mask: net.CIDRMask(24, 32)},
 					Headers: HTTPHeaders{
 						{Name: "Origin", Value: "https://example.com"},
 						{Name: "Content-Type", Value: "application/json"},
@@ -401,7 +401,7 @@ func TestConfig_getHeadersByIPDirector(t *testing.T) {
 					},
 				},
 				NetHeaders{
-					IPNet: net.IPNet{IP: net.ParseIP("192.168.32.0"), Mask: net.CIDRMask(24, 32)},
+					IPNet: net.IPNet{IP: net.ParseIP("10.2.0.0"), Mask: net.CIDRMask(24, 32)},
 					Headers: HTTPHeaders{
 						{Name: "Accept-Encoding", Value: "gzip, deflate, br"},
 						{Name: "Accept-Language", Value: "en-US,en;q=0.9"},

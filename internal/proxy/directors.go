@@ -202,7 +202,90 @@ func NewDirectorSetHeadersByIP(m map[string]HTTPHeaders) (DirectorSetHeadersByIP
 			Headers: v,
 		})
 	}
-	return res, nil
+
+	return sortByIPNet(res), nil
+}
+
+// sortByIPNet sorts by CIDR using quicksort algorithm.
+func sortByIPNet(d DirectorSetHeadersByIP) DirectorSetHeadersByIP {
+	ipv4 := make(DirectorSetHeadersByIP, 0, len(d))
+	ipv6 := make(DirectorSetHeadersByIP, 0, len(d))
+	for _, item := range d {
+		if item.IPNet.IP.To4() != nil {
+			ipv4 = append(ipv4, item)
+		} else {
+			ipv6 = append(ipv6, item)
+		}
+	}
+
+	ipv4 = quickSortByIPNet(ipv4)
+	ipv6 = quickSortByIPNet(ipv6)
+
+	return append(ipv4, ipv6...)
+}
+
+// quickSortByIPNet sorts by CIDR using quicksort algorithm.
+// The result is sorted by IPNet.
+// example:
+//
+//	IN -> DirectorSetHeadersByIP{
+//				{IPNet: net.IPNet{IP: net.ParseIP("192.168.88.0"), Mask: net.CIDRMask(24, 32)}},
+//				{IPNet: net.IPNet{IP: net.ParseIP("192.0.0.0"), Mask: net.CIDRMask(8, 32)}},
+//				{IPNet: net.IPNet{IP: net.ParseIP("172.16.0.0"), Mask: net.CIDRMask(16, 32)}},
+//				{IPNet: net.IPNet{IP: net.ParseIP("192.168.0.0"), Mask: net.CIDRMask(16, 32)}},
+//				{IPNet: net.IPNet{IP: net.ParseIP("192.168.99.0"), Mask: net.CIDRMask(24, 32)}},
+//				{IPNet: net.IPNet{IP: net.ParseIP("172.0.0.0"), Mask: net.CIDRMask(8, 32)}},
+//			},
+//
+//	OUT <- DirectorSetHeadersByIP{
+//				{IPNet: net.IPNet{IP: net.ParseIP("192.0.0.0"), Mask: net.CIDRMask(8, 32)}},
+//				{IPNet: net.IPNet{IP: net.ParseIP("192.168.0.0"), Mask: net.CIDRMask(16, 32)}},
+//				{IPNet: net.IPNet{IP: net.ParseIP("192.168.88.0"), Mask: net.CIDRMask(24, 32)}},
+//				{IPNet: net.IPNet{IP: net.ParseIP("192.168.99.0"), Mask: net.CIDRMask(24, 32)}},
+//				{IPNet: net.IPNet{IP: net.ParseIP("172.0.0.0"), Mask: net.CIDRMask(8, 32)}},
+//				{IPNet: net.IPNet{IP: net.ParseIP("172.16.0.0"), Mask: net.CIDRMask(16, 32)}},
+//			},
+func quickSortByIPNet(d DirectorSetHeadersByIP) DirectorSetHeadersByIP {
+	if len(d) <= 1 {
+		return d
+	}
+
+	mid := len(d) / 2
+	left := d[:mid]
+	right := d[mid:]
+
+	left = quickSortByIPNet(left)
+	right = quickSortByIPNet(right)
+
+	return mergeByIPNet(left, right)
+}
+
+// mergeByIPNet merges two sorted arrays with CIDRs.
+// The result is sorted by IPNet.
+func mergeByIPNet(left, right DirectorSetHeadersByIP) DirectorSetHeadersByIP {
+	res := make(DirectorSetHeadersByIP, 0, len(left)+len(right))
+	for len(left) > 0 || len(right) > 0 {
+		if len(left) > 0 && len(right) > 0 {
+			if left[0].IPNet.Contains(right[0].IPNet.IP) {
+				res = append(res, left[0])
+				left = left[1:]
+			} else if right[0].IPNet.Contains(left[0].IPNet.IP) {
+				res = append(res, right[0])
+				right = right[1:]
+			} else {
+				res = append(res, left[0], right[0])
+				left = left[1:]
+				right = right[1:]
+			}
+		} else if len(left) > 0 {
+			res = append(res, left[0])
+			left = left[1:]
+		} else if len(right) > 0 {
+			res = append(res, right[0])
+			right = right[1:]
+		}
+	}
+	return res
 }
 
 func (h DirectorSetHeadersByIP) Director(request *http.Request) error {
