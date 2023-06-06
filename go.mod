@@ -23,6 +23,7 @@ require (
 )
 
 require (
+	github.com/egorgasay/cidranger v1.0.1
 	github.com/hashicorp/golang-lru/v2 v2.0.1
 	github.com/jonboulle/clockwork v0.4.0
 	github.com/letsencrypt/pebble/v2 v2.4.0
@@ -43,6 +44,7 @@ require (
 	github.com/prometheus/common v0.34.0 // indirect
 	github.com/prometheus/procfs v0.7.3 // indirect
 	github.com/valyala/fastrand v1.1.0 // indirect
+	github.com/yl2chen/cidranger v1.0.2 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	golang.org/x/mod v0.8.0 // indirect

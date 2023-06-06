@@ -1,0 +1,10 @@
+
+# A map with an IP key/mask and a value with an array of strings separated by a colon Header:Value
+# to add to a request with matching ip address for backend.
+# Example:
+# [Proxy.HeadersByIP]
+#"192.168.0.0/24" = ["IPLocal:Test"]
+#"fe80:0000:0000:0000::/64" = [
+#   "IPLocal:Test2",
+#   "Local:False"
+# ]
