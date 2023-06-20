@@ -156,6 +156,17 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 		"fe80:0000:0000:0000::/64": {
 			{Name: "TestHeader5", Value: "TestHeaderValue5"},
 		},
+		"8.0.0.0/8": {
+			{Name: "X", Value: "1"},
+			{Name: "Y", Value: "2"},
+		},
+		"8.1.0.0/16": {
+			{Name: "X", Value: "4"},
+			{Name: "Z", Value: "3"},
+		},
+		"8.1.2.0/24": {
+			{Name: "O", Value: "443"},
+		},
 	}
 
 	td := testdeep.NewT(t)
@@ -166,6 +177,7 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 		name         string
 		args         args
 		shouldModify bool
+		want         HTTPHeaders
 		wantErr      bool
 	}{
 		{
@@ -173,12 +185,34 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 			args: args{
 				request: &http.Request{RemoteAddr: "192.168.0.19:897"},
 			},
+			want: HTTPHeaders{
+				{Name: "TestHeader1", Value: "TestHeaderValue1"},
+				{Name: "TestHeader2", Value: "TestHeaderValue2"},
+				{Name: "TestHeader3", Value: "TestHeaderValue3"},
+				{Name: "TestHeader4", Value: "TestHeaderValue4"},
+			},
+			shouldModify: true,
+		},
+		{
+			name: "okIPv4_2",
+			args: args{
+				request: &http.Request{RemoteAddr: "8.1.2.19:897"},
+			},
+			want: HTTPHeaders{
+				{Name: "O", Value: "443"},
+				{Name: "X", Value: "4"},
+				{Name: "Y", Value: "2"},
+				{Name: "Z", Value: "3"},
+			},
 			shouldModify: true,
 		},
 		{
 			name: "okIPv6",
 			args: args{
 				request: &http.Request{RemoteAddr: "[fe80::28ca:829b:2d2e:a908]:897"},
+			},
+			want: HTTPHeaders{
+				{Name: "TestHeader5", Value: "TestHeaderValue5"},
 			},
 			shouldModify: true,
 		},
@@ -238,7 +272,7 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 			}
 
 			var found bool
-			for network, headers := range m {
+			for network := range m {
 				_, cidr, err := net.ParseCIDR(network)
 				if err != nil {
 					t.Errorf("ParseCIDR: %v", err)
@@ -259,7 +293,7 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 				}
 
 				found = true
-				for _, header := range headers {
+				for _, header := range tt.want {
 					td.CmpDeeply(tt.args.request.Header.Get(header.Name), header.Value)
 				}
 			}
