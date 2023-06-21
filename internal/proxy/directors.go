@@ -2,12 +2,11 @@ package proxy
 
 import (
 	"fmt"
+	"github.com/rekby/lets-proxy2/internal/contextlabel"
 	"net"
 	"net/http"
 	"net/url"
 	"strconv"
-
-	"github.com/rekby/lets-proxy2/internal/contextlabel"
 
 	"github.com/rekby/lets-proxy2/internal/log"
 
@@ -196,11 +195,102 @@ type Net struct {
 func (n Net) Network() net.IPNet { return n.IPNet }
 
 type DirectorSetHeadersByIP struct {
+	allHeaders HeadersList
 	cidranger.Ranger[HTTPHeaders]
 }
 
+type HeadersList interface {
+	ShouldRemoveHeaderByIP(headerName string, ip net.IP) bool
+	Add(headerName string, cidr net.IPNet)
+	Len() int
+	Iter(fn func(headerName string, ip net.IP))
+}
+
+type NetHeaderName struct {
+	IPNet      net.IPNet
+	HeaderName string
+}
+
+type HeadersStorageMap map[string][]net.IPNet
+
+type HeadersStorageSlice []NetHeaderName
+
+func newHeadersStorageSlice() *HeadersStorageSlice {
+	s := make(HeadersStorageSlice, 0, 100)
+	return &s
+}
+
+func newHeadersStorageMap() *HeadersStorageMap {
+	m := make(HeadersStorageMap, 400)
+	return &m
+}
+
+func (h *HeadersStorageSlice) ShouldRemoveHeaderByIP(headerName string, ip net.IP) bool {
+	for _, netHeaders := range *h {
+		if headerName == netHeaders.HeaderName && !netHeaders.IPNet.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+func (h *HeadersStorageSlice) Add(headerName string, cidr net.IPNet) {
+	*h = append(*h, NetHeaderName{
+		IPNet:      cidr,
+		HeaderName: headerName,
+	})
+}
+
+func (h *HeadersStorageSlice) Len() int {
+	return len(*h)
+}
+
+func (h *HeadersStorageMap) Iter(fn func(headerName string, ip net.IP)) {
+	for headerName, netHeaders := range *h {
+		for _, netHeader := range netHeaders {
+			fn(headerName, netHeader.IP)
+		}
+	}
+}
+
+func (h *HeadersStorageMap) Add(headerName string, cidr net.IPNet) {
+	(*h)[headerName] = append((*h)[headerName], cidr)
+}
+
+func (h *HeadersStorageMap) ShouldRemoveHeaderByIP(headerName string, ip net.IP) bool {
+	nets, ok := (*h)[headerName]
+	if !ok {
+		return false
+	}
+
+	for _, network := range nets {
+		if network.Contains(ip) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (h *HeadersStorageMap) Len() int {
+	return len(*h)
+}
+
+func (h *HeadersStorageSlice) Iter(fn func(headerName string, ip net.IP)) {
+	for _, netHeaders := range *h {
+		fn(netHeaders.HeaderName, netHeaders.IPNet.IP)
+	}
+}
+
 func NewDirectorSetHeadersByIP(m map[string]HTTPHeaders) (DirectorSetHeadersByIP, error) {
-	ranger := cidranger.NewPCTrieRanger[HTTPHeaders]() // handle 0.0.0.0 and ipv6
+	var allHeaders HeadersList
+	if len(m) > 200 {
+		allHeaders = newHeadersStorageMap()
+	} else {
+		allHeaders = newHeadersStorageSlice()
+	}
+
+	ranger := cidranger.NewPCTrieRanger[HTTPHeaders]()
 	for k, v := range m {
 		_, subnet, err := net.ParseCIDR(k)
 		if err != nil {
@@ -211,8 +301,12 @@ func NewDirectorSetHeadersByIP(m map[string]HTTPHeaders) (DirectorSetHeadersByIP
 		if err != nil {
 			return DirectorSetHeadersByIP{}, fmt.Errorf("can't insert into cidranger %w", err)
 		}
+
+		for _, header := range v {
+			allHeaders.Add(header.Name, *subnet)
+		}
 	}
-	return DirectorSetHeadersByIP{Ranger: ranger}, nil
+	return DirectorSetHeadersByIP{Ranger: ranger, allHeaders: allHeaders}, nil
 }
 
 func (h DirectorSetHeadersByIP) Director(request *http.Request) error {
@@ -229,13 +323,28 @@ func (h DirectorSetHeadersByIP) Director(request *http.Request) error {
 
 	ip := net.ParseIP(host)
 
+	if len(request.Header) < h.allHeaders.Len() {
+		for headerName := range request.Header {
+			if h.allHeaders.ShouldRemoveHeaderByIP(headerName, ip) {
+				delete(request.Header, headerName)
+			}
+		}
+	} else {
+		h.allHeaders.Iter(func(headerName string, ip net.IP) {
+			_, ok := request.Header[headerName]
+			if ok && h.allHeaders.ShouldRemoveHeaderByIP(headerName, ip) {
+				delete(request.Header, headerName)
+			}
+		})
+	}
+
 	err = h.IterByIncomingNetworks(ip, func(network net.IPNet, value HTTPHeaders) error {
 		if request.Header == nil {
 			request.Header = make(http.Header)
 		}
 
 		for _, header := range value {
-			request.Header.Set(header.Name, header.Value)
+			request.Header[header.Name] = []string{header.Value}
 		}
 
 		return nil

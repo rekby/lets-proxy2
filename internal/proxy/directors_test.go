@@ -207,6 +207,50 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 			shouldModify: true,
 		},
 		{
+			name: "okIPv4_RemoveTestHeader1_IterOverReqHeaders",
+			args: args{
+				request: &http.Request{RemoteAddr: "8.1.2.19:897", Header: http.Header{
+					"TestHeader1": []string{""},
+					"SHOULD_KEEP": []string{"_THIS"},
+				}},
+			},
+			want: HTTPHeaders{
+				{Name: "O", Value: "443"},
+				{Name: "X", Value: "4"},
+				{Name: "Y", Value: "2"},
+				{Name: "Z", Value: "3"},
+				{Name: "SHOULD_KEEP", Value: "_THIS"},
+			},
+			shouldModify: true,
+		},
+		{
+			name: "okIPv4_RemoveTestHeader1_IterOverRules",
+			args: args{
+				request: &http.Request{RemoteAddr: "89.19.92.199:897", Header: http.Header{
+					"TestHeader1":  []string{""},
+					"TestHeader2":  []string{""},
+					"TestHeader3":  []string{""},
+					"TestHeader4":  []string{""},
+					"TestHeader5":  []string{""},
+					"SHOULD_KEEP1": []string{""},
+					"SHOULD_KEEP2": []string{""},
+					"SHOULD_KEEP3": []string{""},
+					"TestHeader6":  []string{"SHOULD_KEEP4"},
+					"SHOULD_KEEP5": []string{""},
+					"SHOULD_KEEP6": []string{""},
+				}},
+			},
+			want: HTTPHeaders{
+				{Name: "SHOULD_KEEP1", Value: ""},
+				{Name: "SHOULD_KEEP2", Value: ""},
+				{Name: "SHOULD_KEEP3", Value: ""},
+				{Name: "TestHeader6", Value: "SHOULD_KEEP4"},
+				{Name: "SHOULD_KEEP5", Value: ""},
+				{Name: "SHOULD_KEEP6", Value: ""},
+			},
+			shouldModify: true,
+		},
+		{
 			name: "okIPv6",
 			args: args{
 				request: &http.Request{RemoteAddr: "[fe80::28ca:829b:2d2e:a908]:897"},
@@ -279,22 +323,28 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 				}
 
 				split := strings.Split(tt.args.request.RemoteAddr, ":")
-				ip := tt.args.request.RemoteAddr
+				addr := tt.args.request.RemoteAddr
 
 				if len(split) > 1 {
-					ip = strings.Trim(strings.Join(split[:len(split)-1], ":"), "[]")
+					addr = strings.Trim(strings.Join(split[:len(split)-1], ":"), "[]")
 				} else if len(split) == 0 {
 					t.Errorf("Director() RemoteAddr error")
 					continue
 				}
 
-				if !cidr.Contains(net.ParseIP(ip)) {
+				ip := net.ParseIP(addr)
+
+				if (ip.To4() != nil && cidr.IP.To4() == nil) || (ip.To4() == nil && cidr.IP.To4() != nil) {
 					continue
 				}
 
 				found = true
 				for _, header := range tt.want {
-					td.CmpDeeply(tt.args.request.Header.Get(header.Name), header.Value)
+					v, exists := tt.args.request.Header[header.Name]
+					if !exists {
+						t.Errorf("Director() header not found: %v", header.Name)
+					}
+					td.CmpDeeply(v, []string{header.Value})
 				}
 			}
 
