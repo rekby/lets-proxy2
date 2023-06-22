@@ -200,95 +200,44 @@ type DirectorSetHeadersByIP struct {
 }
 
 type HeadersList interface {
-	ShouldRemoveHeaderByIP(headerName string, ip net.IP) bool
-	Add(headerName string, cidr net.IPNet)
+	ShouldRemoveHeaderByIP(headerName string) bool
+	Add(headerName string)
 	Len() int
-	Iter(fn func(headerName string, ip net.IP))
+	Iter(fn func(headerName string))
 }
 
-type NetHeaderName struct {
-	IPNet      net.IPNet
-	HeaderName string
-}
-
-type HeadersStorageMap map[string][]net.IPNet
-
-type HeadersStorageSlice []NetHeaderName
+type HeadersStorageSlice []string
 
 func newHeadersStorageSlice() *HeadersStorageSlice {
 	s := make(HeadersStorageSlice, 0, 100)
 	return &s
 }
 
-func newHeadersStorageMap() *HeadersStorageMap {
-	m := make(HeadersStorageMap, 400)
-	return &m
-}
-
-func (h *HeadersStorageSlice) ShouldRemoveHeaderByIP(headerName string, ip net.IP) bool {
-	for _, netHeaders := range *h {
-		if headerName == netHeaders.HeaderName && !netHeaders.IPNet.Contains(ip) {
+func (h *HeadersStorageSlice) ShouldRemoveHeaderByIP(headerName string) bool {
+	for _, name := range *h {
+		if headerName == name {
 			return true
 		}
 	}
 	return false
 }
 
-func (h *HeadersStorageSlice) Add(headerName string, cidr net.IPNet) {
-	*h = append(*h, NetHeaderName{
-		IPNet:      cidr,
-		HeaderName: headerName,
-	})
+func (h *HeadersStorageSlice) Add(headerName string) {
+	*h = append(*h, headerName)
 }
 
 func (h *HeadersStorageSlice) Len() int {
 	return len(*h)
 }
 
-func (h *HeadersStorageMap) Iter(fn func(headerName string, ip net.IP)) {
-	for headerName, netHeaders := range *h {
-		for _, netHeader := range netHeaders {
-			fn(headerName, netHeader.IP)
-		}
-	}
-}
-
-func (h *HeadersStorageMap) Add(headerName string, cidr net.IPNet) {
-	(*h)[headerName] = append((*h)[headerName], cidr)
-}
-
-func (h *HeadersStorageMap) ShouldRemoveHeaderByIP(headerName string, ip net.IP) bool {
-	nets, ok := (*h)[headerName]
-	if !ok {
-		return false
-	}
-
-	for _, network := range nets {
-		if network.Contains(ip) {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (h *HeadersStorageMap) Len() int {
-	return len(*h)
-}
-
-func (h *HeadersStorageSlice) Iter(fn func(headerName string, ip net.IP)) {
-	for _, netHeaders := range *h {
-		fn(netHeaders.HeaderName, netHeaders.IPNet.IP)
+func (h *HeadersStorageSlice) Iter(fn func(headerName string)) {
+	for _, name := range *h {
+		fn(name)
 	}
 }
 
 func NewDirectorSetHeadersByIP(m map[string]HTTPHeaders) (DirectorSetHeadersByIP, error) {
-	var allHeaders HeadersList
-	if len(m) > 200 {
-		allHeaders = newHeadersStorageMap()
-	} else {
-		allHeaders = newHeadersStorageSlice()
-	}
+	allHeaders := newHeadersStorageSlice()
 
 	ranger := cidranger.NewPCTrieRanger[HTTPHeaders]()
 	for k, v := range m {
@@ -303,7 +252,7 @@ func NewDirectorSetHeadersByIP(m map[string]HTTPHeaders) (DirectorSetHeadersByIP
 		}
 
 		for _, header := range v {
-			allHeaders.Add(header.Name, *subnet)
+			allHeaders.Add(header.Name)
 		}
 	}
 	return DirectorSetHeadersByIP{Ranger: ranger, allHeaders: allHeaders}, nil
@@ -323,20 +272,12 @@ func (h DirectorSetHeadersByIP) Director(request *http.Request) error {
 
 	ip := net.ParseIP(host)
 
-	if len(request.Header) < h.allHeaders.Len() {
-		for headerName := range request.Header {
-			if h.allHeaders.ShouldRemoveHeaderByIP(headerName, ip) {
-				delete(request.Header, headerName)
-			}
+	h.allHeaders.Iter(func(headerName string) {
+		_, ok := request.Header[headerName]
+		if ok && h.allHeaders.ShouldRemoveHeaderByIP(headerName) {
+			delete(request.Header, headerName)
 		}
-	} else {
-		h.allHeaders.Iter(func(headerName string, ip net.IP) {
-			_, ok := request.Header[headerName]
-			if ok && h.allHeaders.ShouldRemoveHeaderByIP(headerName, ip) {
-				delete(request.Header, headerName)
-			}
-		})
-	}
+	})
 
 	err = h.IterByIncomingNetworks(ip, func(network net.IPNet, value HTTPHeaders) error {
 		if request.Header == nil {
