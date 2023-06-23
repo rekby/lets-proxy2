@@ -184,10 +184,7 @@ type HTTPHeader struct {
 	Value string
 }
 type HTTPHeaders []HTTPHeader
-type NetHeaders struct {
-	IPNet   net.IPNet
-	Headers HTTPHeaders
-}
+
 type Net struct {
 	net.IPNet
 }
@@ -195,49 +192,12 @@ type Net struct {
 func (n Net) Network() net.IPNet { return n.IPNet }
 
 type DirectorSetHeadersByIP struct {
-	allHeaders HeadersList
+	allHeaders []string
 	cidranger.Ranger[HTTPHeaders]
 }
 
-type HeadersList interface {
-	ShouldRemoveHeaderByIP(headerName string) bool
-	Add(headerName string)
-	Len() int
-	Iter(fn func(headerName string))
-}
-
-type HeadersStorageSlice []string
-
-func newHeadersStorageSlice() *HeadersStorageSlice {
-	s := make(HeadersStorageSlice, 0, 100)
-	return &s
-}
-
-func (h *HeadersStorageSlice) ShouldRemoveHeaderByIP(headerName string) bool {
-	for _, name := range *h {
-		if headerName == name {
-			return true
-		}
-	}
-	return false
-}
-
-func (h *HeadersStorageSlice) Add(headerName string) {
-	*h = append(*h, headerName)
-}
-
-func (h *HeadersStorageSlice) Len() int {
-	return len(*h)
-}
-
-func (h *HeadersStorageSlice) Iter(fn func(headerName string)) {
-	for _, name := range *h {
-		fn(name)
-	}
-}
-
 func NewDirectorSetHeadersByIP(m map[string]HTTPHeaders) (DirectorSetHeadersByIP, error) {
-	allHeaders := newHeadersStorageSlice()
+	allHeaders := make([]string, 0, 100)
 
 	ranger := cidranger.NewPCTrieRanger[HTTPHeaders]()
 	for k, v := range m {
@@ -252,10 +212,19 @@ func NewDirectorSetHeadersByIP(m map[string]HTTPHeaders) (DirectorSetHeadersByIP
 		}
 
 		for _, header := range v {
-			allHeaders.Add(header.Name)
+			allHeaders = append(allHeaders, header.Name)
 		}
 	}
 	return DirectorSetHeadersByIP{Ranger: ranger, allHeaders: allHeaders}, nil
+}
+
+func (h DirectorSetHeadersByIP) shouldRemoveHeaderByIP(headerName string) bool {
+	for _, name := range h.allHeaders {
+		if headerName == name {
+			return true
+		}
+	}
+	return false
 }
 
 func (h DirectorSetHeadersByIP) Director(request *http.Request) error {
@@ -272,12 +241,12 @@ func (h DirectorSetHeadersByIP) Director(request *http.Request) error {
 
 	ip := net.ParseIP(host)
 
-	h.allHeaders.Iter(func(headerName string) {
+	for _, headerName := range h.allHeaders {
 		_, ok := request.Header[headerName]
-		if ok && h.allHeaders.ShouldRemoveHeaderByIP(headerName) {
+		if ok && h.shouldRemoveHeaderByIP(headerName) {
 			delete(request.Header, headerName)
 		}
-	})
+	}
 
 	err = h.IterByIncomingNetworks(ip, func(network net.IPNet, value HTTPHeaders) error {
 		if request.Header == nil {
