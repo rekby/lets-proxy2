@@ -212,19 +212,10 @@ func NewDirectorSetHeadersByIP(m map[string]HTTPHeaders) (DirectorSetHeadersByIP
 		}
 
 		for _, header := range v {
-			allHeaders = append(allHeaders, header.Name)
+			allHeaders = append(allHeaders, http.CanonicalHeaderKey(header.Name))
 		}
 	}
 	return DirectorSetHeadersByIP{Ranger: ranger, allHeaders: allHeaders}, nil
-}
-
-func (h DirectorSetHeadersByIP) shouldRemoveHeaderByIP(headerName string) bool {
-	for _, name := range h.allHeaders {
-		if headerName == name {
-			return true
-		}
-	}
-	return false
 }
 
 func (h DirectorSetHeadersByIP) Director(request *http.Request) error {
@@ -242,10 +233,7 @@ func (h DirectorSetHeadersByIP) Director(request *http.Request) error {
 	ip := net.ParseIP(host)
 
 	for _, headerName := range h.allHeaders {
-		_, ok := request.Header[headerName]
-		if ok && h.shouldRemoveHeaderByIP(headerName) {
-			delete(request.Header, headerName)
-		}
+		delete(request.Header, headerName)
 	}
 
 	err = h.IterByIncomingNetworks(ip, func(network net.IPNet, value HTTPHeaders) error {
