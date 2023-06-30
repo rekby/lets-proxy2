@@ -1,21 +1,20 @@
 package proxy
 
 import (
-	"bytes"
 	"fmt"
+	"github.com/rekby/lets-proxy2/internal/contextlabel"
 	"net"
 	"net/http"
 	"net/url"
-	"sort"
 	"strconv"
-
-	"github.com/rekby/lets-proxy2/internal/contextlabel"
 
 	"github.com/rekby/lets-proxy2/internal/log"
 
 	zc "github.com/rekby/zapcontext"
 
 	"go.uber.org/zap"
+
+	"github.com/egorgasay/cidranger"
 )
 
 const (
@@ -185,51 +184,45 @@ type HTTPHeader struct {
 	Value string
 }
 type HTTPHeaders []HTTPHeader
-type NetHeaders struct {
-	IPNet   net.IPNet
-	Headers HTTPHeaders
+
+type Net struct {
+	net.IPNet
 }
-type DirectorSetHeadersByIP []NetHeaders
+
+func (n Net) Network() net.IPNet { return n.IPNet }
+
+type DirectorSetHeadersByIP struct {
+	allHeaders []string
+	cidranger.Ranger[HTTPHeaders]
+}
 
 func NewDirectorSetHeadersByIP(m map[string]HTTPHeaders) (DirectorSetHeadersByIP, error) {
-	res := make(DirectorSetHeadersByIP, 0, len(m))
+	allHeadersSet := make(map[string]struct{})
+
+	ranger := cidranger.NewPCTrieRanger[HTTPHeaders]()
 	for k, v := range m {
 		_, subnet, err := net.ParseCIDR(k)
 		if err != nil {
-			return nil, fmt.Errorf("can't parse CIDR: %v %w", k, err)
+			return DirectorSetHeadersByIP{}, fmt.Errorf("can't parse CIDR: %v %w", k, err)
 		}
 
-		res = append(res, NetHeaders{
-			IPNet:   *subnet,
-			Headers: v,
-		})
+		err = ranger.Insert(&Net{IPNet: *subnet}, v)
+		if err != nil {
+			return DirectorSetHeadersByIP{}, fmt.Errorf("can't insert into cidranger %w", err)
+		}
+
+		for _, header := range v {
+			allHeadersSet[http.CanonicalHeaderKey(header.Name)] = struct{}{}
+		}
 	}
-	sortByIPNet(res)
-	return res, nil
-}
 
-func sortByIPNet(d DirectorSetHeadersByIP) {
-	sort.Slice(d, func(i, j int) bool {
-		left, right := d[i], d[j]
+	allHeaders := make([]string, 0, len(allHeadersSet))
 
-		maskOnes := func(m net.IPMask) int {
-			ones, _ := m.Size()
-			return ones
-		}
+	for k := range allHeadersSet {
+		allHeaders = append(allHeaders, k)
+	}
 
-		switch {
-		case len(left.IPNet.IP) < len(right.IPNet.IP):
-			return true
-		case len(left.IPNet.IP) > len(right.IPNet.IP):
-			return false
-		case maskOnes(left.IPNet.Mask) < maskOnes(right.IPNet.Mask):
-			return true
-		case maskOnes(left.IPNet.Mask) > maskOnes(right.IPNet.Mask):
-			return false
-		default:
-			return bytes.Compare(left.IPNet.IP, right.IPNet.IP) < 0
-		}
-	})
+	return DirectorSetHeadersByIP{Ranger: ranger, allHeaders: allHeaders}, nil
 }
 
 func (h DirectorSetHeadersByIP) Director(request *http.Request) error {
@@ -246,18 +239,23 @@ func (h DirectorSetHeadersByIP) Director(request *http.Request) error {
 
 	ip := net.ParseIP(host)
 
-	for _, ipHeaders := range h {
-		if !ipHeaders.IPNet.Contains(ip) {
-			continue
-		}
+	for _, headerName := range h.allHeaders {
+		delete(request.Header, headerName)
+	}
 
+	err = h.IterByIncomingNetworks(ip, func(network net.IPNet, value HTTPHeaders) error {
 		if request.Header == nil {
 			request.Header = make(http.Header)
 		}
 
-		for _, header := range ipHeaders.Headers {
-			request.Header.Set(header.Name, header.Value)
+		for _, header := range value {
+			request.Header[header.Name] = []string{header.Value}
 		}
+
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("can't iterate cidranger %w", err)
 	}
 
 	return nil

@@ -1,7 +1,11 @@
 package proxy
 
 import (
+	"fmt"
+	"github.com/egorgasay/cidranger"
 	"net"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/rekby/lets-proxy2/internal/th"
@@ -295,18 +299,15 @@ func TestConfig_Apply(t *testing.T) {
 func TestConfig_getHeadersByIPDirector(t *testing.T) {
 	ctx, flush := th.TestContext(t)
 	defer flush()
-	td := testdeep.NewT(t)
 
 	tests := []struct {
 		name    string
 		c       Config
-		want    DirectorSetHeadersByIP
 		wantErr bool
 	}{
 		{
 			name: "empty",
 			c:    Config{},
-			want: nil,
 		},
 		{
 			name: "oneNetwork",
@@ -316,16 +317,6 @@ func TestConfig_getHeadersByIPDirector(t *testing.T) {
 						"User-Agent:PostmanRuntime/7.29.2",
 						"Accept:*/*",
 						"Accept-Encoding:gzip, deflate, br",
-					},
-				},
-			},
-			want: DirectorSetHeadersByIP{
-				NetHeaders{
-					IPNet: net.IPNet{IP: net.ParseIP("192.168.1.0"), Mask: net.CIDRMask(24, 32)},
-					Headers: HTTPHeaders{
-						{Name: "User-Agent", Value: "PostmanRuntime/7.29.2"},
-						{Name: "Accept", Value: "*/*"},
-						{Name: "Accept-Encoding", Value: "gzip, deflate, br"},
 					},
 				},
 			},
@@ -341,19 +332,18 @@ func TestConfig_getHeadersByIPDirector(t *testing.T) {
 					},
 				},
 			},
-			want:    DirectorSetHeadersByIP{},
 			wantErr: true,
 		},
 		{
 			name: "5Networks",
 			c: Config{
 				HeadersByIP: map[string][]string{
-					"10.0.0.0/8": {
+					"11.0.0.0/8": {
 						"User-Agent:PostmanRuntime/7.29.2",
 						"Accept:*/*",
 						"Accept-Encoding:gzip, deflate, br",
 					},
-					"10.0.0.0/24": {
+					"10.55.0.0/24": {
 						"Connection:Keep-Alive",
 						"Upgrade-Insecure-Requests:1",
 						"Cache-Control:no-cache",
@@ -375,47 +365,6 @@ func TestConfig_getHeadersByIPDirector(t *testing.T) {
 					},
 				},
 			},
-			want: DirectorSetHeadersByIP{
-				NetHeaders{
-					IPNet: net.IPNet{IP: net.ParseIP("10.0.0.0"), Mask: net.CIDRMask(8, 32)},
-					Headers: HTTPHeaders{
-						{Name: "User-Agent", Value: "PostmanRuntime/7.29.2"},
-						{Name: "Accept", Value: "*/*"},
-						{Name: "Accept-Encoding", Value: "gzip, deflate, br"},
-					},
-				},
-				NetHeaders{
-					IPNet: net.IPNet{IP: net.ParseIP("10.0.0.0"), Mask: net.CIDRMask(24, 32)},
-					Headers: HTTPHeaders{
-						{Name: "Connection", Value: "Keep-Alive"},
-						{Name: "Upgrade-Insecure-Requests", Value: "1"},
-						{Name: "Cache-Control", Value: "no-cache"},
-					},
-				},
-				NetHeaders{
-					IPNet: net.IPNet{IP: net.ParseIP("10.0.1.0"), Mask: net.CIDRMask(24, 32)},
-					Headers: HTTPHeaders{
-						{Name: "Origin", Value: "https://example.com"},
-						{Name: "Content-Type", Value: "application/json"},
-						{Name: "Content-Length", Value: "123"},
-					},
-				},
-				NetHeaders{
-					IPNet: net.IPNet{IP: net.ParseIP("10.2.0.0"), Mask: net.CIDRMask(24, 32)},
-					Headers: HTTPHeaders{
-						{Name: "Accept-Encoding", Value: "gzip, deflate, br"},
-						{Name: "Accept-Language", Value: "en-US,en;q=0.9"},
-					},
-				},
-				NetHeaders{
-					IPNet: net.IPNet{IP: net.ParseIP("fe80:0000:0000:0000::"), Mask: net.CIDRMask(64, 128)},
-					Headers: HTTPHeaders{
-						{Name: "Accept", Value: "*/*"},
-						{Name: "Accept-Encoding", Value: "gzip, deflate, br"},
-						{Name: "Accept-Language", Value: "en-US,en;q=0.9"},
-					},
-				},
-			},
 		},
 	}
 	for _, tt := range tests {
@@ -427,39 +376,89 @@ func TestConfig_getHeadersByIPDirector(t *testing.T) {
 
 			if tt.wantErr {
 				return
-			}
-
-			getMapDir := func(d DirectorSetHeadersByIP) map[string]map[string]string {
-				var mp = make(map[string]map[string]string)
-				for _, netHeaders := range d {
-					if netHeaders.Headers == nil {
-						continue
-					}
-					if _, ok := mp[netHeaders.IPNet.String()]; !ok {
-						mp[netHeaders.IPNet.String()] = make(map[string]string)
-					}
-					for _, header := range netHeaders.Headers {
-						mp[netHeaders.IPNet.String()][header.Name] = header.Value
-					}
-				}
-
-				t.Logf("getMapDir() got = %v", mp)
-				return mp
-			}
-
-			if got == nil && tt.want == nil {
+			} else if got == nil {
 				return
 			}
 
-			if gotDir, ok := got.(DirectorSetHeadersByIP); !ok {
-				t.Fatalf("can't lead to the type %v", got)
-			} else {
-				gotMap := getMapDir(gotDir)
-				wantMap := getMapDir(tt.want)
-				if !td.CmpDeeply(gotMap, wantMap) {
-					t.Fatalf("getHeadersByIPDirector() got = %v, want %v", gotMap, wantMap)
+			ranger := got.(cidranger.Ranger[HTTPHeaders])
+			for network, headers := range tt.c.HeadersByIP {
+				_, ipnet, err := net.ParseCIDR(network)
+				if err != nil {
+					t.Fatalf("ParseCIDR error %v", err)
+				}
+
+				ip, err := netToIP(ipnet)
+				if err != nil {
+					t.Fatalf("netToIP error %v", err)
+				}
+
+				if ok, err := ranger.Contains(ip); err != nil {
+					t.Fatalf("contains error %v", err)
+				} else if !ok {
+					t.Fatalf("network %s not found", network)
+				}
+
+				gotHeaders := make([]string, 0, len(headers))
+
+				err = ranger.IterByIncomingNetworks(ip, func(network net.IPNet, h HTTPHeaders) error {
+					if headers == nil {
+						return nil
+					}
+
+					for _, header := range h {
+						gotHeaders = append(gotHeaders, fmt.Sprintf("%s:%s", header.Name, header.Value))
+					}
+					return nil
+				})
+				if err != nil {
+					t.Fatalf("IterByIncomingNetworks error %v", err)
+				}
+
+				if !isTheSameArray(headers, gotHeaders) {
+					t.Fatalf("want \n%v \ngot \n%v", headers, gotHeaders)
 				}
 			}
 		})
 	}
+}
+
+func isTheSameArray[T comparable](a, b []T) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	tmp := make(map[T]struct{})
+	for _, el := range a {
+		tmp[el] = struct{}{}
+	}
+	for _, el := range b {
+		if _, ok := tmp[el]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func netToIP(ipnet *net.IPNet) (net.IP, error) {
+	ip := ipnet.IP.String()
+
+	sep := ":"
+	if ipnet.IP.To4() != nil {
+		sep = "."
+	}
+
+	split := strings.Split(ip, sep)
+
+	if sep == ":" && split[len(split)-1] == "" {
+		return net.ParseIP(strings.Join(split, sep) + "1"), nil
+	}
+	num, err := strconv.Atoi(split[len(split)-1])
+	if err != nil {
+		return nil, err
+	}
+
+	num++
+	split[3] = strconv.Itoa(num)
+
+	return net.ParseIP(strings.Join(split, sep)), nil
 }

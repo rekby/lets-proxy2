@@ -56,6 +56,9 @@ github.com/cespare/xxhash/v2
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
+# github.com/egorgasay/cidranger v1.0.1
+## explicit; go 1.18
+github.com/egorgasay/cidranger
 # github.com/gojuno/minimock/v3 v3.0.5
 ## explicit
 github.com/gojuno/minimock/v3
@@ -145,6 +148,9 @@ github.com/sirupsen/logrus
 # github.com/valyala/fastrand v1.1.0
 ## explicit
 github.com/valyala/fastrand
+# github.com/yl2chen/cidranger v1.0.2
+## explicit; go 1.13
+github.com/yl2chen/cidranger/net
 # go.uber.org/atomic v1.9.0
 ## explicit; go 1.13
 go.uber.org/atomic

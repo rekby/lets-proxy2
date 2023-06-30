@@ -156,6 +156,17 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 		"fe80:0000:0000:0000::/64": {
 			{Name: "TestHeader5", Value: "TestHeaderValue5"},
 		},
+		"8.0.0.0/8": {
+			{Name: "X", Value: "1"},
+			{Name: "Y", Value: "2"},
+		},
+		"8.1.0.0/16": {
+			{Name: "X", Value: "4"},
+			{Name: "Z", Value: "3"},
+		},
+		"8.1.2.0/24": {
+			{Name: "O", Value: "443"},
+		},
 	}
 
 	td := testdeep.NewT(t)
@@ -166,6 +177,7 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 		name         string
 		args         args
 		shouldModify bool
+		want         HTTPHeaders
 		wantErr      bool
 	}{
 		{
@@ -173,12 +185,78 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 			args: args{
 				request: &http.Request{RemoteAddr: "192.168.0.19:897"},
 			},
+			want: HTTPHeaders{
+				{Name: "TestHeader1", Value: "TestHeaderValue1"},
+				{Name: "TestHeader2", Value: "TestHeaderValue2"},
+				{Name: "TestHeader3", Value: "TestHeaderValue3"},
+				{Name: "TestHeader4", Value: "TestHeaderValue4"},
+			},
+			shouldModify: true,
+		},
+		{
+			name: "okIPv4_2",
+			args: args{
+				request: &http.Request{RemoteAddr: "8.1.2.19:897"},
+			},
+			want: HTTPHeaders{
+				{Name: "O", Value: "443"},
+				{Name: "X", Value: "4"},
+				{Name: "Y", Value: "2"},
+				{Name: "Z", Value: "3"},
+			},
+			shouldModify: true,
+		},
+		{
+			name: "okIPv4_RemoveTestHeader1_IterOverReqHeaders",
+			args: args{
+				request: &http.Request{RemoteAddr: "8.1.2.19:897", Header: http.Header{
+					"TestHeader1": []string{""},
+					"SHOULD_KEEP": []string{"_THIS"},
+				}},
+			},
+			want: HTTPHeaders{
+				{Name: "O", Value: "443"},
+				{Name: "X", Value: "4"},
+				{Name: "Y", Value: "2"},
+				{Name: "Z", Value: "3"},
+				{Name: "SHOULD_KEEP", Value: "_THIS"},
+			},
+			shouldModify: true,
+		},
+		{
+			name: "okIPv4_RemoveTestHeader1_IterOverRules",
+			args: args{
+				request: &http.Request{RemoteAddr: "89.19.92.199:897", Header: http.Header{
+					"TestHeader1":  []string{""},
+					"TestHeader2":  []string{""},
+					"TestHeader3":  []string{""},
+					"TestHeader4":  []string{""},
+					"TestHeader5":  []string{""},
+					"SHOULD_KEEP1": []string{""},
+					"SHOULD_KEEP2": []string{""},
+					"SHOULD_KEEP3": []string{""},
+					"TestHeader6":  []string{"SHOULD_KEEP4"},
+					"SHOULD_KEEP5": []string{""},
+					"SHOULD_KEEP6": []string{""},
+				}},
+			},
+			want: HTTPHeaders{
+				{Name: "SHOULD_KEEP1", Value: ""},
+				{Name: "SHOULD_KEEP2", Value: ""},
+				{Name: "SHOULD_KEEP3", Value: ""},
+				{Name: "TestHeader6", Value: "SHOULD_KEEP4"},
+				{Name: "SHOULD_KEEP5", Value: ""},
+				{Name: "SHOULD_KEEP6", Value: ""},
+			},
 			shouldModify: true,
 		},
 		{
 			name: "okIPv6",
 			args: args{
 				request: &http.Request{RemoteAddr: "[fe80::28ca:829b:2d2e:a908]:897"},
+			},
+			want: HTTPHeaders{
+				{Name: "TestHeader5", Value: "TestHeaderValue5"},
 			},
 			shouldModify: true,
 		},
@@ -193,9 +271,10 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 		{
 			name: "wrongAddrIPv4",
 			args: args{
-				request: &http.Request{RemoteAddr: "172.168.0.1:897"},
+				request: &http.Request{RemoteAddr: "172.168.0:897"},
 			},
 			shouldModify: false,
+			wantErr:      true,
 		},
 		{
 			name: "wrongAddrIPv6",
@@ -203,6 +282,7 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 				request: &http.Request{RemoteAddr: "[ae80:28ca:27ca:829b:2d2e:a908]:897"},
 			},
 			shouldModify: false,
+			wantErr:      true,
 		},
 		{
 			name: "noPortIPv4",
@@ -210,6 +290,7 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 				request: &http.Request{RemoteAddr: "172.168.0.1"},
 			},
 			shouldModify: false,
+			wantErr:      true,
 		},
 		{
 			name: "noPortIPv6",
@@ -217,6 +298,7 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 				request: &http.Request{RemoteAddr: "[ae80:28ca:27ca:829b:2d2e:a908]"},
 			},
 			shouldModify: false,
+			wantErr:      true,
 		},
 	}
 
@@ -234,24 +316,35 @@ func TestDirectorSetHeadersByIP(t *testing.T) {
 			}
 
 			var found bool
-			for _, netHeaders := range d {
+			for network := range m {
+				_, cidr, err := net.ParseCIDR(network)
+				if err != nil {
+					t.Errorf("ParseCIDR: %v", err)
+				}
+
 				split := strings.Split(tt.args.request.RemoteAddr, ":")
-				ip := tt.args.request.RemoteAddr
+				addr := tt.args.request.RemoteAddr
 
 				if len(split) > 1 {
-					ip = strings.Trim(strings.Join(split[:len(split)-1], ":"), "[]")
+					addr = strings.Trim(strings.Join(split[:len(split)-1], ":"), "[]")
 				} else if len(split) == 0 {
 					t.Errorf("Director() RemoteAddr error")
 					continue
 				}
 
-				if !netHeaders.IPNet.Contains(net.ParseIP(ip)) {
+				ip := net.ParseIP(addr)
+
+				if (ip.To4() != nil && cidr.IP.To4() == nil) || (ip.To4() == nil && cidr.IP.To4() != nil) {
 					continue
 				}
 
 				found = true
-				for _, header := range netHeaders.Headers {
-					td.CmpDeeply(tt.args.request.Header.Get(header.Name), header.Value)
+				for _, header := range tt.want {
+					v, exists := tt.args.request.Header[header.Name]
+					if !exists {
+						t.Errorf("Director() header not found: %v", header.Name)
+					}
+					td.CmpDeeply(v, []string{header.Value})
 				}
 			}
 
@@ -275,7 +368,7 @@ func TestNewDirectorSetHeadersByIP(t *testing.T) {
 	tests := []struct {
 		name    string
 		args    args
-		want    DirectorSetHeadersByIP
+		ips     []net.IP
 		wantErr bool
 	}{
 		{
@@ -289,28 +382,12 @@ func TestNewDirectorSetHeadersByIP(t *testing.T) {
 						{Name: "TestHeader3", Value: "TestHeaderValue3"},
 						{Name: "TestHeader4", Value: "TestHeaderValue4"},
 					},
-					"fe80:0000:0000:0000::/64": {
+					"fe80::/64": {
 						{Name: "TestHeader5", Value: "TestHeaderValue5"},
 					},
 				},
 			},
-			want: DirectorSetHeadersByIP{
-				{
-					IPNet: net.IPNet{IP: net.ParseIP("192.168.0.0"), Mask: net.CIDRMask(24, 32)},
-					Headers: HTTPHeaders{
-						{Name: "TestHeader1", Value: "TestHeaderValue1"},
-						{Name: "TestHeader2", Value: "TestHeaderValue2"},
-						{Name: "TestHeader3", Value: "TestHeaderValue3"},
-						{Name: "TestHeader4", Value: "TestHeaderValue4"},
-					},
-				},
-				{
-					IPNet: net.IPNet{IP: net.ParseIP("fe80::"), Mask: net.CIDRMask(64, 128)},
-					Headers: HTTPHeaders{
-						{Name: "TestHeader5", Value: "TestHeaderValue5"},
-					},
-				},
-			},
+			ips: []net.IP{net.ParseIP("192.168.0.1"), net.ParseIP("fe80:0000:0000:0000::1")},
 		},
 		{
 			name: "wrongFormat",
@@ -323,12 +400,11 @@ func TestNewDirectorSetHeadersByIP(t *testing.T) {
 						{Name: "TestHeader3", Value: "TestHeaderValue3"},
 						{Name: "TestHeader4", Value: "TestHeaderValue4"},
 					},
-					"fe80:0000:0000:0000::/64": {
+					"fe80::/64": {
 						{Name: "TestHeader5", Value: "TestHeaderValue5"},
 					},
 				},
 			},
-			want:    DirectorSetHeadersByIP{},
 			wantErr: true,
 		},
 	}
@@ -343,98 +419,18 @@ func TestNewDirectorSetHeadersByIP(t *testing.T) {
 				return
 			}
 
-			found := false
-			for _, gotNetHeaders := range got {
-				for _, wantNetHeaders := range tt.want {
-					if gotNetHeaders.IPNet.String() != wantNetHeaders.IPNet.String() {
-						continue
-					}
-					found = true
-					td.CmpDeeply(gotNetHeaders.Headers, wantNetHeaders.Headers)
-				}
+			for _, ip := range tt.ips {
+				err = got.IterByIncomingNetworks(ip, func(network net.IPNet, value HTTPHeaders) error {
+					cidr := network.String()
+					td.CmpDeeply(value, tt.args.m[cidr])
+					delete(tt.args.m, cidr)
+					return nil
+				})
+				td.CmpNoError(err)
 			}
-			if !found {
-				t.Errorf("NewDirectorSetHeadersByIP() headers not found")
-			}
-		})
-	}
-}
 
-func Test_sortByIPNet(t *testing.T) {
-	_, flush := th.TestContext(t)
-	defer flush()
-	td := testdeep.NewT(t)
-
-	type args struct {
-		d DirectorSetHeadersByIP
-	}
-	tests := []struct {
-		name string
-		args args
-		want DirectorSetHeadersByIP
-	}{
-		{
-			name: "IPv4Only",
-			args: args{
-				d: DirectorSetHeadersByIP{
-					{IPNet: net.IPNet{IP: net.ParseIP("192.168.88.0"), Mask: net.CIDRMask(24, 32)}},
-					{IPNet: net.IPNet{IP: net.ParseIP("192.0.0.0"), Mask: net.CIDRMask(8, 32)}},
-					{IPNet: net.IPNet{IP: net.ParseIP("172.16.0.0"), Mask: net.CIDRMask(16, 32)}},
-					{IPNet: net.IPNet{IP: net.ParseIP("192.168.0.0"), Mask: net.CIDRMask(16, 32)}},
-					{IPNet: net.IPNet{IP: net.ParseIP("192.168.99.0"), Mask: net.CIDRMask(24, 32)}},
-					{IPNet: net.IPNet{IP: net.ParseIP("172.0.0.0"), Mask: net.CIDRMask(8, 32)}},
-				},
-			},
-			want: DirectorSetHeadersByIP{
-				{IPNet: net.IPNet{IP: net.ParseIP("172.0.0.0"), Mask: net.CIDRMask(8, 32)}},
-				{IPNet: net.IPNet{IP: net.ParseIP("192.0.0.0"), Mask: net.CIDRMask(8, 32)}},
-				{IPNet: net.IPNet{IP: net.ParseIP("172.16.0.0"), Mask: net.CIDRMask(16, 32)}},
-				{IPNet: net.IPNet{IP: net.ParseIP("192.168.0.0"), Mask: net.CIDRMask(16, 32)}},
-				{IPNet: net.IPNet{IP: net.ParseIP("192.168.88.0"), Mask: net.CIDRMask(24, 32)}},
-				{IPNet: net.IPNet{IP: net.ParseIP("192.168.99.0"), Mask: net.CIDRMask(24, 32)}},
-			},
-		},
-		{
-			name: "IPv6Only",
-			args: args{
-				d: DirectorSetHeadersByIP{
-					{IPNet: net.IPNet{IP: net.ParseIP("2001:db8:1234:5678::"), Mask: net.CIDRMask(64, 128)}},
-					{IPNet: net.IPNet{IP: net.ParseIP("2001:db8:1234::"), Mask: net.CIDRMask(48, 128)}},
-					{IPNet: net.IPNet{IP: net.ParseIP("2001:db8:1234:5678:abcd::"), Mask: net.CIDRMask(80, 128)}},
-				},
-			},
-			want: DirectorSetHeadersByIP{
-				{IPNet: net.IPNet{IP: net.ParseIP("2001:db8:1234::"), Mask: net.CIDRMask(48, 128)}},
-				{IPNet: net.IPNet{IP: net.ParseIP("2001:db8:1234:5678::"), Mask: net.CIDRMask(64, 128)}},
-				{IPNet: net.IPNet{IP: net.ParseIP("2001:db8:1234:5678:abcd::"), Mask: net.CIDRMask(80, 128)}},
-			},
-		},
-
-		{
-			name: "IPv6AndIPv4",
-			args: args{
-				d: DirectorSetHeadersByIP{
-					{IPNet: net.IPNet{IP: net.ParseIP("2001:db8:1234:5678:abcd::"), Mask: net.CIDRMask(80, 128)}},
-					{IPNet: net.IPNet{IP: net.ParseIP("192.168.88.0"), Mask: net.CIDRMask(24, 32)}},
-					{IPNet: net.IPNet{IP: net.ParseIP("192.0.0.0"), Mask: net.CIDRMask(8, 32)}},
-					{IPNet: net.IPNet{IP: net.ParseIP("192.168.0.0"), Mask: net.CIDRMask(16, 32)}},
-					{IPNet: net.IPNet{IP: net.ParseIP("2001:db8:1234:5678::"), Mask: net.CIDRMask(64, 128)}},
-				},
-			},
-			want: DirectorSetHeadersByIP{
-				{IPNet: net.IPNet{IP: net.ParseIP("192.0.0.0"), Mask: net.CIDRMask(8, 32)}},
-				{IPNet: net.IPNet{IP: net.ParseIP("192.168.0.0"), Mask: net.CIDRMask(16, 32)}},
-				{IPNet: net.IPNet{IP: net.ParseIP("192.168.88.0"), Mask: net.CIDRMask(24, 32)}},
-				{IPNet: net.IPNet{IP: net.ParseIP("2001:db8:1234:5678::"), Mask: net.CIDRMask(64, 128)}},
-				{IPNet: net.IPNet{IP: net.ParseIP("2001:db8:1234:5678:abcd::"), Mask: net.CIDRMask(80, 128)}},
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			sortByIPNet(tt.args.d)
-			if !td.CmpDeeply(tt.args.d, tt.want) {
-				t.Errorf("sortByIPNet() = %v, want %v", tt.args.d, tt.want)
+			if len(tt.args.m) > 0 {
+				t.Fatalf("not all networks found, %v", tt.args.m)
 			}
 		})
 	}
