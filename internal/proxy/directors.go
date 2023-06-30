@@ -197,7 +197,7 @@ type DirectorSetHeadersByIP struct {
 }
 
 func NewDirectorSetHeadersByIP(m map[string]HTTPHeaders) (DirectorSetHeadersByIP, error) {
-	allHeadersSet := make(map[string]struct{}, 100)
+	allHeadersSet := make(map[string]struct{})
 
 	ranger := cidranger.NewPCTrieRanger[HTTPHeaders]()
 	for k, v := range m {
@@ -216,7 +216,7 @@ func NewDirectorSetHeadersByIP(m map[string]HTTPHeaders) (DirectorSetHeadersByIP
 		}
 	}
 
-	allHeaders := make([]string, 0, 100)
+	allHeaders := make([]string, 0, len(allHeadersSet))
 
 	for k := range allHeadersSet {
 		allHeaders = append(allHeaders, k)
