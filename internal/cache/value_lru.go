@@ -2,9 +2,9 @@ package cache
 
 import (
 	"context"
+	"github.com/rekby/safemutex"
 	"math"
 	"sort"
-	"sync"
 	"sync/atomic"
 
 	zc "github.com/rekby/zapcontext"
@@ -28,14 +28,19 @@ type MemoryValueLRU struct {
 	CleanCount int
 
 	lastTime uint64
-	mu       sync.RWMutex
-	m        map[string]*memoryValueLRUItem // stored always non nil item
+	mu       safemutex.RWMutexWithPointers[memoryValueLRUSynced]
+}
+
+type memoryValueLRUSynced struct {
+	Items map[string]*memoryValueLRUItem // always stored non nil items
 }
 
 func NewMemoryValueLRU(name string) *MemoryValueLRU {
 	return &MemoryValueLRU{
-		Name:       name,
-		m:          make(map[string]*memoryValueLRUItem, defaultMemoryLimitSize+1),
+		Name: name,
+		mu: safemutex.RWNewWithPointers(memoryValueLRUSynced{
+			Items: make(map[string]*memoryValueLRUItem, defaultMemoryLimitSize+1),
+		}),
 		MaxSize:    defaultMemoryLimitSize,
 		CleanCount: defaultLRUCleanCount,
 	}
@@ -47,14 +52,16 @@ func (c *MemoryValueLRU) Get(ctx context.Context, key string) (value interface{}
 			zap.String("key", key), zap.Reflect("value", value), zap.Error(err))
 	}()
 
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mu.RLock(func(synced memoryValueLRUSynced) {
+		if resp, exist := synced.Items[key]; exist {
+			resp.lastUsedTime.Store(c.time())
+			value = resp.value
+			return
+		}
+		err = ErrCacheMiss
+	})
 
-	if resp, exist := c.m[key]; exist {
-		resp.lastUsedTime.Store(c.time())
-		return resp.value, nil
-	}
-	return nil, ErrCacheMiss
+	return value, err
 }
 
 func (c *MemoryValueLRU) Put(ctx context.Context, key string, value interface{}) (err error) {
@@ -63,13 +70,16 @@ func (c *MemoryValueLRU) Put(ctx context.Context, key string, value interface{})
 			zap.String("key", key), zap.Reflect("data_len", value), zap.Error(err))
 	}()
 
-	c.mu.Lock()
-	c.m[key] = &memoryValueLRUItem{key: key, value: value, lastUsedTime: newUint64Atomic(c.time())}
-	if len(c.m) > c.MaxSize {
-		// handlepanic: no external call
-		go c.clean()
-	}
-	c.mu.Unlock()
+	c.mu.Lock(func(synced memoryValueLRUSynced) memoryValueLRUSynced {
+		synced.Items[key] = &memoryValueLRUItem{key: key, value: value, lastUsedTime: newUint64Atomic(c.time())}
+		if len(synced.Items) > c.MaxSize {
+			// handlepanic: no external call
+			go c.clean()
+		}
+
+		return synced
+	})
+
 	return nil
 }
 
@@ -79,10 +89,10 @@ func (c *MemoryValueLRU) Delete(ctx context.Context, key string) (err error) {
 			zap.String("key", key), zap.Error(err))
 	}()
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	delete(c.m, key)
+	c.mu.Lock(func(synced memoryValueLRUSynced) memoryValueLRUSynced {
+		delete(synced.Items, key)
+		return synced
+	})
 
 	return nil
 }
@@ -97,20 +107,19 @@ func (c *MemoryValueLRU) time() uint64 {
 }
 
 func (c *MemoryValueLRU) renumberTime() {
-	c.mu.Lock()
-
-	items := c.getSortedItems()
-	for i, item := range items {
-		item.lastUsedTime.Store(uint64(i))
-	}
-
-	c.mu.Unlock()
+	c.mu.Lock(func(synced memoryValueLRUSynced) memoryValueLRUSynced {
+		items := c.getSortedItems(&synced)
+		for i, item := range items {
+			item.lastUsedTime.Store(uint64(i))
+		}
+		return synced
+	})
 }
 
 // must called from locked state
-func (c *MemoryValueLRU) getSortedItems() []*memoryValueLRUItem {
-	items := make([]*memoryValueLRUItem, 0, len(c.m))
-	for _, item := range c.m {
+func (c *MemoryValueLRU) getSortedItems(synced *memoryValueLRUSynced) []*memoryValueLRUItem {
+	items := make([]*memoryValueLRUItem, 0, len(synced.Items))
+	for _, item := range synced.Items {
 		items = append(items, item)
 	}
 
@@ -121,28 +130,30 @@ func (c *MemoryValueLRU) getSortedItems() []*memoryValueLRUItem {
 }
 
 func (c *MemoryValueLRU) clean() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.Lock(func(synced memoryValueLRUSynced) memoryValueLRUSynced {
+		if c.CleanCount == 0 {
+			return synced
+		}
 
-	if c.CleanCount == 0 {
-		return
-	}
+		if len(synced.Items) <= c.MaxSize {
+			return synced
+		}
 
-	if len(c.m) <= c.MaxSize {
-		return
-	}
+		if c.CleanCount >= c.MaxSize {
+			synced.Items = make(map[string]*memoryValueLRUItem, c.MaxSize+1)
+			return synced
+		}
 
-	if c.CleanCount >= c.MaxSize {
-		c.m = make(map[string]*memoryValueLRUItem, c.MaxSize+1)
-		return
-	}
+		items := c.getSortedItems(&synced)
 
-	items := c.getSortedItems()
+		for i := 0; i < c.CleanCount; i++ {
+			delete(synced.Items, items[i].key)
+		}
 
-	for i := 0; i < c.CleanCount; i++ {
-		delete(c.m, items[i].key)
-	}
+		return synced
+	})
 }
+
 func newUint64Atomic(val uint64) atomic.Uint64 {
 	var v atomic.Uint64
 	v.Store(val)

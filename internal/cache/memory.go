@@ -2,8 +2,7 @@ package cache
 
 import (
 	"context"
-	"sync"
-
+	"github.com/rekby/safemutex"
 	zc "github.com/rekby/zapcontext"
 	"go.uber.org/zap"
 )
@@ -11,14 +10,13 @@ import (
 type MemoryCache struct {
 	Name string // use for log
 
-	mu sync.RWMutex
-	m  map[string][]byte
+	stateMutex safemutex.RWMutexWithPointers[map[string][]byte]
 }
 
 func NewMemoryCache(name string) *MemoryCache {
 	return &MemoryCache{
-		Name: name,
-		m:    make(map[string][]byte),
+		Name:       name,
+		stateMutex: safemutex.RWNewWithPointers(map[string][]byte{}),
 	}
 }
 
@@ -28,12 +26,14 @@ func (c *MemoryCache) Get(ctx context.Context, key string) (data []byte, err err
 			zap.String("key", key), zap.Int("data_len", len(data)), zap.Error(err))
 	}()
 
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	if resp, exist := c.m[key]; exist {
-		return resp, nil
-	}
-	return nil, ErrCacheMiss
+	c.stateMutex.RLock(func(synced map[string][]byte) {
+		if resp, exist := synced[key]; exist {
+			data = resp
+			return
+		}
+		err = ErrCacheMiss
+	})
+	return data, err
 }
 
 func (c *MemoryCache) Put(ctx context.Context, key string, data []byte) (err error) {
@@ -42,9 +42,13 @@ func (c *MemoryCache) Put(ctx context.Context, key string, data []byte) (err err
 			zap.String("key", key), zap.Int("data_len", len(data)), zap.Error(err))
 	}()
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.m[key] = data
+	localCopy := make([]byte, len(data))
+	copy(localCopy, data)
+	c.stateMutex.Lock(func(synced map[string][]byte) map[string][]byte {
+		synced[key] = localCopy
+		return synced
+	})
+
 	return nil
 }
 
@@ -54,10 +58,10 @@ func (c *MemoryCache) Delete(ctx context.Context, key string) (err error) {
 			zap.String("key", key), zap.Error(err))
 	}()
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	delete(c.m, key)
+	c.stateMutex.Lock(func(synced map[string][]byte) map[string][]byte {
+		delete(synced, key)
+		return synced
+	})
 
 	return nil
 }
