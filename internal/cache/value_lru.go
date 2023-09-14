@@ -18,8 +18,7 @@ type memoryValueLRUItem struct {
 	key   string
 	value interface{}
 
-	m            sync.Mutex // sync update lastUsedTime in Get method
-	lastUsedTime uint64
+	lastUsedTime atomic.Uint64
 }
 
 type MemoryValueLRU struct {
@@ -52,9 +51,7 @@ func (c *MemoryValueLRU) Get(ctx context.Context, key string) (value interface{}
 	defer c.mu.RUnlock()
 
 	if resp, exist := c.m[key]; exist {
-		resp.m.Lock()
-		resp.lastUsedTime = c.time()
-		resp.m.Unlock()
+		resp.lastUsedTime.Store(c.time())
 		return resp.value, nil
 	}
 	return nil, ErrCacheMiss
@@ -67,7 +64,7 @@ func (c *MemoryValueLRU) Put(ctx context.Context, key string, value interface{})
 	}()
 
 	c.mu.Lock()
-	c.m[key] = &memoryValueLRUItem{key: key, value: value, lastUsedTime: c.time()}
+	c.m[key] = &memoryValueLRUItem{key: key, value: value, lastUsedTime: newUint64Atomic(c.time())}
 	if len(c.m) > c.MaxSize {
 		// handlepanic: no external call
 		go c.clean()
@@ -104,7 +101,7 @@ func (c *MemoryValueLRU) renumberTime() {
 
 	items := c.getSortedItems()
 	for i, item := range items {
-		item.lastUsedTime = uint64(i)
+		item.lastUsedTime.Store(uint64(i))
 	}
 
 	c.mu.Unlock()
@@ -118,7 +115,7 @@ func (c *MemoryValueLRU) getSortedItems() []*memoryValueLRUItem {
 	}
 
 	sort.Slice(items, func(i, j int) bool {
-		return items[i].lastUsedTime < items[j].lastUsedTime
+		return items[i].lastUsedTime.Load() < items[j].lastUsedTime.Load()
 	})
 	return items
 }
@@ -145,4 +142,9 @@ func (c *MemoryValueLRU) clean() {
 	for i := 0; i < c.CleanCount; i++ {
 		delete(c.m, items[i].key)
 	}
+}
+func newUint64Atomic(val uint64) atomic.Uint64 {
+	var v atomic.Uint64
+	v.Store(val)
+	return v
 }

@@ -15,6 +15,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"github.com/rekby/safemutex"
 	"net/http"
 	"reflect"
 	"strings"
@@ -113,8 +114,7 @@ type Manager struct {
 
 	certForDomainAuthorize cache.Value
 
-	certStateMu sync.Mutex
-	certState   cache.Value
+	certStateMu safemutex.MutexWithPointers[cache.Value]
 
 	httpTokens cache.Bytes
 
@@ -127,7 +127,7 @@ func New(acmeClientManager AcmeClientManager, c cache.Bytes, r prometheus.Regist
 	res := Manager{}
 	res.acmeClientManager = acmeClientManager
 	res.certForDomainAuthorize = cache.NewMemoryValueLRU("authcert")
-	res.certState = cache.NewMemoryValueLRU("certstate")
+	res.certStateMu = safemutex.NewWithPointers[cache.Value](cache.NewMemoryValueLRU("certstate"))
 	res.CertificateIssueTimeout = time.Minute
 	res.httpTokens = cache.NewMemoryCache("Http validation tokens")
 	res.Cache = c
@@ -369,19 +369,23 @@ func filterDomains(ctx context.Context, checker DomainChecker, originalDomains [
 }
 
 func (m *Manager) certStateGet(ctx context.Context, cd CertDescription) *certState {
-	m.certStateMu.Lock()
-	defer m.certStateMu.Unlock()
+	var resInterface any
+	m.certStateMu.Lock(func(certCache cache.Value) (newValue cache.Value) {
+		var err error
+		resInterface, err = certCache.Get(ctx, cd.String())
+		if err == cache.ErrCacheMiss {
+			err = nil
+		}
 
-	resInterface, err := m.certState.Get(ctx, cd.String())
-	if err == cache.ErrCacheMiss {
-		err = nil
-	}
-	log.DebugFatalCtx(ctx, err, "Got cert state from cache", zap.Bool("is_empty", resInterface == nil))
-	if resInterface == nil {
-		resInterface = &certState{}
-		err = m.certState.Put(ctx, cd.String(), resInterface)
-		log.DebugFatalCtx(ctx, err, "Put empty cert state to cache")
-	}
+		log.DebugFatalCtx(ctx, err, "Got cert state from cache", zap.Bool("is_empty", resInterface == nil))
+		if resInterface == nil {
+			resInterface = &certState{}
+			err = certCache.Put(ctx, cd.String(), resInterface)
+			log.DebugFatalCtx(ctx, err, "Put empty cert state to cache")
+		}
+
+		return certCache
+	})
 	return resInterface.(*certState)
 }
 

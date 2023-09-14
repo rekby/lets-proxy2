@@ -116,12 +116,12 @@ func TestValueLRULimitClean(t *testing.T) {
 	c.MaxSize = 5
 	c.CleanCount = 0
 	c.m = make(map[string]*memoryValueLRUItem)
-	c.m["1"] = &memoryValueLRUItem{key: "1", value: 1, lastUsedTime: 1}
-	c.m["2"] = &memoryValueLRUItem{key: "2", value: 2, lastUsedTime: 2}
-	c.m["3"] = &memoryValueLRUItem{key: "3", value: 3, lastUsedTime: 3}
-	c.m["4"] = &memoryValueLRUItem{key: "4", value: 4, lastUsedTime: 4}
-	c.m["5"] = &memoryValueLRUItem{key: "5", value: 5, lastUsedTime: 5}
-	c.m["6"] = &memoryValueLRUItem{key: "6", value: 6, lastUsedTime: 6}
+	c.m["1"] = &memoryValueLRUItem{key: "1", value: 1, lastUsedTime: newUint64Atomic(1)}
+	c.m["2"] = &memoryValueLRUItem{key: "2", value: 2, lastUsedTime: newUint64Atomic(2)}
+	c.m["3"] = &memoryValueLRUItem{key: "3", value: 3, lastUsedTime: newUint64Atomic(3)}
+	c.m["4"] = &memoryValueLRUItem{key: "4", value: 4, lastUsedTime: newUint64Atomic(4)}
+	c.m["5"] = &memoryValueLRUItem{key: "5", value: 5, lastUsedTime: newUint64Atomic(5)}
+	c.m["6"] = &memoryValueLRUItem{key: "6", value: 6, lastUsedTime: newUint64Atomic(6)}
 	c.clean()
 	td.CmpDeeply(len(c.m), 6)
 	td.CmpDeeply(c.m["1"].value, 1)
@@ -134,11 +134,11 @@ func TestValueLRULimitClean(t *testing.T) {
 	c.MaxSize = 5
 	c.CleanCount = 3
 	c.m = make(map[string]*memoryValueLRUItem)
-	c.m["1"] = &memoryValueLRUItem{key: "1", value: 1, lastUsedTime: 1}
-	c.m["2"] = &memoryValueLRUItem{key: "2", value: 2, lastUsedTime: 2}
-	c.m["3"] = &memoryValueLRUItem{key: "3", value: 3, lastUsedTime: 3}
-	c.m["4"] = &memoryValueLRUItem{key: "4", value: 4, lastUsedTime: 4}
-	c.m["5"] = &memoryValueLRUItem{key: "5", value: 5, lastUsedTime: 5}
+	c.m["1"] = &memoryValueLRUItem{key: "1", value: 1, lastUsedTime: newUint64Atomic(1)}
+	c.m["2"] = &memoryValueLRUItem{key: "2", value: 2, lastUsedTime: newUint64Atomic(2)}
+	c.m["3"] = &memoryValueLRUItem{key: "3", value: 3, lastUsedTime: newUint64Atomic(3)}
+	c.m["4"] = &memoryValueLRUItem{key: "4", value: 4, lastUsedTime: newUint64Atomic(4)}
+	c.m["5"] = &memoryValueLRUItem{key: "5", value: 5, lastUsedTime: newUint64Atomic(5)}
 	c.clean()
 	td.CmpDeeply(len(c.m), 5)
 	td.CmpDeeply(c.m["1"].value, 1)
@@ -150,12 +150,12 @@ func TestValueLRULimitClean(t *testing.T) {
 	c.MaxSize = 5
 	c.CleanCount = 2
 	c.m = make(map[string]*memoryValueLRUItem)
-	c.m["1"] = &memoryValueLRUItem{key: "1", value: 1, lastUsedTime: 1}
-	c.m["2"] = &memoryValueLRUItem{key: "2", value: 2, lastUsedTime: 2}
-	c.m["3"] = &memoryValueLRUItem{key: "3", value: 3, lastUsedTime: 3}
-	c.m["4"] = &memoryValueLRUItem{key: "4", value: 4, lastUsedTime: 4}
-	c.m["5"] = &memoryValueLRUItem{key: "5", value: 5, lastUsedTime: 5}
-	c.m["6"] = &memoryValueLRUItem{key: "6", value: 6, lastUsedTime: 6}
+	c.m["1"] = &memoryValueLRUItem{key: "1", value: 1, lastUsedTime: newUint64Atomic(1)}
+	c.m["2"] = &memoryValueLRUItem{key: "2", value: 2, lastUsedTime: newUint64Atomic(2)}
+	c.m["3"] = &memoryValueLRUItem{key: "3", value: 3, lastUsedTime: newUint64Atomic(3)}
+	c.m["4"] = &memoryValueLRUItem{key: "4", value: 4, lastUsedTime: newUint64Atomic(4)}
+	c.m["5"] = &memoryValueLRUItem{key: "5", value: 5, lastUsedTime: newUint64Atomic(5)}
+	c.m["6"] = &memoryValueLRUItem{key: "6", value: 6, lastUsedTime: newUint64Atomic(6)}
 	c.clean()
 	td.CmpDeeply(len(c.m), 4)
 	td.Nil(c.m["1"])
@@ -169,12 +169,12 @@ func TestValueLRULimitClean(t *testing.T) {
 	c.MaxSize = 5
 	c.CleanCount = 2
 	c.m = make(map[string]*memoryValueLRUItem)
-	c.m["1"] = &memoryValueLRUItem{key: "1", value: 1, lastUsedTime: 6}
-	c.m["2"] = &memoryValueLRUItem{key: "2", value: 2, lastUsedTime: 5}
-	c.m["3"] = &memoryValueLRUItem{key: "3", value: 3, lastUsedTime: 4}
-	c.m["4"] = &memoryValueLRUItem{key: "4", value: 4, lastUsedTime: 3}
-	c.m["5"] = &memoryValueLRUItem{key: "5", value: 5, lastUsedTime: 2}
-	c.m["6"] = &memoryValueLRUItem{key: "6", value: 6, lastUsedTime: 1}
+	c.m["1"] = &memoryValueLRUItem{key: "1", value: 1, lastUsedTime: newUint64Atomic(6)}
+	c.m["2"] = &memoryValueLRUItem{key: "2", value: 2, lastUsedTime: newUint64Atomic(5)}
+	c.m["3"] = &memoryValueLRUItem{key: "3", value: 3, lastUsedTime: newUint64Atomic(4)}
+	c.m["4"] = &memoryValueLRUItem{key: "4", value: 4, lastUsedTime: newUint64Atomic(3)}
+	c.m["5"] = &memoryValueLRUItem{key: "5", value: 5, lastUsedTime: newUint64Atomic(2)}
+	c.m["6"] = &memoryValueLRUItem{key: "6", value: 6, lastUsedTime: newUint64Atomic(1)}
 	c.clean()
 	td.CmpDeeply(len(c.m), 4)
 	td.CmpDeeply(c.m["1"].value, 1)
@@ -187,24 +187,24 @@ func TestValueLRULimitClean(t *testing.T) {
 	c.MaxSize = 5
 	c.CleanCount = 5
 	c.m = make(map[string]*memoryValueLRUItem)
-	c.m["1"] = &memoryValueLRUItem{key: "1", value: 1, lastUsedTime: 1}
-	c.m["2"] = &memoryValueLRUItem{key: "2", value: 2, lastUsedTime: 2}
-	c.m["3"] = &memoryValueLRUItem{key: "3", value: 3, lastUsedTime: 3}
-	c.m["4"] = &memoryValueLRUItem{key: "4", value: 4, lastUsedTime: 4}
-	c.m["5"] = &memoryValueLRUItem{key: "5", value: 5, lastUsedTime: 5}
-	c.m["6"] = &memoryValueLRUItem{key: "6", value: 6, lastUsedTime: 6}
+	c.m["1"] = &memoryValueLRUItem{key: "1", value: 1, lastUsedTime: newUint64Atomic(1)}
+	c.m["2"] = &memoryValueLRUItem{key: "2", value: 2, lastUsedTime: newUint64Atomic(2)}
+	c.m["3"] = &memoryValueLRUItem{key: "3", value: 3, lastUsedTime: newUint64Atomic(3)}
+	c.m["4"] = &memoryValueLRUItem{key: "4", value: 4, lastUsedTime: newUint64Atomic(4)}
+	c.m["5"] = &memoryValueLRUItem{key: "5", value: 5, lastUsedTime: newUint64Atomic(5)}
+	c.m["6"] = &memoryValueLRUItem{key: "6", value: 6, lastUsedTime: newUint64Atomic(6)}
 	c.clean()
 	td.CmpDeeply(len(c.m), 0)
 
 	c.MaxSize = 5
 	c.CleanCount = 6
 	c.m = make(map[string]*memoryValueLRUItem)
-	c.m["1"] = &memoryValueLRUItem{key: "1", value: 1, lastUsedTime: 1}
-	c.m["2"] = &memoryValueLRUItem{key: "2", value: 2, lastUsedTime: 2}
-	c.m["3"] = &memoryValueLRUItem{key: "3", value: 3, lastUsedTime: 3}
-	c.m["4"] = &memoryValueLRUItem{key: "4", value: 4, lastUsedTime: 4}
-	c.m["5"] = &memoryValueLRUItem{key: "5", value: 5, lastUsedTime: 5}
-	c.m["6"] = &memoryValueLRUItem{key: "6", value: 6, lastUsedTime: 6}
+	c.m["1"] = &memoryValueLRUItem{key: "1", value: 1, lastUsedTime: newUint64Atomic(1)}
+	c.m["2"] = &memoryValueLRUItem{key: "2", value: 2, lastUsedTime: newUint64Atomic(2)}
+	c.m["3"] = &memoryValueLRUItem{key: "3", value: 3, lastUsedTime: newUint64Atomic(3)}
+	c.m["4"] = &memoryValueLRUItem{key: "4", value: 4, lastUsedTime: newUint64Atomic(4)}
+	c.m["5"] = &memoryValueLRUItem{key: "5", value: 5, lastUsedTime: newUint64Atomic(5)}
+	c.m["6"] = &memoryValueLRUItem{key: "6", value: 6, lastUsedTime: newUint64Atomic(6)}
 	c.clean()
 	td.CmpDeeply(len(c.m), 0)
 
@@ -212,12 +212,12 @@ func TestValueLRULimitClean(t *testing.T) {
 	c.MaxSize = 5
 	c.CleanCount = 3
 	c.m = make(map[string]*memoryValueLRUItem)
-	c.m["1"] = &memoryValueLRUItem{key: "1", value: 1, lastUsedTime: 1}
-	c.m["2"] = &memoryValueLRUItem{key: "2", value: 2, lastUsedTime: 2}
-	c.m["3"] = &memoryValueLRUItem{key: "3", value: 3, lastUsedTime: 3}
-	c.m["4"] = &memoryValueLRUItem{key: "4", value: 4, lastUsedTime: 4}
-	c.m["5"] = &memoryValueLRUItem{key: "5", value: 5, lastUsedTime: 5}
-	c.m["6"] = &memoryValueLRUItem{key: "6", value: 6, lastUsedTime: 6}
+	c.m["1"] = &memoryValueLRUItem{key: "1", value: 1, lastUsedTime: newUint64Atomic(1)}
+	c.m["2"] = &memoryValueLRUItem{key: "2", value: 2, lastUsedTime: newUint64Atomic(2)}
+	c.m["3"] = &memoryValueLRUItem{key: "3", value: 3, lastUsedTime: newUint64Atomic(3)}
+	c.m["4"] = &memoryValueLRUItem{key: "4", value: 4, lastUsedTime: newUint64Atomic(4)}
+	c.m["5"] = &memoryValueLRUItem{key: "5", value: 5, lastUsedTime: newUint64Atomic(5)}
+	c.m["6"] = &memoryValueLRUItem{key: "6", value: 6, lastUsedTime: newUint64Atomic(6)}
 	_, _ = c.Get(ctx, "6")
 	_, _ = c.Get(ctx, "2")
 	_, _ = c.Get(ctx, "3")
@@ -242,11 +242,11 @@ func TestLimitValueRenumberItems(t *testing.T) {
 	var c = NewMemoryValueLRU("test")
 
 	c.m = make(map[string]*memoryValueLRUItem)
-	c.m["1"] = &memoryValueLRUItem{key: "1", value: 1, lastUsedTime: 100}
-	c.m["2"] = &memoryValueLRUItem{key: "2", value: 2, lastUsedTime: 200}
-	c.m["3"] = &memoryValueLRUItem{key: "3", value: 3, lastUsedTime: 300}
-	c.m["4"] = &memoryValueLRUItem{key: "4", value: 4, lastUsedTime: 400}
-	c.m["5"] = &memoryValueLRUItem{key: "5", value: 5, lastUsedTime: 500}
+	c.m["1"] = &memoryValueLRUItem{key: "1", value: 1, lastUsedTime: newUint64Atomic(100)}
+	c.m["2"] = &memoryValueLRUItem{key: "2", value: 2, lastUsedTime: newUint64Atomic(200)}
+	c.m["3"] = &memoryValueLRUItem{key: "3", value: 3, lastUsedTime: newUint64Atomic(300)}
+	c.m["4"] = &memoryValueLRUItem{key: "4", value: 4, lastUsedTime: newUint64Atomic(400)}
+	c.m["5"] = &memoryValueLRUItem{key: "5", value: 5, lastUsedTime: newUint64Atomic(500)}
 
 	c.lastTime = math.MaxUint64/2 - 1
 	_ = c.Put(ctx, "6", 6)
@@ -255,10 +255,10 @@ func TestLimitValueRenumberItems(t *testing.T) {
 
 	c.mu.RLock()
 	defer c.mu.RLock()
-	td.CmpDeeply(c.m["1"].lastUsedTime, uint64(0))
-	td.CmpDeeply(c.m["2"].lastUsedTime, uint64(1))
-	td.CmpDeeply(c.m["3"].lastUsedTime, uint64(2))
-	td.CmpDeeply(c.m["4"].lastUsedTime, uint64(3))
-	td.CmpDeeply(c.m["5"].lastUsedTime, uint64(4))
-	td.CmpDeeply(c.m["6"].lastUsedTime, uint64(5))
+	td.CmpDeeply(c.m["1"].lastUsedTime.Load(), uint64(0))
+	td.CmpDeeply(c.m["2"].lastUsedTime.Load(), uint64(1))
+	td.CmpDeeply(c.m["3"].lastUsedTime.Load(), uint64(2))
+	td.CmpDeeply(c.m["4"].lastUsedTime.Load(), uint64(3))
+	td.CmpDeeply(c.m["5"].lastUsedTime.Load(), uint64(4))
+	td.CmpDeeply(c.m["6"].lastUsedTime.Load(), uint64(5))
 }
