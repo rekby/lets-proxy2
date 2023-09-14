@@ -1,23 +1,21 @@
 package th
 
 import (
+	"github.com/gojuno/minimock/v3"
+	"github.com/rekby/fixenv"
+	"github.com/rekby/safemutex"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest"
 	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"sync"
-
-	"github.com/gojuno/minimock/v3"
-	"github.com/rekby/fixenv"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zaptest"
 )
 
 var (
-	freeListenAddressMutex sync.Mutex
-	freeListenAddressUsed  = map[string]bool{}
+	freeListenAddressMutex = safemutex.NewWithOptions(map[string]bool{}, safemutex.MutexOptions{AllowPointers: true})
 )
 
 func MockController(e fixenv.Env) minimock.MockController {
@@ -53,11 +51,12 @@ func NewFreeLocalTcpAddress(e fixenv.Env) *net.TCPAddr {
 
 		addr := listener.Addr()
 		addrS := addr.String()
-		freeListenAddressMutex.Lock()
-		used := freeListenAddressUsed[addrS]
-		freeListenAddressUsed[addrS] = true
-		freeListenAddressMutex.Unlock()
-
+		var used bool
+		freeListenAddressMutex.Lock(func(freeListenAddressUsed map[string]bool) (newValue map[string]bool) {
+			used = freeListenAddressUsed[addrS]
+			freeListenAddressUsed[addrS] = true
+			return freeListenAddressUsed
+		})
 		if !used {
 			return addr.(*net.TCPAddr)
 		}
