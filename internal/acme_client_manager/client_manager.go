@@ -45,7 +45,7 @@ type AcmeManager struct {
 	httpClient *http.Client
 
 	background sync.WaitGroup
-	mu         safemutex.Mutex[acmeManagerSynced]
+	mu         safemutex.MutexWithPointers[acmeManagerSynced]
 }
 
 type acmeManagerSynced struct {
@@ -71,7 +71,7 @@ func New(ctx context.Context, cache cache.Bytes) *AcmeManager {
 		AgreeFunction:        acme.AcceptTOS,
 		RenewAccountInterval: renewAccountInterval,
 		httpClient:           http.DefaultClient,
-		mu:                   safemutex.NewWithOptions(acmeManagerSynced{lastAccountIndex: -1}, safemutex.MutexOptions{AllowPointers: true}),
+		mu:                   safemutex.NewWithPointers(acmeManagerSynced{lastAccountIndex: -1}),
 	}
 }
 

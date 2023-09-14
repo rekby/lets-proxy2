@@ -21,7 +21,6 @@ func NewEnv(t *testing.T) (env *Env, ctx context.Context, cancel func()) {
 	ctx, ctxCancel := TestContext(td)
 	tWrap := &testWrapper{
 		T: td,
-		m: safemutex.NewWithOptions(testWrapperSynced{}, safemutex.MutexOptions{AllowPointers: true}),
 	}
 	env = &Env{
 		EnvT: fixenv.NewEnv(tWrap),
@@ -44,7 +43,7 @@ type TD struct {
 type testWrapper struct {
 	*testdeep.T
 
-	m safemutex.Mutex[testWrapperSynced]
+	m safemutex.MutexWithPointers[testWrapperSynced]
 }
 
 type testWrapperSynced struct {

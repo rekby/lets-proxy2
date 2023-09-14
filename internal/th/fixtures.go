@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	freeListenAddressMutex = safemutex.NewWithOptions(map[string]bool{}, safemutex.MutexOptions{AllowPointers: true})
+	freeListenAddressMutex = safemutex.NewWithPointers(map[string]bool{})
 )
 
 func MockController(e fixenv.Env) minimock.MockController {

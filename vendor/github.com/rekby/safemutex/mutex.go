@@ -2,33 +2,25 @@ package safemutex
 
 import (
 	"reflect"
-	"sync"
 )
 
 // Mutex contains guarded value inside, access to value allowed inside callbacks only
 // it allow to guarantee not access to the value without lock the mutex
 // zero value is usable as mutex with default options and zero value of guarded type
+// Mutex deny to save value with any type of pointers, which allow accidentally change internal state.
+// it will panic if T contains any pointer.
 type Mutex[T any] struct {
-	m           sync.Mutex
-	value       T
-	options     MutexOptions
+	mutexBase[T]
 	initialized bool
-	errWrap     errWrap
 }
 
 // New create Mutex with initial value and default options.
 // New call internal checks for T and panic if checks failed, see MutexOptions for details
 func New[T any](value T) Mutex[T] {
-	return NewWithOptions(value, MutexOptions{})
-}
-
-// NewWithOptions create Mutex with initial value and custom options.
-// MutexOptions allow to reduce default security when it needs.
-// NewWithOptions call internal checks for T and panic if checks failed, see MutexOptions for details
-func NewWithOptions[T any](value T, options MutexOptions) Mutex[T] {
 	res := Mutex[T]{
-		value:   value,
-		options: options,
+		mutexBase: mutexBase[T]{
+			value: value,
+		},
 	}
 
 	res.validateLocked()
@@ -46,46 +38,23 @@ func (m *Mutex[T]) Lock(f ReadWriteCallback[T]) {
 	m.m.Lock()
 	defer m.m.Unlock()
 
+	m.validateLocked()
 	m.callLocked(f)
 }
 
-func (m *Mutex[T]) callLocked(f ReadWriteCallback[T]) {
-	m.validateLocked()
-
-	hasPanic := true
-
-	defer func() {
-		if hasPanic && !m.options.AllowPoisoned {
-			m.errWrap = errWrap{ErrPoisoned}
-		}
-	}()
-
-	m.value = f(m.value)
-	hasPanic = false
-
-}
-
 func (m *Mutex[T]) validateLocked() {
-	if m.errWrap.err != nil {
-		panic(m.errWrap)
-	}
+	m.baseValidateLocked()
 
 	if m.initialized {
 		return
 	}
 
-	m.initialized = true
-
-	if !m.options.AllowPointers {
-		if checkTypeCanContainPointers(reflect.TypeOf(m.value)) {
-			panic(errContainPointers)
-		}
+	// check pointers
+	if checkTypeCanContainPointers(reflect.TypeOf(m.value)) {
+		panic(errContainPointers)
 	}
-}
 
-type MutexOptions struct {
-	AllowPointers bool
-	AllowPoisoned bool
+	m.initialized = true
 }
 
 // checkTypeCanContainPointers check the value for potential contain pointers

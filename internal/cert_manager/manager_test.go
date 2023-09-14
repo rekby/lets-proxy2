@@ -278,7 +278,7 @@ func createManager(t *testing.T) (res testManagerContext, cancel func()) {
 		AllowRSACert:            true,
 		AllowECDSACert:          true,
 		certForDomainAuthorize:  res.certForDomainAuthorize,
-		certStateMu:             safemutex.NewWithOptions[cache.Value](res.certState, safemutex.MutexOptions{AllowPointers: true}),
+		certStateMu:             safemutex.NewWithPointers[cache.Value](res.certState),
 		httpTokens:              res.httpTokens,
 	}
 	res.manager.initMetrics(nil)

@@ -114,7 +114,7 @@ type Manager struct {
 
 	certForDomainAuthorize cache.Value
 
-	certStateMu safemutex.Mutex[cache.Value]
+	certStateMu safemutex.MutexWithPointers[cache.Value]
 
 	httpTokens cache.Bytes
 
@@ -127,7 +127,7 @@ func New(acmeClientManager AcmeClientManager, c cache.Bytes, r prometheus.Regist
 	res := Manager{}
 	res.acmeClientManager = acmeClientManager
 	res.certForDomainAuthorize = cache.NewMemoryValueLRU("authcert")
-	res.certStateMu = safemutex.NewWithOptions[cache.Value](cache.NewMemoryValueLRU("certstate"), safemutex.MutexOptions{AllowPointers: true})
+	res.certStateMu = safemutex.NewWithPointers[cache.Value](cache.NewMemoryValueLRU("certstate"))
 	res.CertificateIssueTimeout = time.Minute
 	res.httpTokens = cache.NewMemoryCache("Http validation tokens")
 	res.Cache = c
