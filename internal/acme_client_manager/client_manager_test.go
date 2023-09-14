@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"encoding/json"
+	"github.com/rekby/safemutex"
 	"math/big"
 	"testing"
 
@@ -199,16 +200,20 @@ func TestClientManager_nextEnabledClientIndex(t *testing.T) {
 			defer flush()
 
 			m := AcmeManager{
-				lastAccountIndex: test.lastAccountIndex,
+				mu: safemutex.NewWithOptions(acmeManagerSynced{}, safemutex.MutexOptions{AllowPointers: true}),
 			}
 
-			for _, enabled := range test.accountsEnabled {
-				m.accounts = append(m.accounts, clientAccount{enabled: enabled})
-			}
+			m.mu.Lock(func(synced acmeManagerSynced) acmeManagerSynced {
+				synced.lastAccountIndex = test.lastAccountIndex
+				for _, enabled := range test.accountsEnabled {
+					synced.accounts = append(synced.accounts, clientAccount{enabled: enabled})
+				}
 
-			resIndex, resOk := m.nextEnabledClientIndex()
-			e.Cmp(resIndex, test.resIndex)
-			e.Cmp(resOk, test.resOk)
+				resIndex, resOk := m.nextEnabledClientIndexLocked(&synced)
+				e.Cmp(resIndex, test.resIndex)
+				e.Cmp(resOk, test.resOk)
+				return synced
+			})
 		})
 	}
 }

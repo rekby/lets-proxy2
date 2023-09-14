@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/rekby/safemutex"
 	"net/http"
 	"sync"
 	"time"
@@ -38,18 +39,21 @@ type AcmeManager struct {
 	AgreeFunction        func(tosurl string) bool
 	RenewAccountInterval time.Duration
 
-	ctx                   context.Context
-	ctxCancel             context.CancelFunc
-	ctxAutorenewCompleted context.Context
-	cache                 cache.Bytes
-	httpClient            *http.Client
+	ctx        context.Context
+	ctxCancel  context.CancelFunc
+	cache      cache.Bytes
+	httpClient *http.Client
 
-	background       sync.WaitGroup
-	mu               sync.Mutex
-	lastAccountIndex int
-	accounts         []clientAccount
-	stateLoaded      bool
-	closed           bool
+	background sync.WaitGroup
+	mu         safemutex.Mutex[acmeManagerSynced]
+}
+
+type acmeManagerSynced struct {
+	lastAccountIndex      int
+	accounts              []clientAccount
+	stateLoaded           bool
+	closed                bool
+	ctxAutorenewCompleted context.Context
 }
 
 type clientAccount struct {
@@ -67,19 +71,22 @@ func New(ctx context.Context, cache cache.Bytes) *AcmeManager {
 		AgreeFunction:        acme.AcceptTOS,
 		RenewAccountInterval: renewAccountInterval,
 		httpClient:           http.DefaultClient,
-		lastAccountIndex:     -1,
+		mu:                   safemutex.NewWithOptions(acmeManagerSynced{lastAccountIndex: -1}, safemutex.MutexOptions{AllowPointers: true}),
 	}
 }
 
 func (m *AcmeManager) Close() error {
 	logger := zc.L(m.ctx)
 	logger.Debug("Start close")
-	m.mu.Lock()
-	alreadyClosed := m.closed
-	ctxAutorenewCompleted := m.ctxAutorenewCompleted
-	m.closed = true
-	m.ctxCancel()
-	m.mu.Unlock()
+	var alreadyClosed bool
+	var ctxAutorenewCompleted context.Context
+	m.mu.Lock(func(value acmeManagerSynced) (newValue acmeManagerSynced) {
+		alreadyClosed = value.closed
+		ctxAutorenewCompleted = value.ctxAutorenewCompleted
+		value.closed = true
+		m.ctxCancel()
+		return value
+	})
 	logger.Debug("Set closed flag", zap.Any("autorenew_context", ctxAutorenewCompleted))
 
 	if alreadyClosed {
@@ -95,60 +102,77 @@ func (m *AcmeManager) Close() error {
 	return nil
 }
 
-func (m *AcmeManager) GetClient(ctx context.Context) (_ *acme.Client, disableFunc func(), err error) {
+func (m *AcmeManager) GetClient(ctx context.Context) (resClient *acme.Client, disableFunc func(), err error) {
 	if ctx.Err() != nil {
 		return nil, nil, errors.New("acme manager context closed")
 	}
 
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if m.closed {
-		return nil, nil, xerrors.Errorf("GetClient: %w", errClosed)
+	fail := func(resErr error) {
+		resClient = nil
+		disableFunc = nil
+		err = resErr
+	}
+	good := func(c *acme.Client, f func()) {
+		resClient = c
+		disableFunc = f
+		err = nil
 	}
 
-	createDisableFunc := func(index int) func() {
-		return func() {
-			wasEnabled := m.disableAccountSelfSync(index)
-			if wasEnabled {
-				time.AfterFunc(disableDuration, func() {
-					m.accountEnableSelfSync(index)
-				})
+	m.mu.Lock(func(synced acmeManagerSynced) acmeManagerSynced {
+		if synced.closed {
+			fail(xerrors.Errorf("GetClient: %w", errClosed))
+			return synced
+		}
+
+		createDisableFunc := func(index int) func() {
+			return func() {
+				wasEnabled := m.disableAccountSelfSync(index)
+				if wasEnabled {
+					time.AfterFunc(disableDuration, func() {
+						m.accountEnableSelfSync(index)
+					})
+				}
 			}
 		}
-	}
 
-	if !m.stateLoaded && m.cache != nil && !m.IgnoreCacheLoad {
-		err := m.loadFromCache(ctx)
-		if err != nil && err != cache.ErrCacheMiss {
-			return nil, nil, err
+		if !synced.stateLoaded && m.cache != nil && !m.IgnoreCacheLoad {
+			err := m.loadFromCacheLocked(ctx, &synced)
+			if err != nil && !errors.Is(err, cache.ErrCacheMiss) {
+				fail(err)
+				return synced
+			}
+			synced.stateLoaded = true
 		}
-		m.stateLoaded = true
-	}
 
-	if index, ok := m.nextEnabledClientIndex(); ok {
-		return m.accounts[index].client, createDisableFunc(index), nil
-	}
+		if index, ok := m.nextEnabledClientIndexLocked(&synced); ok {
+			good(synced.accounts[index].client, createDisableFunc(index))
+			return synced
+		}
 
-	acc, err := m.registerAccount(ctx)
-	m.accounts = append(m.accounts, acc)
+		acc, err := m.registerAccount(ctx)
+		synced.accounts = append(synced.accounts, acc)
 
-	m.background.Add(1)
-	// handlepanic: in accountRenewSelfSync
-	go func(index int) {
-		defer m.background.Done()
-		m.accountRenewSelfSync(index)
-	}(len(m.accounts) - 1)
+		m.background.Add(1)
+		// handlepanic: in accountRenewSelfSync
+		go func(index int) {
+			defer m.background.Done()
+			m.accountRenewSelfSync(index)
+		}(len(synced.accounts) - 1)
 
-	if err != nil {
-		return nil, nil, err
-	}
+		if err != nil {
+			fail(err)
+			return synced
+		}
 
-	if err = m.saveState(ctx); err != nil {
-		return nil, nil, err
-	}
+		if err = m.saveStateLocked(ctx, &synced); err != nil {
+			fail(err)
+			return synced
+		}
 
-	return acc.client, createDisableFunc(len(m.accounts) - 1), nil
+		good(acc.client, createDisableFunc(len(synced.accounts)-1))
+		return synced
+	})
+	return resClient, disableFunc, err
 }
 
 func (m *AcmeManager) accountRenewSelfSync(index int) {
@@ -156,10 +180,12 @@ func (m *AcmeManager) accountRenewSelfSync(index int) {
 	ctx, ctxCancel := context.WithCancel(m.ctx)
 	defer ctxCancel()
 
-	m.mu.Lock()
-	m.ctxAutorenewCompleted = ctx
-	acc := m.accounts[index]
-	m.mu.Unlock()
+	var acc clientAccount
+	m.mu.Lock(func(synced acmeManagerSynced) acmeManagerSynced {
+		synced.ctxAutorenewCompleted = ctx
+		acc = synced.accounts[index]
+		return synced
+	})
 
 	if m.ctx.Err() != nil {
 		return
@@ -183,37 +209,39 @@ func (m *AcmeManager) accountRenewSelfSync(index int) {
 				newAccount = renewTos(m.ctx, acc.client, acc.account)
 			}()
 			acc.account = newAccount
-			m.mu.Lock()
-			m.accounts[index] = acc
-			m.mu.Unlock()
+			m.mu.Lock(func(synced acmeManagerSynced) acmeManagerSynced {
+				synced.accounts[index] = acc
+				return synced
+			})
 		}
 	}
 }
 
 func (m *AcmeManager) disableAccountSelfSync(index int) (wasEnabled bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if m.accounts[index].enabled {
-		m.accounts[index].enabled = false
-		return true
-	}
-
-	return false
+	m.mu.Lock(func(synced acmeManagerSynced) acmeManagerSynced {
+		if synced.accounts[index].enabled {
+			synced.accounts[index].enabled = false
+			wasEnabled = true
+			return synced
+		}
+		wasEnabled = false
+		return synced
+	})
+	return wasEnabled
 }
 
 func (m *AcmeManager) accountEnableSelfSync(index int) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.accounts[index].enabled = true
+	m.mu.Lock(func(synced acmeManagerSynced) acmeManagerSynced {
+		synced.accounts[index].enabled = true
+		return synced
+	})
 }
 
 func (m *AcmeManager) initClient() *acme.Client {
 	return &acme.Client{DirectoryURL: m.DirectoryURL, HTTPClient: m.httpClient}
 }
 
-func (m *AcmeManager) loadFromCache(ctx context.Context) (err error) {
+func (m *AcmeManager) loadFromCacheLocked(ctx context.Context, synced *acmeManagerSynced) (err error) {
 	defer func() {
 		var effectiveError error
 		if err == cache.ErrCacheMiss {
@@ -239,7 +267,7 @@ func (m *AcmeManager) loadFromCache(ctx context.Context) (err error) {
 		return xerrors.Errorf("no accounts in state")
 	}
 
-	m.accounts = make([]clientAccount, 0, len(state.Accounts))
+	synced.accounts = make([]clientAccount, 0, len(state.Accounts))
 	for index, stateAccount := range state.Accounts {
 		client := m.initClient()
 		client.Key = stateAccount.PrivateKey
@@ -255,34 +283,34 @@ func (m *AcmeManager) loadFromCache(ctx context.Context) (err error) {
 			defer m.background.Done()
 			m.accountRenewSelfSync(index)
 		}(index)
-		m.accounts = append(m.accounts, acc)
+		synced.accounts = append(synced.accounts, acc)
 	}
 
 	return nil
 }
 
-func (m *AcmeManager) nextEnabledClientIndex() (int, bool) {
+func (m *AcmeManager) nextEnabledClientIndexLocked(synced *acmeManagerSynced) (int, bool) {
 	switch {
-	case len(m.accounts) == 0:
+	case len(synced.accounts) == 0:
 		return 0, false
-	case len(m.accounts) == 1 && m.accounts[0].enabled:
+	case len(synced.accounts) == 1 && synced.accounts[0].enabled:
 		return 0, true
 	default:
 		// pass
 	}
 
-	startIndex := m.lastAccountIndex
+	startIndex := synced.lastAccountIndex
 	if startIndex < 0 {
-		startIndex = len(m.accounts) - 1
+		startIndex = len(synced.accounts) - 1
 	}
 	index := startIndex
 	for {
 		index++
-		if index >= len(m.accounts) {
+		if index >= len(synced.accounts) {
 			index = 0
 		}
-		if m.accounts[index].enabled {
-			m.lastAccountIndex = index
+		if synced.accounts[index].enabled {
+			synced.lastAccountIndex = index
 			return index, true
 		}
 		if index == startIndex {
@@ -310,11 +338,11 @@ func (m *AcmeManager) registerAccount(ctx context.Context) (clientAccount, error
 	return acc, nil
 }
 
-func (m *AcmeManager) saveState(ctx context.Context) error {
+func (m *AcmeManager) saveStateLocked(ctx context.Context, synced *acmeManagerSynced) error {
 	var state acmeManagerState
-	state.Accounts = make([]acmeAccountState, 0, len(m.accounts))
+	state.Accounts = make([]acmeAccountState, 0, len(synced.accounts))
 
-	for _, acc := range m.accounts {
+	for _, acc := range synced.accounts {
 		state.Accounts = append(state.Accounts, acmeAccountState{PrivateKey: acc.client.Key.(*rsa.PrivateKey), AcmeAccount: acc.account})
 	}
 
