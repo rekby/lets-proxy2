@@ -2,7 +2,7 @@ package th
 
 import (
 	"context"
-	"sync"
+	"github.com/rekby/safemutex"
 	"testing"
 
 	"github.com/maxatome/go-testdeep"
@@ -19,7 +19,10 @@ type Env struct {
 func NewEnv(t *testing.T) (env *Env, ctx context.Context, cancel func()) {
 	td := testdeep.NewT(t)
 	ctx, ctxCancel := TestContext(td)
-	tWrap := &testWrapper{T: td}
+	tWrap := &testWrapper{
+		T: td,
+		m: safemutex.NewWithOptions(testWrapperSynced{}, safemutex.MutexOptions{AllowPointers: true}),
+	}
 	env = &Env{
 		EnvT: fixenv.NewEnv(tWrap),
 		Ctx:  ctx,
@@ -41,32 +44,40 @@ type TD struct {
 type testWrapper struct {
 	*testdeep.T
 
-	m               sync.Mutex
+	m safemutex.Mutex[testWrapperSynced]
+}
+
+type testWrapperSynced struct {
 	cleanups        []func()
 	cleanupsStarted bool
 }
 
 func (t *testWrapper) Cleanup(f func()) {
-	t.m.Lock()
-	defer t.m.Unlock()
-
-	t.cleanups = append(t.cleanups, f)
+	t.m.Lock(func(synced testWrapperSynced) testWrapperSynced {
+		synced.cleanups = append(synced.cleanups, f)
+		return synced
+	})
 }
 
 func (t *testWrapper) startCleanups() {
-	t.m.Lock()
-	started := t.cleanupsStarted
-	if !started {
-		t.cleanupsStarted = true
-	}
-	t.m.Unlock()
+	var started bool
+	var cleanups []func()
+
+	t.m.Lock(func(synced testWrapperSynced) testWrapperSynced {
+		started := synced.cleanupsStarted
+		if !started {
+			synced.cleanupsStarted = true
+		}
+		cleanups = synced.cleanups
+		return synced
+	})
 
 	if started {
 		return
 	}
 
-	for i := len(t.cleanups) - 1; i >= 0; i-- {
-		f := t.cleanups[i]
+	for i := len(cleanups) - 1; i >= 0; i-- {
+		f := cleanups[i]
 		f()
 	}
 }
