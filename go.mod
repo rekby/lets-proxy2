@@ -28,6 +28,7 @@ require (
 	github.com/jonboulle/clockwork v0.4.0
 	github.com/letsencrypt/pebble/v2 v2.4.0
 	github.com/rekby/fastuuid v0.9.0
+	github.com/rekby/safemutex v0.1.0
 	golang.org/x/time v0.3.0
 )
 

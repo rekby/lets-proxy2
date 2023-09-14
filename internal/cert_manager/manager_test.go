@@ -10,6 +10,7 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"github.com/rekby/safemutex"
 	"net"
 	"net/http"
 	"testing"
@@ -277,7 +278,7 @@ func createManager(t *testing.T) (res testManagerContext, cancel func()) {
 		AllowRSACert:            true,
 		AllowECDSACert:          true,
 		certForDomainAuthorize:  res.certForDomainAuthorize,
-		certState:               res.certState,
+		certStateMu:             safemutex.NewWithOptions[cache.Value](res.certState, safemutex.MutexOptions{AllowPointers: true}),
 		httpTokens:              res.httpTokens,
 	}
 	res.manager.initMetrics(nil)
