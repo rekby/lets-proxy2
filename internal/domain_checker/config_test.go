@@ -10,6 +10,7 @@ import (
 	"github.com/gojuno/minimock/v3"
 
 	"github.com/maxatome/go-testdeep"
+
 	"github.com/rekby/lets-proxy2/internal/th"
 )
 
@@ -90,6 +91,35 @@ func TestConfig_CreateDomainCheckerWhiteListOnly(t *testing.T) {
 
 	res, err = checker.IsDomainAllowed(ctx, "asd.ru")
 	td.True(res)
+	td.CmpNoError(err)
+}
+
+func TestConfig_CreateDomainCheckerBlackAndWhiteLists(t *testing.T) {
+	ctx, cancel := th.TestContext(t)
+	defer cancel()
+
+	td := testdeep.NewT(t)
+	cfg := Config{
+		BlackList: `.*\.com$`,
+		WhiteList: `^(www\.)?test\.com$`,
+	}
+	checker, err := cfg.CreateDomainChecker(ctx)
+	td.CmpNoError(err)
+
+	res, err := checker.IsDomainAllowed(ctx, "denied.com")
+	td.False(res)
+	td.CmpNoError(err)
+
+	res, err = checker.IsDomainAllowed(ctx, "test.com")
+	td.True(res)
+	td.CmpNoError(err)
+
+	res, err = checker.IsDomainAllowed(ctx, "www.test.com")
+	td.True(res)
+	td.CmpNoError(err)
+
+	res, err = checker.IsDomainAllowed(ctx, "bad.test.com")
+	td.False(res)
 	td.CmpNoError(err)
 }
 
