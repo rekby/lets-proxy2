@@ -161,8 +161,9 @@ IPWhiteList = ""
 BlackList = ""
 
 # Regexp in golang syntax of whitelist domains for issue certificate.
-# Whitelist need for allow part of domains, which excluded by blacklist.
-#
+# # Whitelist need only for allow part of domains, which excluded by blacklist.
+# If you want work by whitelist domains only - you have to add BlackList rule: ".*" (deny all)
+# Then allow what you want.
 WhiteList = ""
 
 # Comma separated dns server, used for resolve ip:port address of domains while check it.
