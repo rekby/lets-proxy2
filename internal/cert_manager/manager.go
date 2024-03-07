@@ -15,12 +15,13 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"github.com/rekby/safemutex"
 	"net/http"
 	"reflect"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/rekby/safemutex"
 
 	"github.com/rekby/lets-proxy2/internal/domain"
 
@@ -32,8 +33,9 @@ import (
 
 	"golang.org/x/xerrors"
 
-	"github.com/rekby/lets-proxy2/internal/cache"
 	"go.uber.org/zap/zapcore"
+
+	"github.com/rekby/lets-proxy2/internal/cache"
 
 	"github.com/rekby/lets-proxy2/internal/log"
 
@@ -434,7 +436,7 @@ func (m *Manager) createOrderAndCertificate(ctx context.Context, acmeClient Acme
 	order, err := m.createOrderForDomains(ctx, acmeClient, domainNames...)
 	log.DebugWarning(logger, err, "Domains authorized")
 	if err != nil {
-		return nil, errors.New("order authorization error")
+		return nil, fmt.Errorf("order authorization error: %+v", err)
 	}
 
 	res, err := m.issueCertificate(ctx, acmeClient, cd, order)
