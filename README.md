@@ -12,6 +12,7 @@ English description
 Home page: https://github.com/rekby/lets-proxy2
 
 Features:
+* Domain names for certificates get from request by [SNI]([url](https://en.wikipedia.org/wiki/Server_Name_Indication))
 * http-01 and tls-alpn-01 validation
 * HTTPS (with certificate autoissue) and HTTP reverse proxy
 * Zero config for start usage
@@ -36,7 +37,7 @@ https requests to port 443 and proxies them as http to port 80 on the same IP ad
 
 Lets-proxy adds the http headers, `X-Forwarded-For` which contains the IP address.
 It obtains valid TLS certificates from Let's Encrypt and handles https for free, in an automated way, 
-including certificate renewal, and without warning in browsers.
+including certificate renewal, and without warning in browsers. It needs only for domain be true public domain and has A/AAAA record to public available IP address.
 
 The program was created for shared hosting and can handle many thousands of domains per server.
 It is simple to implement and doesn't need settings to start the program on personal server/vps.
@@ -54,6 +55,7 @@ Use --help key for details:
 Сайт программы: https://github.com/rekby/lets-proxy2
 
 Возможности:
+* Доменные имена для выпуска сертификатов получаются из [SNI]([url](https://ru.wikipedia.org/wiki/Server_Name_Indication)), их не нужно настраивать.
 * Авторизация доменов по протоколам http-01 and tls-alpn-01
 * Проксирование HTTPS (с автовыпуском сертификата) and HTTP
 * Начать использование можно без настроек
@@ -78,7 +80,7 @@ Use --help key for details:
 запущенным http-сервером. При этом lets-proxy начнёт слушать порт 433 и передавать запросы на порт 80 с тем же IP-адресом.
 К запросу будет добавляться заголовок `X-Forwarded-For` с IP-адресом источника запроса.
 Сертификаты для работы https получаются в реальном времени от letsencrypt.org. Это правильные
-(не самоподписанные) бесплатные сертификаты, которым доверяют браузеры.
+(не самоподписанные) бесплатные сертификаты, которым доверяют браузеры. Нужно только чтобы домен был общедоступен и указывал на общедоступный IP-адрес.
 
 Программа разрабатывается для использования на виртуальном хостинге и может работать с тысячами доменов
 на каждом сервере.
