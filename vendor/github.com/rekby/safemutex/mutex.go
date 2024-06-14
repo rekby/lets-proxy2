@@ -2,6 +2,7 @@ package safemutex
 
 import (
 	"reflect"
+	"sync"
 )
 
 // Mutex contains guarded value inside, access to value allowed inside callbacks only
@@ -10,15 +11,16 @@ import (
 // Mutex deny to save value with any type of pointers, which allow accidentally change internal state.
 // it will panic if T contains any pointer.
 type Mutex[T any] struct {
-	mutexBase[T]
-	initialized bool
+	mutexBase[T, sync.Mutex]
+	initOnce    sync.Once
+	initialized bool // for tests only
 }
 
 // New create Mutex with initial value and default options.
 // New call internal checks for T and panic if checks failed, see MutexOptions for details
 func New[T any](value T) Mutex[T] {
 	res := Mutex[T]{
-		mutexBase: mutexBase[T]{
+		mutexBase: mutexBase[T, sync.Mutex]{
 			value: value,
 		},
 	}
@@ -32,7 +34,7 @@ func New[T any](value T) Mutex[T] {
 
 // Lock - call f within locked mutex.
 // it will panic if value type not pass internal checks
-// it will panic with ErrPoisoned if previous call exited without return value:
+// it will panic with ErrPoisoned if previous locked call exited without return value:
 // with panic or runtime.Goexit()
 func (m *Mutex[T]) Lock(f ReadWriteCallback[T]) {
 	m.m.Lock()
@@ -45,15 +47,14 @@ func (m *Mutex[T]) Lock(f ReadWriteCallback[T]) {
 func (m *Mutex[T]) validateLocked() {
 	m.baseValidateLocked()
 
-	if m.initialized {
-		return
-	}
+	m.initOnce.Do(m.initLocked)
+}
 
-	// check pointers
+func (m *Mutex[T]) initLocked() {
 	if checkTypeCanContainPointers(reflect.TypeOf(m.value)) {
-		panic(errContainPointers)
+		m.errWrap.err = errContainPointers
+		panic(m.errWrap)
 	}
-
 	m.initialized = true
 }
 
